@@ -1,0 +1,1 @@
+INSERT INTO tasks (name, cost, description) VALUES ('Чистка надгробия', '1200','Тщательная очистка надгробия от мха и прочего');
