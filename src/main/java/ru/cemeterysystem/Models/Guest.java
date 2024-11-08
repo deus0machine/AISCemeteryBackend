@@ -18,9 +18,13 @@ public class Guest {
     @Column(name = "id")
     private Long id;
     @Column(name = "fio", nullable = false)
-    private String name;
+    private String fio;
     @Column(name = "contacts")
     private String contacts;
-    @Column(name = "dateOfRegistration", nullable = false)
+    @Column(name = "DATEOFREGISTRATION", nullable = false)
     private Date dateOfRegistration;
+    @Column(name = "login", nullable = false)
+    private String login;
+    @Column(name = "password", nullable = false)
+    private String password;
 }
