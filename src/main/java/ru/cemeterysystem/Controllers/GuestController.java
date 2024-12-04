@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import ru.cemeterysystem.Models.Guest;
 import ru.cemeterysystem.Repositories.GuestRepository;
+import ru.cemeterysystem.Services.GuestService;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -13,12 +14,12 @@ import java.util.Optional;
 @RequestMapping("/api")
 public class GuestController {
     @Autowired
-    private GuestRepository guestRepository;
+    private GuestService guestService;
     @PostMapping("/login")
     public Map<String, Object> login(@RequestBody Guest credentials) {
         Map<String, Object> response = new HashMap<>();
 
-        Optional<Guest> optionalGuest = guestRepository.findByLoginAndPassword(
+        Optional<Guest> optionalGuest = guestService.findByLoginAndPassword(
                 credentials.getLogin(), credentials.getPassword());
 
         if (optionalGuest.isPresent()) {

@@ -15,6 +15,7 @@ public class GuestService {
     public void setGuestRepository(GuestRepository guestRepository) {
         this.guestRepository = guestRepository;
     }
+    public Optional<Guest> findByLoginAndPassword(String login, String password){ return guestRepository.findByLoginAndPassword(login, password);}
     public List<Guest> getAllGuests() {
         return (List<Guest>) guestRepository.findAll();
     }
