@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.Date;
+import java.util.List;
 
 @Data
 @AllArgsConstructor
@@ -27,4 +28,10 @@ public class Guest {
     private String login;
     @Column(name = "password", nullable = false)
     private String password;
+
+    @OneToMany(mappedBy = "guest", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Burial> burials;
+
+    @Column(name = "balance", nullable = false)
+    private Long balance;
 }

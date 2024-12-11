@@ -6,19 +6,35 @@ import org.springframework.http.ResponseEntity;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 import ru.cemeterysystem.Models.Burial;
+import ru.cemeterysystem.Models.Order;
 import ru.cemeterysystem.Services.BurialService;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/burials")
 public class BurialController {
-
     private final BurialService burialService;
 
     @Autowired
     public BurialController(BurialService burialService) {
         this.burialService = burialService;
     }
-
+    @GetMapping("/fio/{fio}")
+    public ResponseEntity<List<Burial>> getBurialsByFio(@PathVariable String fio) {
+        List<Burial> burials = burialService.findBurialByFio(fio);
+        return ResponseEntity.ok(burials);
+    }
+    @GetMapping("/guest/{guestId}")
+    public ResponseEntity<List<Burial>> getBurialsByGuest(@PathVariable Long guestId) {
+        List<Burial> burials = burialService.findBurialByGuestId(guestId);
+        return ResponseEntity.ok(burials);
+    }
+    @GetMapping("/all")
+    public ResponseEntity<List<Burial>> getBurials() {
+        List<Burial> burials = burialService.findAll();
+        return ResponseEntity.ok(burials);
+    }
     @PostMapping
     public ResponseEntity<Burial> createBurial(@RequestBody @Valid Burial burial) {
         Burial savedBurial = burialService.createBurial(burial);

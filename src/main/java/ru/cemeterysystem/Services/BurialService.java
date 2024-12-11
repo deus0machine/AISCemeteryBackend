@@ -7,6 +7,7 @@ import ru.cemeterysystem.Repositories.BurialRepository;
 
 import java.time.LocalDate;
 import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -18,7 +19,15 @@ public class BurialService {
     public BurialService(BurialRepository burialRepository) {
         this.burialRepository = burialRepository;
     }
-
+    public List<Burial> findBurialByFio(String fio){
+        return burialRepository.findByFio(fio);
+    }
+    public List<Burial> findBurialByGuestId(Long guestId){
+        return burialRepository.findByGuest_Id(guestId);
+    }
+    public List<Burial> findAll(){
+        return (List<Burial>) burialRepository.findAll();
+    }
     public Burial createBurial(Burial burial) {
         // Простейшая валидация даты смерти
         if (burial.getDeathDate().isAfter(LocalDate.now())) {

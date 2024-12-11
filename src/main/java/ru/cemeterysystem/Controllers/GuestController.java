@@ -15,6 +15,7 @@ import java.util.Optional;
 public class GuestController {
     @Autowired
     private GuestService guestService;
+
     @PostMapping("/login")
     public Map<String, Object> login(@RequestBody Guest credentials) {
         Map<String, Object> response = new HashMap<>();

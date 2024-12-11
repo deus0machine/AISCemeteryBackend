@@ -1,5 +1,6 @@
 package ru.cemeterysystem.Models;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -20,17 +21,20 @@ public class Burial {
     @Column(name = "id")
     private Long id;
 
+    @ManyToOne
+    @JoinColumn(name = "guest_id", nullable = false) // Внешний ключ, связывающий заказ с пользователем
+    @JsonBackReference
+    private Guest guest;
+
     @Column(name = "fio", nullable = false)
     @NotNull(message = "ФИО не может быть пустым")
     private String fio;
 
     @Column(name = "death_date", nullable = false)
-    @Temporal(TemporalType.DATE)
     @NotNull(message = "Дата смерти не может быть пустой")
     private LocalDate deathDate;
 
     @Column(name = "birth_date", nullable = false)
-    @Temporal(TemporalType.DATE)
     @NotNull(message = "Дата рождения не может быть пустой")
     private LocalDate birthDate;
 
