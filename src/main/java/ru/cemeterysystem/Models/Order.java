@@ -1,5 +1,6 @@
 package ru.cemeterysystem.Models;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -20,9 +21,15 @@ public class Order {
     @Column(name = "id")
     private Long id;
 
+    @JsonBackReference("burial-guest")
     @ManyToOne
     @JoinColumn(name = "guest_id", nullable = false) // Внешний ключ, связывающий заказ с пользователем
     private Guest guest;
+
+    @JsonBackReference("burial-order")
+    @ManyToOne
+    @JoinColumn(name = "burial_id", nullable = false) // Внешний ключ, связывающий заказ с пользователем
+    private Burial burial;
 
     @Column(name = "order_name", nullable = false)
     private String orderName;
@@ -37,7 +44,8 @@ public class Order {
     @Temporal(TemporalType.DATE)
     private Date orderDate;
 
-    public Order(Guest guest, String orderName, String orderDescription, Long orderCost, Date orderDate) {
+    public Order(Burial burial , Guest guest, String orderName, String orderDescription, Long orderCost, Date orderDate) {
+        this.burial = burial;
         this.guest = guest;
         this.orderName = orderName;
         this.orderDescription = orderDescription;

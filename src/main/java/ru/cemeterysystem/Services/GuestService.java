@@ -8,6 +8,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import ru.cemeterysystem.Models.Burial;
 import ru.cemeterysystem.Models.Guest;
 import ru.cemeterysystem.Repositories.GuestRepository;
 
@@ -32,14 +33,14 @@ public class GuestService implements UserDetailsService {
         }
         return Optional.empty();
     }
+    public Optional<Guest> saveGuestBalance(Guest guest){
+        return Optional.of(guestRepository.save(guest));
+    }
     public Optional<Guest> findById(long id){
         return guestRepository.findById(id);
     }
     public List<Guest> getAllGuests() {
         return (List<Guest>) guestRepository.findAll();
-    }
-    public Optional<Guest> getGuestById(Long id) {
-        return guestRepository.findById(id);
     }
     public void deleteGuestById(Long id) {
         guestRepository.deleteById(id);

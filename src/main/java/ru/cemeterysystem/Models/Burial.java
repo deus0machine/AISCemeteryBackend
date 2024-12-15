@@ -2,6 +2,7 @@ package ru.cemeterysystem.Models;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -10,7 +11,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
+
 @JsonIdentityInfo(generator = ObjectIdGenerators.PropertyGenerator.class, property = "id")
 @Data
 @AllArgsConstructor
@@ -25,8 +29,12 @@ public class Burial {
 
     @ManyToOne
     @JoinColumn(name = "guest_id", nullable = false) // Внешний ключ, связывающий заказ с пользователем
-    @JsonBackReference
+    @JsonBackReference("guest-burial")
     private Guest guest;
+
+    @JsonManagedReference("burial-order")
+    @OneToMany(mappedBy = "burial", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Order> orders = new ArrayList<>();
 
     @Column(name = "fio", nullable = false)
     @NotNull(message = "ФИО не может быть пустым")

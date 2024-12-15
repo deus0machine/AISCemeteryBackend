@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import ru.cemeterysystem.Models.Burial;
 import ru.cemeterysystem.Repositories.BurialRepository;
+import ru.cemeterysystem.Repositories.OrderRepository;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -12,10 +13,9 @@ import java.util.Optional;
 @Service
 public class BurialService {
 
-    private final BurialRepository burialRepository;
-
+    private BurialRepository burialRepository;
     @Autowired
-    public BurialService(BurialRepository burialRepository) {
+    public void setServiceRepository(BurialRepository burialRepository) {
         this.burialRepository = burialRepository;
     }
     public List<Burial> findBurialByFio(String fio){

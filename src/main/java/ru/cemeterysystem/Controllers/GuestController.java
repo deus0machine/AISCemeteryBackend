@@ -9,6 +9,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import ru.cemeterysystem.Models.Burial;
 import ru.cemeterysystem.Models.Guest;
 import ru.cemeterysystem.Repositories.GuestRepository;
 import ru.cemeterysystem.Services.GuestService;
@@ -29,6 +30,11 @@ public class GuestController {
         guestService.registerGuest(guest);
         return ResponseEntity.ok("Guest registered successfully!");
     }
+    @GetMapping("/guest/get/{guestId}")
+    public ResponseEntity<Optional<Guest>> getGuestById(@PathVariable Long guestId) {
+        Optional<Guest> guest = guestService.findById(guestId);
+        return ResponseEntity.ok(guest);
+    }
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> credentials) {
         Map<String, Object> response = new HashMap<>();
@@ -44,6 +50,7 @@ public class GuestController {
             response.put("contacts", guest.getContacts());
             response.put("dateOfRegistration", guest.getDateOfRegistration());
             response.put("login", guest.getLogin());
+            response.put("balance", guest.getBalance());
             response.put("role", guest.getRole().name());
             return ResponseEntity.ok(response);
         } else {

@@ -1,12 +1,12 @@
 package ru.cemeterysystem.Models;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
 
 import java.util.Collection;
 import java.util.Date;
@@ -32,7 +32,7 @@ public class Guest  {
     private String login;
     @Column(name = "password", nullable = false)
     private String password;
-
+    @JsonManagedReference("guest-burial")
     @OneToMany(mappedBy = "guest", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Burial> burials;
 
