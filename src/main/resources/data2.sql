@@ -1,7 +1,4 @@
 INSERT INTO tasks (name, cost, description) VALUES ('Чистка надгробия', '1200','Тщательная очистка надгробия от мха и прочего');
-insert into guests (fio, contacts, dateOfRegistration, login, password, balance) values ('Севостьянов Сергей Вячеславович', '79289018987', '2024-11-03', '1111', '1111', 15000);
-INSERT INTO guests (id, fio, contacts, DATEOFREGISTRATION, login, password, balance) VALUES (2, 'Петров Петр Петрович', '123-456-7890', '2023-12-01', 'petrov', 'password123', 15000);
-
 INSERT INTO orders (guest_id, order_name, order_description, order_cost, order_date)
 VALUES (1, 'Уборка территории', 'Очистка территории от мусора', 500, '2024-11-25');
 INSERT INTO orders (guest_id, order_name, order_description, order_cost, order_date)

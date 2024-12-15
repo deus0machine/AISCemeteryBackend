@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.util.Date;
 
 @Data
@@ -35,4 +36,12 @@ public class Order {
     @Column(name = "order_date", nullable = false)
     @Temporal(TemporalType.DATE)
     private Date orderDate;
+
+    public Order(Guest guest, String orderName, String orderDescription, Long orderCost, Date orderDate) {
+        this.guest = guest;
+        this.orderName = orderName;
+        this.orderDescription = orderDescription;
+        this.orderCost = orderCost;
+        this.orderDate = orderDate;
+    }
 }

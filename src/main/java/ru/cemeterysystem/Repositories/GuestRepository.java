@@ -9,4 +9,5 @@ import java.util.Optional;
 @Repository
 public interface GuestRepository extends CrudRepository<Guest, Long> {
     Optional<Guest> findByLoginAndPassword(String login, String password);
+    Optional<Guest> findByLogin(String login);
 }

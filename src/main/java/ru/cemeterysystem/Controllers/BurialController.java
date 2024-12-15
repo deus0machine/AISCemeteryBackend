@@ -6,10 +6,12 @@ import org.springframework.http.ResponseEntity;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 import ru.cemeterysystem.Models.Burial;
-import ru.cemeterysystem.Models.Order;
+import ru.cemeterysystem.Models.Guest;
 import ru.cemeterysystem.Services.BurialService;
+import ru.cemeterysystem.Services.GuestService;
 
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/burials")
@@ -34,6 +36,11 @@ public class BurialController {
     public ResponseEntity<List<Burial>> getBurials() {
         List<Burial> burials = burialService.findAll();
         return ResponseEntity.ok(burials);
+    }
+    @GetMapping("/burial/{burialId}")
+    public ResponseEntity<Optional<Burial>> getBurialById(@PathVariable Long burialId) {
+        Optional<Burial> burial = burialService.findBurialById(burialId);
+        return ResponseEntity.ok(burial);
     }
     @PostMapping
     public ResponseEntity<Burial> createBurial(@RequestBody @Valid Burial burial) {

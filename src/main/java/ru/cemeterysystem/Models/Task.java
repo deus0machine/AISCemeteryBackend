@@ -21,4 +21,10 @@ public class Task {
     private String cost;
     @Column(name = "description")
     private String description;
+
+    public Task(String name, String cost, String description) {
+        this.name = name;
+        this.cost = cost;
+        this.description=description;
+    }
 }

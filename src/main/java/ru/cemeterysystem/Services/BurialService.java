@@ -6,7 +6,6 @@ import ru.cemeterysystem.Models.Burial;
 import ru.cemeterysystem.Repositories.BurialRepository;
 
 import java.time.LocalDate;
-import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,6 +26,9 @@ public class BurialService {
     }
     public List<Burial> findAll(){
         return (List<Burial>) burialRepository.findAll();
+    }
+    public Optional<Burial> findBurialById(Long id){
+        return burialRepository.findById(id);
     }
     public Burial createBurial(Burial burial) {
         // Простейшая валидация даты смерти
