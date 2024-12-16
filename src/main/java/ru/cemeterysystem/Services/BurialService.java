@@ -70,6 +70,15 @@ public class BurialService {
 
         return burialRepository.save(updatedBurial);
     }
+    public Burial updatePartBurial(Long id, Burial burial){
+        Optional<Burial> existingBurial = burialRepository.findById(id);
+        Burial updatedBurial = existingBurial.get();
+        updatedBurial.setFio(burial.getFio());
+        updatedBurial.setDeathDate(burial.getDeathDate());
+        updatedBurial.setBirthDate(burial.getBirthDate());
+        updatedBurial.setBiography(burial.getBiography());
+        return burialRepository.save(updatedBurial);
+    }
 
     public void deleteBurial(Long id) {
         // Проверка, существует ли запись с таким id

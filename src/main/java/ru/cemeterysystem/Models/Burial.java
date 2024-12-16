@@ -51,6 +51,7 @@ public class Burial {
     @Column(name = "biography")
     private String biography;
 
+    @Lob
     @Column(name = "photo")
     private byte[] photo;
 

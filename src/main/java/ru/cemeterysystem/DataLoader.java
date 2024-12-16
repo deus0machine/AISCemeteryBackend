@@ -33,9 +33,9 @@ public class DataLoader implements CommandLineRunner {
         if (guestRepository.count() == 0) {
             // Создаем гостей
             Guest admin = new Guest();
-            admin.setFio("Admin User");
+            admin.setFio("ADMIN");
             admin.setLogin("admin");
-            admin.setPassword(new BCryptPasswordEncoder().encode("admin123"));
+            admin.setPassword(new BCryptPasswordEncoder().encode("admin"));
             admin.setRole(Guest.Role.ADMIN);
             admin.setDateOfRegistration(new Date());
             admin.setBalance(0L);

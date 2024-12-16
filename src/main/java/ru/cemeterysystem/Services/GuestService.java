@@ -13,6 +13,7 @@ import ru.cemeterysystem.Models.Guest;
 import ru.cemeterysystem.Repositories.GuestRepository;
 
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -46,7 +47,14 @@ public class GuestService implements UserDetailsService {
         guestRepository.deleteById(id);
     }
     public void registerGuest(Guest guest) {
+        Optional<Guest> existingGuest = guestRepository.findByLogin(guest.getLogin());
+        if (existingGuest.isPresent()) {
+            throw new IllegalArgumentException("Guest with this login already exists.");
+        }
         guest.setPassword(passwordEncoder.encode(guest.getPassword())); // Хэшируем пароль
+        guest.setBalance(10000L);
+        guest.setDateOfRegistration(new Date());
+        guest.setRole(Guest.Role.USER);
         guestRepository.save(guest); // Сохраняем гостя в базу
     }
 

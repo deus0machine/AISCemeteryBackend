@@ -56,6 +56,15 @@ public class BurialController {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
     }
+    @PutMapping("/part/{id}")
+    public ResponseEntity<Burial> updatePartBurial(@PathVariable Long id, @RequestBody @Valid Burial burial) {
+        try {
+            Burial updatedBurial = burialService.updatePartBurial(id, burial);
+            return new ResponseEntity<>(updatedBurial, HttpStatus.OK);
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+    }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteBurial(@PathVariable Long id) {

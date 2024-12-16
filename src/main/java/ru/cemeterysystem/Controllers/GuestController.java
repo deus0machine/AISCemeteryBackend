@@ -26,9 +26,12 @@ public class GuestController {
     @Autowired
     private AuthenticationManager authenticationManager;
     @PostMapping("/register")
-    public ResponseEntity<String> registerGuest(@RequestBody Guest guest) {
+    public ResponseEntity<Map<String, String>> registerGuest(@RequestBody Guest guest) {
         guestService.registerGuest(guest);
-        return ResponseEntity.ok("Guest registered successfully!");
+        Map<String, String> response = new HashMap<>();
+        response.put("status", "SUCCESS");
+        response.put("message", "Guest registered successfully!");
+        return ResponseEntity.ok(response);
     }
     @GetMapping("/guest/get/{guestId}")
     public ResponseEntity<Optional<Guest>> getGuestById(@PathVariable Long guestId) {

@@ -6,6 +6,8 @@ import ru.cemeterysystem.Models.Order;
 import ru.cemeterysystem.Repositories.OrderRepository;
 import ru.cemeterysystem.Repositories.TaskRepository;
 
+import java.time.LocalDate;
+import java.util.Date;
 import java.util.List;
 
 @Service
@@ -20,5 +22,8 @@ public class OrderService {
     }
     public List<Order> getOrdersByGuest(Long guestId){
         return  orderRepository.findByGuest_Id(guestId);
+    }
+    public List<Order> getOrdersBetweenDates(Date startDate, Date endDate) {
+        return orderRepository.findByOrderDateBetween(startDate, endDate);
     }
 }
