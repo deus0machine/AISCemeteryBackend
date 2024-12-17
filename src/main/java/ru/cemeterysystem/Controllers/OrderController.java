@@ -29,8 +29,12 @@ public class OrderController {
 
     @GetMapping("/all")
     public ResponseEntity<List<Order>> getOrdersBetweenDates(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date startDate,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date endDate) {
+            @RequestParam("startDate") Long startDateMillis,
+            @RequestParam("endDate") Long endDateMillis) {
+        // Преобразование миллисекунд в Date
+        Date startDate = new Date(startDateMillis);
+        Date endDate = new Date(endDateMillis);
+
         List<Order> orders = orderService.getOrdersBetweenDates(startDate, endDate);
         return ResponseEntity.ok(orders);
     }

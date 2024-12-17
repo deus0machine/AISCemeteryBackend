@@ -15,6 +15,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import ru.cemeterysystem.Services.GuestService;
 
 @Configuration
@@ -26,8 +27,10 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable()) // Отключаем CSRF
                 .authorizeHttpRequests(auth -> auth
-                        .anyRequest().permitAll()  // Разрешаем доступ ко всем запросам
-                );
+                        .requestMatchers("/api/orders/all").hasRole("ADMIN") // Разрешаем доступ только пользователям с ролью ADMIN
+                        .anyRequest().permitAll() // Разрешаем доступ ко всем запросам
+                )
+                .addFilterBefore(new JwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

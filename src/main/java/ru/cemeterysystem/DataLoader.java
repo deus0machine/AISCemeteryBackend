@@ -14,7 +14,9 @@ import ru.cemeterysystem.Repositories.OrderRepository;
 import ru.cemeterysystem.Repositories.TaskRepository;
 
 import java.time.LocalDate;
+import java.util.Calendar;
 import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.List;
 
 @Component
@@ -59,12 +61,13 @@ public class DataLoader implements CommandLineRunner {
             // Создаем захоронения
             Burial burial1 = new Burial(user, "Иванов Иван Иванович", LocalDate.of(2023, 1, 15), LocalDate.of(1980, 5, 20));
             Burial burial2 = new Burial(user, "Петрова Анна Сергеевна", LocalDate.of(2023, 2, 10), LocalDate.of(1990, 7, 30));
-            Burial burial3 = new Burial(admin, "Иванов Иван Иванович", LocalDate.of(1980, 5, 15), LocalDate.of(1950, 10, 10));
-            burialRepository.saveAll(List.of(burial1, burial2, burial3));
+            Burial burial3 = new Burial(admin, "Сергеев Андрей Иванович", LocalDate.of(1980, 5, 15), LocalDate.of(1950, 10, 10));
+            Burial burial4 = new Burial(user, "Банденков Владимир Викторович", LocalDate.of(2024, 12, 18), LocalDate.of(2003, 9, 19));
+            burialRepository.saveAll(List.of(burial1, burial2, burial3,burial4));
 
             // Создаем заказы
-            Order order1 = new Order(burial1,user, "Уборка территории", "Очистка территории от мусора", 500L, new Date(2024 - 1900, 10, 25));
-            Order order2 = new Order(burial2, user, "Уход за надгробием", "Полировка до блеска", 1200L, new Date(2024 - 1900, 10, 27));
+            Order order1 = new Order(burial1,user, "Уборка территории", "Очистка территории от мусора", 500L, new GregorianCalendar(2024, Calendar.DECEMBER, 25).getTime());
+            Order order2 = new Order(burial2, user, "Уход за надгробием", "Полировка до блеска", 1200L, new GregorianCalendar(2024, Calendar.DECEMBER, 28).getTime());
             orderRepository.saveAll(List.of(order1, order2));
 
 

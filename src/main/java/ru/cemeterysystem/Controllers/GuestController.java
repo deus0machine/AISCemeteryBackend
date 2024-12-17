@@ -13,6 +13,7 @@ import ru.cemeterysystem.Models.Burial;
 import ru.cemeterysystem.Models.Guest;
 import ru.cemeterysystem.Repositories.GuestRepository;
 import ru.cemeterysystem.Services.GuestService;
+import ru.cemeterysystem.utils.JwtUtils;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -23,8 +24,11 @@ import java.util.Optional;
 public class GuestController {
     @Autowired
     private GuestService guestService;
-    @Autowired
-    private AuthenticationManager authenticationManager;
+    @GetMapping("/guest/get/{guestId}")
+    public ResponseEntity<Optional<Guest>> getGuestById(@PathVariable Long guestId) {
+        Optional<Guest> guest = guestService.findById(guestId);
+        return ResponseEntity.ok(guest);
+    }
     @PostMapping("/register")
     public ResponseEntity<Map<String, String>> registerGuest(@RequestBody Guest guest) {
         guestService.registerGuest(guest);
@@ -33,11 +37,7 @@ public class GuestController {
         response.put("message", "Guest registered successfully!");
         return ResponseEntity.ok(response);
     }
-    @GetMapping("/guest/get/{guestId}")
-    public ResponseEntity<Optional<Guest>> getGuestById(@PathVariable Long guestId) {
-        Optional<Guest> guest = guestService.findById(guestId);
-        return ResponseEntity.ok(guest);
-    }
+
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> credentials) {
         Map<String, Object> response = new HashMap<>();
@@ -47,6 +47,7 @@ public class GuestController {
 
         if (optionalGuest.isPresent()) {
             Guest guest = optionalGuest.get();
+            String token = JwtUtils.generateToken(guest);
             response.put("status", "SUCCESS");
             response.put("id", guest.getId());
             response.put("fio", guest.getFio());
@@ -55,6 +56,7 @@ public class GuestController {
             response.put("login", guest.getLogin());
             response.put("balance", guest.getBalance());
             response.put("role", guest.getRole().name());
+            response.put("token", token);
             return ResponseEntity.ok(response);
         } else {
             response.put("status", "FAILURE");
