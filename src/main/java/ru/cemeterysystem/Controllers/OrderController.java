@@ -1,15 +1,20 @@
 package ru.cemeterysystem.Controllers;
 
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import ru.cemeterysystem.Models.Guest;
 import ru.cemeterysystem.Models.Order;
 import ru.cemeterysystem.Repositories.OrderRepository;
 import ru.cemeterysystem.Services.OrderService;
+import ru.cemeterysystem.dto.OrderReportDTO;
 
 import java.time.LocalDate;
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -37,5 +42,33 @@ public class OrderController {
 
         List<Order> orders = orderService.getOrdersBetweenDates(startDate, endDate);
         return ResponseEntity.ok(orders);
+    }
+
+    @GetMapping("/orders/all")
+    public List<OrderReportDTO> getAllOrders() {
+        List<Order> orders = orderService.getOrders();
+        return orders.stream()
+                .map(orderService::convertToOrderReportDTO)
+                .collect(Collectors.toList());
+    }
+    @PutMapping("/update/{id}")
+    public ResponseEntity<Void> updateOrderStatus(@PathVariable Long id, @RequestBody boolean isCompleted) {
+        Optional<Order> orderOptional = orderService.findById(id);
+        if (orderOptional.isPresent()) {
+            Order order = orderOptional.get();
+            order.setCompleted(isCompleted);
+            orderService.addOrder(order);
+            return ResponseEntity.ok().build();
+        }
+        return ResponseEntity.notFound().build();
+    }
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteBurial(@PathVariable Long id) {
+        try {
+            orderService.deleteOrder(id);
+            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
     }
 }

@@ -23,12 +23,12 @@ public class Order {
 
     @JsonBackReference("burial-guest")
     @ManyToOne
-    @JoinColumn(name = "guest_id", nullable = false) // Внешний ключ, связывающий заказ с пользователем
+    @JoinColumn(name = "guest_id", nullable = false)
     private Guest guest;
 
     @JsonBackReference("burial-order")
     @ManyToOne
-    @JoinColumn(name = "burial_id", nullable = false) // Внешний ключ, связывающий заказ с пользователем
+    @JoinColumn(name = "burial_id", nullable = false)
     private Burial burial;
 
     @Column(name = "order_name", nullable = false)
@@ -44,6 +44,8 @@ public class Order {
     @Temporal(TemporalType.DATE)
     private Date orderDate;
 
+    @Column(name = "is_completed", nullable = false)
+    private boolean isCompleted = false;
     public Order(Burial burial , Guest guest, String orderName, String orderDescription, Long orderCost, Date orderDate) {
         this.burial = burial;
         this.guest = guest;

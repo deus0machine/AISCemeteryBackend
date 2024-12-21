@@ -16,6 +16,7 @@ import ru.cemeterysystem.Services.GuestService;
 import ru.cemeterysystem.utils.JwtUtils;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -63,6 +64,11 @@ public class GuestController {
             response.put("message", "Invalid login or password");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
         }
+    }
+    @GetMapping("/guest/all")
+    public ResponseEntity<List<Guest>> getGuests() {
+        List<Guest> guests = guestService.getAllGuests();
+        return ResponseEntity.ok(guests);
     }
 
 }
