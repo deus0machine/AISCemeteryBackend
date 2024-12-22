@@ -12,7 +12,6 @@ import java.util.Optional;
 
 @Service
 public class BurialService {
-
     private BurialRepository burialRepository;
     @Autowired
     public void setServiceRepository(BurialRepository burialRepository) {
@@ -31,18 +30,13 @@ public class BurialService {
         return burialRepository.findById(id);
     }
     public Burial createBurial(Burial burial) {
-        // Простейшая валидация даты смерти
         if (burial.getDeathDate().isAfter(LocalDate.now())) {
             throw new IllegalArgumentException("Дата смерти не может быть позже сегодняшнего дня");
         }
 
-        // Проверка, что дата смерти не раньше даты рождения
         if (burial.getDeathDate().isBefore(burial.getBirthDate())) {
             throw new IllegalArgumentException("Дата смерти не может быть раньше даты рождения");
         }
-
-        // Прочая логика валидации может быть добавлена здесь
-
         return burialRepository.save(burial);
     }
     public Burial updateBurial(Long id, Burial burial) {
@@ -81,7 +75,6 @@ public class BurialService {
     }
 
     public void deleteBurial(Long id) {
-        // Проверка, существует ли запись с таким id
         if (!burialRepository.existsById(id)) {
             throw new IllegalArgumentException("Захоронение с таким id не найдено");
         }

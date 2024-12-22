@@ -70,6 +70,14 @@ public class GuestController {
         List<Guest> guests = guestService.getAllGuests();
         return ResponseEntity.ok(guests);
     }
-
+    @DeleteMapping("/guest/{id}")
+    public ResponseEntity<Void> deleteGuest(@PathVariable Long id) {
+        try {
+            guestService.deleteGuestById(id);
+            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+    }
 }
 
