@@ -1,4 +1,4 @@
-package ru.cemeterysystem.Models;
+package ru.cemeterysystem.models;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
@@ -12,7 +12,6 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.PropertyGenerator.class, property = "id")
@@ -20,28 +19,27 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @Entity
-@Table(name = "burials")
-public class Burial {
+@Table(name = "memorials")
+public class Memorial {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "guest_id", nullable = false) // Внешний ключ, связывающий заказ с пользователем
-    @JsonBackReference("guest-burial")
-    private Guest guest;
+    @JoinColumn(name = "user_id", nullable = false) // Внешний ключ, связывающий заказ с пользователем
+    @JsonBackReference("user-memorial")
+    private User user;
 
-    @JsonManagedReference("burial-order")
-    @OneToMany(mappedBy = "burial", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference("memorial-order")
+    @OneToMany(mappedBy = "memorial", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Order> orders = new ArrayList<>();
 
     @Column(name = "fio", nullable = false)
     @NotNull(message = "ФИО не может быть пустым")
     private String fio;
 
-    @Column(name = "death_date", nullable = false)
-    @NotNull(message = "Дата смерти не может быть пустой")
+    @Column(name = "death_date")
     private LocalDate deathDate;
 
     @Column(name = "birth_date", nullable = false)
@@ -60,8 +58,11 @@ public class Burial {
     @Column(name = "yCoord")
     private Long yCoord;
 
-    public Burial(Guest guest, String fio, LocalDate deathDate, LocalDate birthDate) {
-        this.guest = guest;
+    //Сделать поле для хранения документа, подтверждающего существование человека и его смерть
+    @Column(name = "doc_url")
+    String documentUrl;
+    public Memorial(User user, String fio, LocalDate deathDate, LocalDate birthDate) {
+        this.user = user;
         this.fio = fio;
         this.deathDate = deathDate;
         this.birthDate = birthDate;

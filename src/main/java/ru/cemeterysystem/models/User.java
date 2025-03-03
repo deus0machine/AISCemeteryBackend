@@ -1,4 +1,4 @@
-package ru.cemeterysystem.Models;
+package ru.cemeterysystem.models;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
@@ -8,7 +8,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 @JsonIdentityInfo(generator = ObjectIdGenerators.PropertyGenerator.class, property = "id")
@@ -17,7 +16,7 @@ import java.util.List;
 @NoArgsConstructor
 @Entity
 @Table(name = "guests")
-public class Guest  {
+public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
@@ -32,9 +31,9 @@ public class Guest  {
     private String login;
     @Column(name = "password", nullable = false)
     private String password;
-    @JsonManagedReference("guest-burial")
-    @OneToMany(mappedBy = "guest", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Burial> burials;
+    @JsonManagedReference("user-memorial")
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Memorial> memorials;
 
     @Column(name = "balance", nullable = false)
     private Long balance;

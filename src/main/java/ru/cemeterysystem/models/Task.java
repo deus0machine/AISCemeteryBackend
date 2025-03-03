@@ -1,4 +1,4 @@
-package ru.cemeterysystem.Models;
+package ru.cemeterysystem.models;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

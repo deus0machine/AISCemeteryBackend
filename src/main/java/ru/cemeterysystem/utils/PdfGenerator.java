@@ -9,7 +9,7 @@ import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
 import org.springframework.stereotype.Component;
-import ru.cemeterysystem.Models.Order;
+import ru.cemeterysystem.models.Order;
 
 import java.io.ByteArrayOutputStream;
 import java.util.List;
@@ -45,8 +45,8 @@ public class PdfGenerator {
             // Заполнение данными
             for (Order order : orders) {
                 table.addCell(String.valueOf(order.getId()));
-                table.addCell(order.getGuest().getFio());
-                table.addCell(order.getBurial().getFio());
+                table.addCell(order.getUser().getFio());
+                table.addCell(order.getMemorial().getFio());
                 table.addCell(order.getOrderName());
                 table.addCell(order.getOrderCost().toString());
                 table.addCell(order.getOrderDate().toString());

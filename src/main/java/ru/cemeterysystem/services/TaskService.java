@@ -1,9 +1,9 @@
-package ru.cemeterysystem.Services;
+package ru.cemeterysystem.services;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import ru.cemeterysystem.Models.Task;
-import ru.cemeterysystem.Repositories.TaskRepository;
+import ru.cemeterysystem.models.Task;
+import ru.cemeterysystem.repositories.TaskRepository;
 
 import java.util.List;
 import java.util.Optional;

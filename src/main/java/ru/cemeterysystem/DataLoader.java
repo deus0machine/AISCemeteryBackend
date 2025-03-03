@@ -4,14 +4,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
-import ru.cemeterysystem.Models.Burial;
-import ru.cemeterysystem.Models.Guest;
-import ru.cemeterysystem.Models.Order;
-import ru.cemeterysystem.Models.Task;
-import ru.cemeterysystem.Repositories.BurialRepository;
-import ru.cemeterysystem.Repositories.GuestRepository;
-import ru.cemeterysystem.Repositories.OrderRepository;
-import ru.cemeterysystem.Repositories.TaskRepository;
+import ru.cemeterysystem.models.User;
+import ru.cemeterysystem.models.Memorial;
+import ru.cemeterysystem.models.Order;
+import ru.cemeterysystem.models.Task;
+import ru.cemeterysystem.repositories.MemorialRepository;
+import ru.cemeterysystem.repositories.UserRepository;
+import ru.cemeterysystem.repositories.OrderRepository;
+import ru.cemeterysystem.repositories.TaskRepository;
 
 import java.time.LocalDate;
 import java.util.Calendar;
@@ -22,36 +22,36 @@ import java.util.List;
 @Component
 public class DataLoader implements CommandLineRunner {
     @Autowired
-    private GuestRepository guestRepository;
+    private UserRepository userRepository;
 
     @Autowired
     private TaskRepository taskRepository;
     @Autowired
     private OrderRepository orderRepository;
     @Autowired
-    private BurialRepository burialRepository;
+    private MemorialRepository memorialRepository;
     @Override
     public void run(String... args) {
-        if (guestRepository.count() == 0) {
+        if (userRepository.count() == 0) {
             // Создаем гостей
-            Guest admin = new Guest();
+            User admin = new User();
             admin.setFio("ADMIN");
             admin.setLogin("admin");
             admin.setPassword(new BCryptPasswordEncoder().encode("admin"));
-            admin.setRole(Guest.Role.ADMIN);
+            admin.setRole(User.Role.ADMIN);
             admin.setDateOfRegistration(new Date());
             admin.setBalance(0L);
 
-            Guest user = new Guest();
+            User user = new User();
             user.setFio("Севостьянов Сергей Вячеславович");
             user.setContacts("7821872677");
             user.setLogin("1111");
             user.setPassword(new BCryptPasswordEncoder().encode("1111"));
-            user.setRole(Guest.Role.USER);
+            user.setRole(User.Role.USER);
             user.setDateOfRegistration(new Date());
             user.setBalance(15000L);
 
-            guestRepository.saveAll(List.of(admin, user));
+            userRepository.saveAll(List.of(admin, user));
 
             // Создаем задачи
             Task cleaningTask = new Task("Чистка надгробия", "1200", "Тщательная очистка надгробия от мха и прочего");
@@ -59,11 +59,11 @@ public class DataLoader implements CommandLineRunner {
             taskRepository.saveAll(List.of(cleaningTask, task2));
 
             // Создаем захоронения
-            Burial burial1 = new Burial(user, "Иванов Иван Иванович", LocalDate.of(2023, 1, 15), LocalDate.of(1980, 5, 20));
-            Burial burial2 = new Burial(user, "Петрова Анна Сергеевна", LocalDate.of(2023, 2, 10), LocalDate.of(1990, 7, 30));
-            Burial burial3 = new Burial(admin, "Сергеев Андрей Иванович", LocalDate.of(1980, 5, 15), LocalDate.of(1950, 10, 10));
-            Burial burial4 = new Burial(user, "Банденков Владимир Викторович", LocalDate.of(2024, 12, 18), LocalDate.of(2003, 9, 19));
-            burialRepository.saveAll(List.of(burial1, burial2, burial3,burial4));
+            Memorial burial1 = new Memorial(user, "Иванов Иван Иванович", LocalDate.of(2023, 1, 15), LocalDate.of(1980, 5, 20));
+            Memorial burial2 = new Memorial(user, "Петрова Анна Сергеевна", LocalDate.of(2023, 2, 10), LocalDate.of(1990, 7, 30));
+            Memorial burial3 = new Memorial(admin, "Сергеев Андрей Иванович", LocalDate.of(1980, 5, 15), LocalDate.of(1950, 10, 10));
+            Memorial burial4 = new Memorial(user, "Банденков Владимир Викторович", LocalDate.of(2024, 12, 18), LocalDate.of(2003, 9, 19));
+            memorialRepository.saveAll(List.of(burial1, burial2, burial3,burial4));
 
             // Создаем заказы
             Order order1 = new Order(burial1,user, "Уборка территории", "Очистка территории от мусора", 500L, new GregorianCalendar(2024, Calendar.DECEMBER, 25).getTime());

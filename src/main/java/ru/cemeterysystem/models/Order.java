@@ -1,4 +1,4 @@
-package ru.cemeterysystem.Models;
+package ru.cemeterysystem.models;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
@@ -6,7 +6,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDate;
 import java.util.Date;
 
 @Data
@@ -21,15 +20,15 @@ public class Order {
     @Column(name = "id")
     private Long id;
 
-    @JsonBackReference("burial-guest")
+    @JsonBackReference("memorial-user")
     @ManyToOne
-    @JoinColumn(name = "guest_id", nullable = false)
-    private Guest guest;
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
-    @JsonBackReference("burial-order")
+    @JsonBackReference("memorial-order")
     @ManyToOne
-    @JoinColumn(name = "burial_id", nullable = false)
-    private Burial burial;
+    @JoinColumn(name = "memorial_id", nullable = false)
+    private Memorial memorial;
 
     @Column(name = "order_name", nullable = false)
     private String orderName;
@@ -46,9 +45,9 @@ public class Order {
 
     @Column(name = "is_completed", nullable = false)
     private boolean isCompleted = false;
-    public Order(Burial burial , Guest guest, String orderName, String orderDescription, Long orderCost, Date orderDate) {
-        this.burial = burial;
-        this.guest = guest;
+    public Order(Memorial memorial , User user, String orderName, String orderDescription, Long orderCost, Date orderDate) {
+        this.memorial = memorial;
+        this.user = user;
         this.orderName = orderName;
         this.orderDescription = orderDescription;
         this.orderCost = orderCost;

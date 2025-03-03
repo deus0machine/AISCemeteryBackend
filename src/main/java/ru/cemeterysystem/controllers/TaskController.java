@@ -1,19 +1,16 @@
-package ru.cemeterysystem.Controllers;
+package ru.cemeterysystem.controllers;
 
-import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
-import ru.cemeterysystem.Models.Burial;
-import ru.cemeterysystem.Models.Guest;
-import ru.cemeterysystem.Models.Order;
-import ru.cemeterysystem.Models.Task;
-import ru.cemeterysystem.Services.BurialService;
-import ru.cemeterysystem.Services.GuestService;
-import ru.cemeterysystem.Services.OrderService;
-import ru.cemeterysystem.Services.TaskService;
+import ru.cemeterysystem.models.User;
+import ru.cemeterysystem.models.Memorial;
+import ru.cemeterysystem.models.Order;
+import ru.cemeterysystem.models.Task;
+import ru.cemeterysystem.services.MemorialService;
+import ru.cemeterysystem.services.UserService;
+import ru.cemeterysystem.services.OrderService;
+import ru.cemeterysystem.services.TaskService;
 import ru.cemeterysystem.dto.TaskToOrderRequest;
 
 import java.util.Base64;
@@ -29,9 +26,9 @@ public class TaskController {
     @Autowired
     OrderService orderService = new OrderService();
     @Autowired
-    BurialService burialService = new BurialService();
+    MemorialService memorialService = new MemorialService();
     @Autowired
-    GuestService guestService = new GuestService();
+    UserService userService = new UserService();
     @GetMapping("/all")
     public ResponseEntity<List<Task>> getTasks() {
         List<Task> tasks = taskService.getAllTasks();
@@ -48,10 +45,10 @@ public class TaskController {
         if (imageBase64 != null) {
             // Если изображение отправлено, можно его декодировать
             byte[] imageBytes = Base64.getDecoder().decode(imageBase64);
-            Optional<Burial> burialOpt = burialService.findBurialById(burialId);
-            Burial burial = burialOpt.get();
+            Optional<Memorial> burialOpt = memorialService.findBurialById(burialId);
+            Memorial burial = burialOpt.get();
             burial.setPhoto(imageBytes);
-            burialService.updateBurial(burialId, burial);
+            memorialService.updateBurial(burialId, burial);
             // Сохранить изображение или обработать
         }
         Optional<Task> taskOpt = taskService.getTaskById(taskId);
@@ -61,18 +58,18 @@ public class TaskController {
         order.setOrderCost(Long.valueOf(task.getCost()));
         order.setOrderName(task.getName());
         order.setOrderDate(new Date());
-        Guest guest = new Guest();
-        guest.setId(guestId);
-        order.setGuest(guest);
-        Burial burial = new Burial();
+        User user = new User();
+        user.setId(guestId);
+        order.setUser(user);
+        Memorial burial = new Memorial();
         burial.setId(burialId);
-        order.setBurial(burial);
+        order.setMemorial(burial);
         orderService.addOrder(order);
-        Optional<Guest> guestBalance = guestService.findById(guestId);
-        Guest guestBalance2 = guestBalance.get();
-        Long newBalance = guestBalance2.getBalance()-Long.valueOf(task.getCost());
-        guestBalance2.setBalance(newBalance);
-        guestService.saveGuestBalance(guestBalance2);
+        Optional<User> guestBalance = userService.findById(guestId);
+        User userBalance2 = guestBalance.get();
+        Long newBalance = userBalance2.getBalance()-Long.valueOf(task.getCost());
+        userBalance2.setBalance(newBalance);
+        userService.saveGuestBalance(userBalance2);
         return ResponseEntity.ok("Задача выполнена");
     }
 }

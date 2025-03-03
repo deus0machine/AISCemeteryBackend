@@ -1,4 +1,4 @@
-package ru.cemeterysystem.Services;
+package ru.cemeterysystem.services;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -8,8 +8,8 @@ import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
-import ru.cemeterysystem.Models.Order;
-import ru.cemeterysystem.Repositories.OrderRepository;
+import ru.cemeterysystem.models.Order;
+import ru.cemeterysystem.repositories.OrderRepository;
 import ru.cemeterysystem.utils.PdfGenerator;
 import java.util.*;
 

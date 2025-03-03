@@ -1,35 +1,34 @@
-package ru.cemeterysystem.Services;
+package ru.cemeterysystem.services;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import ru.cemeterysystem.Models.Burial;
-import ru.cemeterysystem.Repositories.BurialRepository;
-import ru.cemeterysystem.Repositories.OrderRepository;
+import ru.cemeterysystem.models.Memorial;
+import ru.cemeterysystem.repositories.MemorialRepository;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
 @Service
-public class BurialService {
-    private BurialRepository burialRepository;
+public class MemorialService {
+    private MemorialRepository memorialRepository;
     @Autowired
-    public void setServiceRepository(BurialRepository burialRepository) {
-        this.burialRepository = burialRepository;
+    public void setServiceRepository(MemorialRepository memorialRepository) {
+        this.memorialRepository = memorialRepository;
     }
-    public List<Burial> findBurialByFio(String fio){
-        return burialRepository.findByFio(fio);
+    public List<Memorial> findBurialByFio(String fio){
+        return memorialRepository.findByFio(fio);
     }
-    public List<Burial> findBurialByGuestId(Long guestId){
-        return burialRepository.findByGuest_Id(guestId);
+    public List<Memorial> findBurialByGuestId(Long guestId){
+        return memorialRepository.findByUser_Id(guestId);
     }
-    public List<Burial> findAll(){
-        return (List<Burial>) burialRepository.findAll();
+    public List<Memorial> findAll(){
+        return (List<Memorial>) memorialRepository.findAll();
     }
-    public Optional<Burial> findBurialById(Long id){
-        return burialRepository.findById(id);
+    public Optional<Memorial> findBurialById(Long id){
+        return memorialRepository.findById(id);
     }
-    public Burial createBurial(Burial burial) {
+    public Memorial createBurial(Memorial burial) {
         if (burial.getDeathDate().isAfter(LocalDate.now())) {
             throw new IllegalArgumentException("Дата смерти не может быть позже сегодняшнего дня");
         }
@@ -37,10 +36,10 @@ public class BurialService {
         if (burial.getDeathDate().isBefore(burial.getBirthDate())) {
             throw new IllegalArgumentException("Дата смерти не может быть раньше даты рождения");
         }
-        return burialRepository.save(burial);
+        return memorialRepository.save(burial);
     }
-    public Burial updateBurial(Long id, Burial burial) {
-        Optional<Burial> existingBurial = burialRepository.findById(id);
+    public Memorial updateBurial(Long id, Memorial burial) {
+        Optional<Memorial> existingBurial = memorialRepository.findById(id);
         if (!existingBurial.isPresent()) {
             throw new IllegalArgumentException("Захоронение с таким id не найдено");
         }
@@ -53,7 +52,7 @@ public class BurialService {
             throw new IllegalArgumentException("Дата смерти не может быть раньше даты рождения");
         }
 
-        Burial updatedBurial = existingBurial.get();
+        Memorial updatedBurial = existingBurial.get();
         updatedBurial.setFio(burial.getFio());
         updatedBurial.setDeathDate(burial.getDeathDate());
         updatedBurial.setBirthDate(burial.getBirthDate());
@@ -62,23 +61,23 @@ public class BurialService {
         updatedBurial.setXCoord(burial.getXCoord());
         updatedBurial.setYCoord(burial.getYCoord());
 
-        return burialRepository.save(updatedBurial);
+        return memorialRepository.save(updatedBurial);
     }
-    public Burial updatePartBurial(Long id, Burial burial){
-        Optional<Burial> existingBurial = burialRepository.findById(id);
-        Burial updatedBurial = existingBurial.get();
+    public Memorial updatePartBurial(Long id, Memorial burial){
+        Optional<Memorial> existingBurial = memorialRepository.findById(id);
+        Memorial updatedBurial = existingBurial.get();
         updatedBurial.setFio(burial.getFio());
         updatedBurial.setDeathDate(burial.getDeathDate());
         updatedBurial.setBirthDate(burial.getBirthDate());
         updatedBurial.setBiography(burial.getBiography());
-        return burialRepository.save(updatedBurial);
+        return memorialRepository.save(updatedBurial);
     }
 
     public void deleteBurial(Long id) {
-        if (!burialRepository.existsById(id)) {
+        if (!memorialRepository.existsById(id)) {
             throw new IllegalArgumentException("Захоронение с таким id не найдено");
         }
 
-        burialRepository.deleteById(id);
+        memorialRepository.deleteById(id);
     }
 }

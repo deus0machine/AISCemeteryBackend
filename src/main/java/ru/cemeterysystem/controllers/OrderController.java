@@ -1,16 +1,12 @@
-package ru.cemeterysystem.Controllers;
+package ru.cemeterysystem.controllers;
 
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import ru.cemeterysystem.Models.Guest;
-import ru.cemeterysystem.Models.Order;
-import ru.cemeterysystem.Repositories.OrderRepository;
-import ru.cemeterysystem.Services.OrderService;
+import ru.cemeterysystem.models.Order;
+import ru.cemeterysystem.services.OrderService;
 import ru.cemeterysystem.dto.OrderReportDTO;
 
-import java.time.LocalDate;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;

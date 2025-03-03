@@ -1,9 +1,9 @@
-package ru.cemeterysystem.Services;
+package ru.cemeterysystem.services;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import ru.cemeterysystem.Models.Order;
-import ru.cemeterysystem.Repositories.OrderRepository;
+import ru.cemeterysystem.models.Order;
+import ru.cemeterysystem.repositories.OrderRepository;
 import ru.cemeterysystem.dto.OrderReportDTO;
 
 import java.util.Date;
@@ -21,7 +21,7 @@ public class OrderService {
         return orderRepository.save(order);
     }
     public List<Order> getOrdersByGuest(Long guestId){
-        return  orderRepository.findByGuest_Id(guestId);
+        return  orderRepository.findByUser_Id(guestId);
     }
     public List<Order> getOrdersBetweenDates(Date startDate, Date endDate) {
         return orderRepository.findByOrderDateBetween(startDate, endDate);
@@ -39,10 +39,10 @@ public class OrderService {
         dto.setOrderDescription(order.getOrderDescription());
         dto.setOrderCost(order.getOrderCost());
         dto.setOrderDate(order.getOrderDate().toString());
-        dto.setGuestId(order.getGuest().getId());
-        dto.setGuestName(order.getGuest().getFio());
-        dto.setBurialId(order.getBurial().getId());
-        dto.setBurialName(order.getBurial().getFio());
+        dto.setGuestId(order.getUser().getId());
+        dto.setGuestName(order.getUser().getFio());
+        dto.setBurialId(order.getMemorial().getId());
+        dto.setBurialName(order.getMemorial().getFio());
         dto.setCompleted(order.isCompleted());
         return dto;
     }
