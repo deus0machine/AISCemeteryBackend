@@ -1,9 +1,8 @@
 package ru.cemeterysystem.models;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -11,10 +10,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-@JsonIdentityInfo(generator = ObjectIdGenerators.PropertyGenerator.class, property = "id")
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -28,10 +27,10 @@ public class Memorial {
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false) // Внешний ключ, связывающий заказ с пользователем
-    @JsonBackReference("user-memorial")
+    @JsonIgnore
     private User user;
 
-    @JsonManagedReference("memorial-order")
+    @JsonIgnore
     @OneToMany(mappedBy = "memorial", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Order> orders = new ArrayList<>();
 
@@ -61,6 +60,45 @@ public class Memorial {
     //Сделать поле для хранения документа, подтверждающего существование человека и его смерть
     @Column(name = "doc_url")
     String documentUrl;
+
+    @Embedded
+    @AttributeOverrides({
+        @AttributeOverride(name = "latitude", column = @Column(name = "main_latitude")),
+        @AttributeOverride(name = "longitude", column = @Column(name = "main_longitude")),
+        @AttributeOverride(name = "address", column = @Column(name = "main_address"))
+    })
+    private Location mainLocation;
+
+    @Embedded
+    @AttributeOverrides({
+        @AttributeOverride(name = "latitude", column = @Column(name = "burial_latitude")),
+        @AttributeOverride(name = "longitude", column = @Column(name = "burial_longitude")),
+        @AttributeOverride(name = "address", column = @Column(name = "burial_address"))
+    })
+    private Location burialLocation;
+
+    private String photoUrl;
+    private boolean isPublic;
+    private Long treeId;
+
+    @ManyToOne
+    @JoinColumn(name = "created_by")
+    private User createdBy;
+
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+
     public Memorial(User user, String fio, LocalDate deathDate, LocalDate birthDate) {
         this.user = user;
         this.fio = fio;

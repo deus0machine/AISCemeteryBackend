@@ -60,9 +60,16 @@ public class DataLoader implements CommandLineRunner {
 
             // Создаем захоронения
             Memorial burial1 = new Memorial(user, "Иванов Иван Иванович", LocalDate.of(2023, 1, 15), LocalDate.of(1980, 5, 20));
+            burial1.setPublic(true);
+            burial1.setCreatedBy(user);
             Memorial burial2 = new Memorial(user, "Петрова Анна Сергеевна", LocalDate.of(2023, 2, 10), LocalDate.of(1990, 7, 30));
+            burial2.setPublic(true);
+            burial2.setCreatedBy(user);
             Memorial burial3 = new Memorial(admin, "Сергеев Андрей Иванович", LocalDate.of(1980, 5, 15), LocalDate.of(1950, 10, 10));
+            burial3.setCreatedBy(admin);
             Memorial burial4 = new Memorial(user, "Банденков Владимир Викторович", LocalDate.of(2024, 12, 18), LocalDate.of(2003, 9, 19));
+            burial4.setPublic(true);
+            burial4.setCreatedBy(user);
             memorialRepository.saveAll(List.of(burial1, burial2, burial3,burial4));
 
             // Создаем заказы

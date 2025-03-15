@@ -25,8 +25,8 @@ public class TaskController {
     TaskService taskService = new TaskService();
     @Autowired
     OrderService orderService = new OrderService();
-    @Autowired
-    MemorialService memorialService = new MemorialService();
+    //@Autowired
+    //MemorialService memorialService = new MemorialService();
     @Autowired
     UserService userService = new UserService();
     @GetMapping("/all")
@@ -45,10 +45,10 @@ public class TaskController {
         if (imageBase64 != null) {
             // Если изображение отправлено, можно его декодировать
             byte[] imageBytes = Base64.getDecoder().decode(imageBase64);
-            Optional<Memorial> burialOpt = memorialService.findBurialById(burialId);
-            Memorial burial = burialOpt.get();
-            burial.setPhoto(imageBytes);
-            memorialService.updateBurial(burialId, burial);
+        //    Optional<Memorial> burialOpt = memorialService.findBurialById(burialId);
+        //    Memorial burial = burialOpt.get();
+        //    burial.setPhoto(imageBytes);
+        //    memorialService.updateBurial(burialId, burial);
             // Сохранить изображение или обработать
         }
         Optional<Task> taskOpt = taskService.getTaskById(taskId);

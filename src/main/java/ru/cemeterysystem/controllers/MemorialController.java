@@ -1,76 +1,93 @@
 package ru.cemeterysystem.controllers;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import jakarta.validation.Valid;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import ru.cemeterysystem.dto.MemorialDTO;
 import ru.cemeterysystem.models.Memorial;
+import ru.cemeterysystem.models.User;
 import ru.cemeterysystem.services.MemorialService;
+import ru.cemeterysystem.services.UserService;
 
 import java.util.List;
-import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/burials")
+@RequestMapping("/api/memorials")
+@RequiredArgsConstructor
 public class MemorialController {
     private final MemorialService memorialService;
+    private final UserService userService;
 
-    @Autowired
-    public MemorialController(MemorialService memorialService) {
-        this.memorialService = memorialService;
+    private User getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String login = authentication.getName();
+        return userService.findByLogin(login)
+            .orElseThrow(() -> new RuntimeException("User not found"));
     }
-    @GetMapping("/fio/{fio}")
-    public ResponseEntity<List<Memorial>> getBurialsByFio(@PathVariable String fio) {
-        List<Memorial> burials = memorialService.findBurialByFio(fio);
-        return ResponseEntity.ok(burials);
+
+    @GetMapping
+    public List<Memorial> getAllMemorials() {
+        return memorialService.getAllMemorials();
     }
-    @GetMapping("/guest/{guestId}")
-    public ResponseEntity<List<Memorial>> getBurialsByGuest(@PathVariable Long guestId) {
-        List<Memorial> burials = memorialService.findBurialByGuestId(guestId);
-        return ResponseEntity.ok(burials);
+
+    @GetMapping("/my")
+    public List<Memorial> getMyMemorials() {
+        User user = getCurrentUser();
+        return memorialService.getMyMemorials(user.getId());
     }
-    @GetMapping("/all")
-    public ResponseEntity<List<Memorial>> getBurials() {
-        List<Memorial> burials = memorialService.findAll();
-        return ResponseEntity.ok(burials);
+
+    @GetMapping("/public")
+    public List<Memorial> getPublicMemorials() {
+        return memorialService.getPublicMemorials();
     }
-    @GetMapping("/burial/{burialId}")
-    public ResponseEntity<Optional<Memorial>> getBurialById(@PathVariable Long burialId) {
-        Optional<Memorial> burial = memorialService.findBurialById(burialId);
-        return ResponseEntity.ok(burial);
+
+    @GetMapping("/{id}")
+    public Memorial getMemorialById(@PathVariable Long id) {
+        return memorialService.getMemorialById(id);
     }
+
     @PostMapping
-    public ResponseEntity<Memorial> createBurial(@RequestBody @Valid Memorial burial) {
-        Memorial savedBurial = memorialService.createBurial(burial);
-        return new ResponseEntity<>(savedBurial, HttpStatus.CREATED);
+    public Memorial createMemorial(@RequestBody MemorialDTO dto) {
+        User user = getCurrentUser();
+        return memorialService.createMemorial(dto, user.getId());
     }
+
     @PutMapping("/{id}")
-    public ResponseEntity<Memorial> updateBurial(@PathVariable Long id, @RequestBody @Valid Memorial burial) {
-        try {
-            Memorial updatedBurial = memorialService.updateBurial(id, burial);
-            return new ResponseEntity<>(updatedBurial, HttpStatus.OK);
-        } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
-    }
-    @PutMapping("/part/{id}")
-    public ResponseEntity<Memorial> updatePartBurial(@PathVariable Long id, @RequestBody @Valid Memorial burial) {
-        try {
-            Memorial updatedBurial = memorialService.updatePartBurial(id, burial);
-            return new ResponseEntity<>(updatedBurial, HttpStatus.OK);
-        } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+    public Memorial updateMemorial(@PathVariable Long id,
+                                 @RequestBody MemorialDTO dto) {
+        return memorialService.updateMemorial(id, dto);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteBurial(@PathVariable Long id) {
-        try {
-            memorialService.deleteBurial(id);
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+    public ResponseEntity<Void> deleteMemorial(@PathVariable Long id) {
+        memorialService.deleteMemorial(id);
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/{id}/privacy")
+    public ResponseEntity<Void> updateMemorialPrivacy(@PathVariable Long id,
+                                                    @RequestBody boolean isPublic) {
+        memorialService.updateMemorialPrivacy(id, isPublic);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{id}/photo")
+    public String uploadPhoto(@PathVariable Long id,
+                            @RequestParam("photo") MultipartFile file) {
+        return memorialService.uploadPhoto(id, file);
+    }
+
+    @GetMapping("/search")
+    public List<Memorial> searchMemorials(
+        @RequestParam(required = false) String query,
+        @RequestParam(required = false) String location,
+        @RequestParam(required = false) String startDate,
+        @RequestParam(required = false) String endDate,
+        @RequestParam(required = false) Boolean isPublic
+    ) {
+        return memorialService.searchMemorials(query, location, startDate, endDate, isPublic);
     }
 }
