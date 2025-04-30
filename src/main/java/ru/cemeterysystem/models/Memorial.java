@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -48,10 +49,6 @@ public class Memorial {
     @Column(name = "biography")
     private String biography;
 
-    @Lob
-    @Column(name = "photo")
-    private byte[] photo;
-
     @Column(name = "xCoord")
     private Long xCoord;
     @Column(name = "yCoord")
@@ -77,8 +74,13 @@ public class Memorial {
     })
     private Location burialLocation;
 
+    @Column(name = "photo_url")
     private String photoUrl;
+
+    @Column(name = "is_public", nullable = false, columnDefinition = "boolean default false")
+    @JsonProperty("is_public")
     private boolean isPublic;
+
     private Long treeId;
 
     @ManyToOne

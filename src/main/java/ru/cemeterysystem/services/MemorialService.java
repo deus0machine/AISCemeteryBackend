@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import ru.cemeterysystem.dto.MemorialDTO;
+import ru.cemeterysystem.mappers.MemorialMapper;
 import ru.cemeterysystem.models.Memorial;
 import ru.cemeterysystem.models.User;
 import ru.cemeterysystem.repositories.MemorialRepository;
@@ -14,6 +15,7 @@ import ru.cemeterysystem.services.FileStorageService;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -21,27 +23,34 @@ public class MemorialService {
     private final MemorialRepository memorialRepository;
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
+    private final MemorialMapper memorialMapper;
 
-    public List<Memorial> getAllMemorials() {
-        return memorialRepository.findAll();
+    public List<MemorialDTO> getAllMemorials() {
+        return memorialRepository.findAll().stream()
+            .map(memorialMapper::toDTO)
+            .collect(Collectors.toList());
     }
 
-    public List<Memorial> getMyMemorials(Long userId) {
+    public List<MemorialDTO> getMyMemorials(Long userId) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("User not found"));
-        return memorialRepository.findByCreatedBy(user);
+        return memorialRepository.findByCreatedBy(user).stream()
+            .map(memorialMapper::toDTO)
+            .collect(Collectors.toList());
     }
 
-    public List<Memorial> getPublicMemorials() {
-        return memorialRepository.findByIsPublicTrue();
+    public List<MemorialDTO> getPublicMemorials() {
+        return memorialRepository.findByIsPublicTrue().stream()
+            .map(memorialMapper::toDTO)
+            .collect(Collectors.toList());
     }
 
-    public Memorial getMemorialById(Long id) {
-        return memorialRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Memorial not found"));
+    public MemorialDTO getMemorialById(Long id) {
+        return memorialMapper.toDTO(memorialRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Memorial not found")));
     }
 
-    public Memorial createMemorial(MemorialDTO dto, Long userId) {
+    public MemorialDTO createMemorial(MemorialDTO dto, Long userId) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -53,12 +62,13 @@ public class MemorialService {
         memorial.setCreatedBy(user);
         memorial.setUser(user);
 
-        return memorialRepository.save(memorial);
+        return memorialMapper.toDTO(memorialRepository.save(memorial));
     }
 
     @Transactional
-    public Memorial updateMemorial(Long id, MemorialDTO dto) {
-        Memorial memorial = getMemorialById(id);
+    public MemorialDTO updateMemorial(Long id, MemorialDTO dto) {
+        Memorial memorial = memorialRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Memorial not found"));
         
         validateMemorialDates(LocalDate.parse(dto.getBirthDate()), 
                             dto.getDeathDate() != null ? LocalDate.parse(dto.getDeathDate()) : null);
@@ -68,12 +78,13 @@ public class MemorialService {
         }
         
         updateMemorialFromDTO(memorial, dto);
-        return memorialRepository.save(memorial);
+        return memorialMapper.toDTO(memorialRepository.save(memorial));
     }
 
     @Transactional
     public void deleteMemorial(Long id) {
-        Memorial memorial = getMemorialById(id);
+        Memorial memorial = memorialRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Memorial not found"));
         
         if (memorial.getPhotoUrl() != null) {
             fileStorageService.deleteFile(memorial.getPhotoUrl());
@@ -83,14 +94,16 @@ public class MemorialService {
     }
 
     public void updateMemorialPrivacy(Long id, boolean isPublic) {
-        Memorial memorial = getMemorialById(id);
+        Memorial memorial = memorialRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Memorial not found"));
         memorial.setPublic(isPublic);
         memorialRepository.save(memorial);
     }
 
     @Transactional
     public String uploadPhoto(Long id, MultipartFile file) {
-        Memorial memorial = getMemorialById(id);
+        Memorial memorial = memorialRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Memorial not found"));
         
         if (memorial.getPhotoUrl() != null) {
             fileStorageService.deleteFile(memorial.getPhotoUrl());
@@ -102,17 +115,23 @@ public class MemorialService {
         return photoUrl;
     }
 
-    public List<Memorial> searchMemorials(String query, String location, String startDate,
+    public List<MemorialDTO> searchMemorials(String query, String location, String startDate,
                                         String endDate, Boolean isPublic) {
-        return memorialRepository.search(query, location, startDate, endDate, isPublic);
+        return memorialRepository.search(query, location, startDate, endDate, isPublic).stream()
+            .map(memorialMapper::toDTO)
+            .collect(Collectors.toList());
     }
 
-    public List<Memorial> findByFio(String fio) {
-        return memorialRepository.findByFio(fio);
+    public List<MemorialDTO> findByFio(String fio) {
+        return memorialRepository.findByFio(fio).stream()
+            .map(memorialMapper::toDTO)
+            .collect(Collectors.toList());
     }
 
-    public List<Memorial> findByUserId(Long userId) {
-        return memorialRepository.findByUser_Id(userId);
+    public List<MemorialDTO> findByUserId(Long userId) {
+        return memorialRepository.findByUser_Id(userId).stream()
+            .map(memorialMapper::toDTO)
+            .collect(Collectors.toList());
     }
 
     private void updateMemorialFromDTO(Memorial memorial, MemorialDTO dto) {
@@ -137,70 +156,5 @@ public class MemorialService {
                 throw new IllegalArgumentException("Дата смерти не может быть раньше даты рождения");
             }
         }
-    }
-
-    public List<Memorial> findBurialByFio(String fio){
-        return memorialRepository.findByFio(fio);
-    }
-    public List<Memorial> findBurialByGuestId(Long guestId){
-        return memorialRepository.findByUser_Id(guestId);
-    }
-    public List<Memorial> findAll(){
-        return (List<Memorial>) memorialRepository.findAll();
-    }
-    public Optional<Memorial> findBurialById(Long id){
-        return memorialRepository.findById(id);
-    }
-    public Memorial createBurial(Memorial burial) {
-        if (burial.getDeathDate().isAfter(LocalDate.now())) {
-            throw new IllegalArgumentException("Дата смерти не может быть позже сегодняшнего дня");
-        }
-
-        if (burial.getDeathDate().isBefore(burial.getBirthDate())) {
-            throw new IllegalArgumentException("Дата смерти не может быть раньше даты рождения");
-        }
-        return memorialRepository.save(burial);
-    }
-    public Memorial updateBurial(Long id, Memorial burial) {
-        Optional<Memorial> existingBurial = memorialRepository.findById(id);
-        if (!existingBurial.isPresent()) {
-            throw new IllegalArgumentException("Захоронение с таким id не найдено");
-        }
-
-        if (burial.getDeathDate().isAfter(LocalDate.now())) {
-            throw new IllegalArgumentException("Дата смерти не может быть позже сегодняшнего дня");
-        }
-
-        if (burial.getDeathDate().isBefore(burial.getBirthDate())) {
-            throw new IllegalArgumentException("Дата смерти не может быть раньше даты рождения");
-        }
-
-        Memorial updatedBurial = existingBurial.get();
-        updatedBurial.setFio(burial.getFio());
-        updatedBurial.setDeathDate(burial.getDeathDate());
-        updatedBurial.setBirthDate(burial.getBirthDate());
-        updatedBurial.setBiography(burial.getBiography());
-        updatedBurial.setPhoto(burial.getPhoto());
-        updatedBurial.setXCoord(burial.getXCoord());
-        updatedBurial.setYCoord(burial.getYCoord());
-
-        return memorialRepository.save(updatedBurial);
-    }
-    public Memorial updatePartBurial(Long id, Memorial burial){
-        Optional<Memorial> existingBurial = memorialRepository.findById(id);
-        Memorial updatedBurial = existingBurial.get();
-        updatedBurial.setFio(burial.getFio());
-        updatedBurial.setDeathDate(burial.getDeathDate());
-        updatedBurial.setBirthDate(burial.getBirthDate());
-        updatedBurial.setBiography(burial.getBiography());
-        return memorialRepository.save(updatedBurial);
-    }
-
-    public void deleteBurial(Long id) {
-        if (!memorialRepository.existsById(id)) {
-            throw new IllegalArgumentException("Захоронение с таким id не найдено");
-        }
-
-        memorialRepository.deleteById(id);
     }
 }

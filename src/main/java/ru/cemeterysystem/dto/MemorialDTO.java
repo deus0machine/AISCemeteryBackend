@@ -3,6 +3,7 @@ package ru.cemeterysystem.dto;
 import lombok.Data;
 import ru.cemeterysystem.models.Location;
 import java.time.LocalDateTime;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Data
 public class MemorialDTO {
@@ -14,9 +15,10 @@ public class MemorialDTO {
     private Location mainLocation;
     private Location burialLocation;
     private String photoUrl;
+    @JsonProperty("is_public")
     private boolean isPublic;
     private Long treeId;
-    private Long createdBy;
+    private UserDTO createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 } 

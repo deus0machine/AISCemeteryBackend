@@ -26,26 +26,28 @@ public class FileStorageService {
     public String storeFile(MultipartFile file) {
         try {
             String fileName = generateFileName(file);
+            String key = "diplomSS/" + fileName;
+            
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                 .bucket(bucketName)
-                .key(fileName)
+                .key(key)
                 .contentType(file.getContentType())
                 .build();
 
             s3Client.putObject(putObjectRequest,
                 RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
 
-            return getFileUrl(fileName);
+            return getFileUrl(key);
         } catch (IOException e) {
             throw new RuntimeException("Failed to store file", e);
         }
     }
 
     public void deleteFile(String fileUrl) {
-        String fileName = extractFileNameFromUrl(fileUrl);
+        String key = extractFileNameFromUrl(fileUrl);
         DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
             .bucket(bucketName)
-            .key(fileName)
+            .key(key)
             .build();
 
         s3Client.deleteObject(deleteObjectRequest);
@@ -58,8 +60,8 @@ public class FileStorageService {
         return UUID.randomUUID().toString() + extension;
     }
 
-    private String getFileUrl(String fileName) {
-        return String.format("%s/%s/%s", endpoint, bucketName, fileName);
+    private String getFileUrl(String key) {
+        return String.format("%s/%s/%s", endpoint, bucketName, key);
     }
 
     private String extractFileNameFromUrl(String fileUrl) {
