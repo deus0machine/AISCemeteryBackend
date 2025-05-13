@@ -8,10 +8,12 @@ import ru.cemeterysystem.models.User;
 import ru.cemeterysystem.models.Memorial;
 import ru.cemeterysystem.models.Order;
 import ru.cemeterysystem.models.Task;
+import ru.cemeterysystem.models.FamilyTree;
 import ru.cemeterysystem.repositories.MemorialRepository;
 import ru.cemeterysystem.repositories.UserRepository;
 import ru.cemeterysystem.repositories.OrderRepository;
 import ru.cemeterysystem.repositories.TaskRepository;
+import ru.cemeterysystem.repositories.FamilyTreeRepository;
 
 import java.time.LocalDate;
 import java.util.Calendar;
@@ -30,6 +32,9 @@ public class DataLoader implements CommandLineRunner {
     private OrderRepository orderRepository;
     @Autowired
     private MemorialRepository memorialRepository;
+    @Autowired
+    private FamilyTreeRepository familyTreeRepository;
+
     @Override
     public void run(String... args) {
         if (userRepository.count() == 0) {
@@ -77,7 +82,13 @@ public class DataLoader implements CommandLineRunner {
             Order order2 = new Order(burial2, user, "Уход за надгробием", "Полировка до блеска", 1200L, new GregorianCalendar(2024, Calendar.DECEMBER, 28).getTime());
             orderRepository.saveAll(List.of(order1, order2));
 
-
+            // Создаем тестовое семейное дерево
+            FamilyTree familyTree = new FamilyTree();
+            familyTree.setName("Семья Ивановых");
+            familyTree.setDescription("Генеалогическое древо семьи Ивановых");
+            familyTree.setOwner(user);
+            familyTree.setPublic(true);
+            familyTreeRepository.save(familyTree);
         }
     }
 }
