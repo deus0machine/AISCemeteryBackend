@@ -1,7 +1,7 @@
 package ru.cemeterysystem.models;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonIdentityReference;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -31,11 +31,12 @@ public class User {
     private String login;
     @Column(name = "password", nullable = false)
     private String password;
-    @JsonManagedReference("user-memorial")
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIdentityReference(alwaysAsId = true)
     private List<Memorial> memorials;
 
     @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIdentityReference(alwaysAsId = true)
     private List<FamilyTree> familyTrees;
 
     @Column(name = "balance", nullable = false)

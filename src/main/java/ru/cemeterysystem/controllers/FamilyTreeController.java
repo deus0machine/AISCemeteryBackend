@@ -30,8 +30,16 @@ public class FamilyTreeController {
     @PostMapping
     public ResponseEntity<?> createFamilyTree(
             @RequestBody FamilyTree familyTree,
-            @AuthenticationPrincipal User user) {
+            @AuthenticationPrincipal UserDetails userDetails) {
         try {
+            if (userDetails == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("User is not authenticated");
+            }
+
+            User user = userService.findByLogin(userDetails.getUsername())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
             logger.debug("Creating family tree for user: {}", user.getId());
             return ResponseEntity.ok(familyTreeService.createFamilyTree(familyTree, user));
         } catch (Exception e) {
@@ -105,8 +113,16 @@ public class FamilyTreeController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteFamilyTree(
             @PathVariable Long id,
-            @AuthenticationPrincipal User user) {
+            @AuthenticationPrincipal UserDetails userDetails) {
         try {
+            if (userDetails == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("User is not authenticated");
+            }
+
+            User user = userService.findByLogin(userDetails.getUsername())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
             familyTreeService.deleteFamilyTree(id, user);
             return ResponseEntity.ok().build();
         } catch (Exception e) {

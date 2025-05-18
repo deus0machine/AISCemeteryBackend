@@ -3,6 +3,9 @@ package ru.cemeterysystem.models;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonIdentityReference;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -20,6 +23,7 @@ import java.util.List;
 @NoArgsConstructor
 @Entity
 @Table(name = "memorials")
+@JsonIdentityInfo(generator = ObjectIdGenerators.PropertyGenerator.class, property = "id")
 public class Memorial {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -28,11 +32,11 @@ public class Memorial {
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false) // Внешний ключ, связывающий заказ с пользователем
-    @JsonIgnore
+    @JsonIdentityReference(alwaysAsId = true)
     private User user;
 
-    @JsonIgnore
     @OneToMany(mappedBy = "memorial", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIdentityReference(alwaysAsId = true)
     private List<Order> orders = new ArrayList<>();
 
     @Column(name = "fio", nullable = false)
@@ -85,6 +89,7 @@ public class Memorial {
 
     @ManyToOne
     @JoinColumn(name = "created_by")
+    @JsonIdentityReference(alwaysAsId = true)
     private User createdBy;
 
     private LocalDateTime createdAt;
