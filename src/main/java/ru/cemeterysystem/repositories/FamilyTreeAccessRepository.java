@@ -10,10 +10,13 @@ import java.util.Optional;
 
 @Repository
 public interface FamilyTreeAccessRepository extends JpaRepository<FamilyTreeAccess, Long> {
+    @Query("SELECT fa FROM FamilyTreeAccess fa WHERE fa.familyTree.id = ?1")
     List<FamilyTreeAccess> findByFamilyTreeId(Long familyTreeId);
     
+    @Query("SELECT fa FROM FamilyTreeAccess fa WHERE fa.user.id = ?1")
     List<FamilyTreeAccess> findByUserId(Long userId);
     
+    @Query("SELECT fa FROM FamilyTreeAccess fa WHERE fa.familyTree.id = ?1 AND fa.user.id = ?2")
     Optional<FamilyTreeAccess> findByFamilyTreeIdAndUserId(Long familyTreeId, Long userId);
     
     @Query("SELECT fa FROM FamilyTreeAccess fa WHERE fa.familyTree.id = ?1 AND fa.accessLevel = ?2")

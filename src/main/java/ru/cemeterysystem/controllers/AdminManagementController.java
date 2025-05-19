@@ -21,7 +21,7 @@ public class AdminManagementController {
     @PostMapping("/request/email")
     public ResponseEntity<Void> sendRequest(@RequestBody String email) {
         try {
-            adminService.sendPdfToEmail(email);
+            //adminService.sendPdfToEmail(email);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();

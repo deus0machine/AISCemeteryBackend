@@ -4,36 +4,38 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
-import ru.cemeterysystem.models.User;
-import ru.cemeterysystem.models.Memorial;
-import ru.cemeterysystem.models.Order;
-import ru.cemeterysystem.models.Task;
 import ru.cemeterysystem.models.FamilyTree;
-import ru.cemeterysystem.repositories.MemorialRepository;
-import ru.cemeterysystem.repositories.UserRepository;
-import ru.cemeterysystem.repositories.OrderRepository;
-import ru.cemeterysystem.repositories.TaskRepository;
-import ru.cemeterysystem.repositories.FamilyTreeRepository;
+import ru.cemeterysystem.models.Memorial;
+import ru.cemeterysystem.models.User;
+import ru.cemeterysystem.repositories.*;
 
 import java.time.LocalDate;
-import java.util.Calendar;
 import java.util.Date;
-import java.util.GregorianCalendar;
 import java.util.List;
 
 @Component
 public class DataLoader implements CommandLineRunner {
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
+    private final MemorialRepository memorialRepository;
+    private final FamilyTreeRepository familyTreeRepository;
+    private final FamilyTreeAccessRepository familyTreeAccessRepository;
+    private final MemorialRelationRepository memorialRelationRepository;
+    private final FamilyTreeVersionRepository familyTreeVersionRepository;
 
     @Autowired
-    private TaskRepository taskRepository;
-    @Autowired
-    private OrderRepository orderRepository;
-    @Autowired
-    private MemorialRepository memorialRepository;
-    @Autowired
-    private FamilyTreeRepository familyTreeRepository;
+    public DataLoader(UserRepository userRepository,
+                     MemorialRepository memorialRepository,
+                     FamilyTreeRepository familyTreeRepository,
+                     FamilyTreeAccessRepository familyTreeAccessRepository,
+                     MemorialRelationRepository memorialRelationRepository,
+                     FamilyTreeVersionRepository familyTreeVersionRepository) {
+        this.userRepository = userRepository;
+        this.memorialRepository = memorialRepository;
+        this.familyTreeRepository = familyTreeRepository;
+        this.familyTreeAccessRepository = familyTreeAccessRepository;
+        this.memorialRelationRepository = memorialRelationRepository;
+        this.familyTreeVersionRepository = familyTreeVersionRepository;
+    }
 
     @Override
     public void run(String... args) {
@@ -58,10 +60,6 @@ public class DataLoader implements CommandLineRunner {
 
             userRepository.saveAll(List.of(admin, user));
 
-            // Создаем задачи
-            Task cleaningTask = new Task("Чистка надгробия", "1200", "Тщательная очистка надгробия от мха и прочего");
-            Task task2 = new Task("Добавить фотографию", "500", "Добавление фотографии на захоронение");
-            taskRepository.saveAll(List.of(cleaningTask, task2));
 
             // Создаем захоронения
             Memorial burial1 = new Memorial(user, "Иванов Иван Иванович", LocalDate.of(2023, 1, 15), LocalDate.of(1980, 5, 20));
@@ -77,16 +75,11 @@ public class DataLoader implements CommandLineRunner {
             burial4.setCreatedBy(user);
             memorialRepository.saveAll(List.of(burial1, burial2, burial3,burial4));
 
-            // Создаем заказы
-            Order order1 = new Order(burial1,user, "Уборка территории", "Очистка территории от мусора", 500L, new GregorianCalendar(2024, Calendar.DECEMBER, 25).getTime());
-            Order order2 = new Order(burial2, user, "Уход за надгробием", "Полировка до блеска", 1200L, new GregorianCalendar(2024, Calendar.DECEMBER, 28).getTime());
-            orderRepository.saveAll(List.of(order1, order2));
-
             // Создаем тестовое семейное дерево
             FamilyTree familyTree = new FamilyTree();
             familyTree.setName("Семья Ивановых");
             familyTree.setDescription("Генеалогическое древо семьи Ивановых");
-            familyTree.setOwner(user);
+            familyTree.setUser(user);
             familyTree.setPublic(true);
             familyTreeRepository.save(familyTree);
         }

@@ -32,21 +32,25 @@ public class FamilyTreeAccessController {
     public ResponseEntity<FamilyTreeAccess> updateAccess(
             @PathVariable Long familyTreeId,
             @PathVariable Long userId,
-            @RequestParam FamilyTreeAccess.AccessLevel newAccessLevel) {
-        return ResponseEntity.ok(accessService.updateAccess(familyTreeId, userId, newAccessLevel));
+            @RequestParam FamilyTreeAccess.AccessLevel newAccessLevel,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(accessService.updateAccess(familyTreeId, userId, newAccessLevel, user.getId()));
     }
 
     @DeleteMapping("/users/{userId}")
     public ResponseEntity<Void> revokeAccess(
             @PathVariable Long familyTreeId,
-            @PathVariable Long userId) {
-        accessService.revokeAccess(familyTreeId, userId);
+            @PathVariable Long userId,
+            @AuthenticationPrincipal User user) {
+        accessService.revokeAccess(familyTreeId, userId, user.getId());
         return ResponseEntity.ok().build();
     }
 
     @GetMapping
-    public ResponseEntity<List<FamilyTreeAccess>> getAccessList(@PathVariable Long familyTreeId) {
-        return ResponseEntity.ok(accessService.getAccessList(familyTreeId));
+    public ResponseEntity<List<FamilyTreeAccess>> getAccessList(
+            @PathVariable Long familyTreeId,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(accessService.getAccessList(familyTreeId, user.getId()));
     }
 
     @GetMapping("/my")

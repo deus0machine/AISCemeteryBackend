@@ -56,8 +56,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
                 logger.debug("No valid Authorization header found in request");
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.getWriter().write("No valid Authorization header found");
+                filterChain.doFilter(request, response);
                 return;
             }
 
@@ -66,8 +65,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             if (userLogin == null) {
                 logger.debug("Could not extract username from token");
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.getWriter().write("Invalid token");
+                filterChain.doFilter(request, response);
                 return;
             }
 
@@ -85,8 +83,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     logger.debug("Successfully authenticated user: {}", userLogin);
                 } else {
                     logger.debug("Token is not valid for user: {}", userLogin);
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    response.getWriter().write("Token is not valid");
+                    filterChain.doFilter(request, response);
                     return;
                 }
             }
@@ -94,8 +91,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
         } catch (Exception e) {
             logger.error("Error processing JWT token: {}", e.getMessage(), e);
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.getWriter().write("Error processing authentication token");
+            filterChain.doFilter(request, response);
         }
     }
 } 

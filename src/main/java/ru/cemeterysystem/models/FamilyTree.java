@@ -1,8 +1,6 @@
 package ru.cemeterysystem.models;
 
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.JsonIdentityReference;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import com.fasterxml.jackson.annotation.*;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -23,27 +21,38 @@ public class FamilyTree {
     @Column(length = 1000)
     private String description;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "owner_id", nullable = false)
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
     @JsonIdentityReference(alwaysAsId = true)
-    private User owner;
+    @JsonProperty("user")
+    private User user;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    @JsonProperty("is_public")
     private boolean isPublic;
 
     @Column(name = "created_at", nullable = false)
+    @JsonProperty("created_at")
     private LocalDateTime createdAt;
 
     @Column(name = "updated_at")
+    @JsonProperty("updated_at")
     private LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "familyTree", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIdentityReference(alwaysAsId = true)
+    @JsonProperty("memorialRelations")
     private List<MemorialRelation> memorialRelations;
+
+    @OneToMany(mappedBy = "familyTree", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonProperty("accessList")
+    @JsonManagedReference
+    private List<FamilyTreeAccess> accessList;
 
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
     }
 
     @PreUpdate

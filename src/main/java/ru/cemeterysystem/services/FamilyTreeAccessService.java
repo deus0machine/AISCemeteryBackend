@@ -35,6 +35,10 @@ public class FamilyTreeAccessService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        if (!hasAccess(familyTreeId, grantedById, FamilyTreeAccess.AccessLevel.ADMIN)) {
+            throw new RuntimeException("Insufficient permissions to grant access");
+        }
+
         if (accessRepository.existsByFamilyTreeIdAndUserId(familyTreeId, userId)) {
             throw new RuntimeException("Access already granted for this user");
         }
@@ -49,7 +53,11 @@ public class FamilyTreeAccessService {
     }
 
     @Transactional
-    public FamilyTreeAccess updateAccess(Long familyTreeId, Long userId, FamilyTreeAccess.AccessLevel newAccessLevel) {
+    public FamilyTreeAccess updateAccess(Long familyTreeId, Long userId, FamilyTreeAccess.AccessLevel newAccessLevel, Long updatedById) {
+        if (!hasAccess(familyTreeId, updatedById, FamilyTreeAccess.AccessLevel.ADMIN)) {
+            throw new RuntimeException("Insufficient permissions to update access");
+        }
+
         FamilyTreeAccess access = accessRepository.findByFamilyTreeIdAndUserId(familyTreeId, userId)
                 .orElseThrow(() -> new RuntimeException("Access not found"));
 
@@ -58,7 +66,11 @@ public class FamilyTreeAccessService {
     }
 
     @Transactional
-    public void revokeAccess(Long familyTreeId, Long userId) {
+    public void revokeAccess(Long familyTreeId, Long userId, Long revokedById) {
+        if (!hasAccess(familyTreeId, revokedById, FamilyTreeAccess.AccessLevel.ADMIN)) {
+            throw new RuntimeException("Insufficient permissions to revoke access");
+        }
+
         if (!accessRepository.existsByFamilyTreeIdAndUserId(familyTreeId, userId)) {
             throw new RuntimeException("Access not found");
         }
@@ -66,7 +78,10 @@ public class FamilyTreeAccessService {
     }
 
     @Transactional(readOnly = true)
-    public List<FamilyTreeAccess> getAccessList(Long familyTreeId) {
+    public List<FamilyTreeAccess> getAccessList(Long familyTreeId, Long requestingUserId) {
+        if (!hasAccess(familyTreeId, requestingUserId, FamilyTreeAccess.AccessLevel.VIEWER)) {
+            throw new RuntimeException("Insufficient permissions to view access list");
+        }
         return accessRepository.findByFamilyTreeId(familyTreeId);
     }
 

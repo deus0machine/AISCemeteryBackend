@@ -35,9 +35,13 @@ public class User {
     @JsonIdentityReference(alwaysAsId = true)
     private List<Memorial> memorials;
 
-    @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIdentityReference(alwaysAsId = true)
     private List<FamilyTree> familyTrees;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIdentityReference(alwaysAsId = true)
+    private List<FamilyTreeAccess> accessList;
 
     @Column(name = "balance", nullable = false)
     private Long balance;

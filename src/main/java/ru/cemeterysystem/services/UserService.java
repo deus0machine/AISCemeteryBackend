@@ -1,6 +1,6 @@
 package ru.cemeterysystem.services;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -17,14 +17,10 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class UserService implements UserDetailsService {
-    private UserRepository userRepository;
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-    @Autowired
-    public void setGuestRepository(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public Optional<User> authenticate(String login, String password) {
         Optional<User> guestOpt = userRepository.findByLogin(login);
@@ -33,10 +29,12 @@ public class UserService implements UserDetailsService {
         }
         return Optional.empty();
     }
-    public Optional<User> saveGuestBalance(User user){
+
+    public Optional<User> saveGuestBalance(User user) {
         return Optional.of(userRepository.save(user));
     }
-    public Optional<User> findById(long id){
+
+    public Optional<User> findById(long id) {
         return userRepository.findById(id);
     }
 
@@ -45,11 +43,13 @@ public class UserService implements UserDetailsService {
     }
 
     public List<User> getAllGuests() {
-        return (List<User>) userRepository.findAll();
+        return userRepository.findAll();
     }
+
     public void deleteGuestById(Long id) {
         userRepository.deleteById(id);
     }
+
     public void registerGuest(User user) {
         Optional<User> existingGuest = userRepository.findByLogin(user.getLogin());
         if (existingGuest.isPresent()) {

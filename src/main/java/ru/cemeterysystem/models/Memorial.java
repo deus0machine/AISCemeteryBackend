@@ -35,9 +35,8 @@ public class Memorial {
     @JsonIdentityReference(alwaysAsId = true)
     private User user;
 
-    @OneToMany(mappedBy = "memorial", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonIdentityReference(alwaysAsId = true)
-    private List<Order> orders = new ArrayList<>();
+    @OneToMany(mappedBy = "sourceMemorial", cascade = CascadeType.ALL)
+    private List<MemorialRelation> relations = new ArrayList<>();
 
     @Column(name = "fio", nullable = false)
     @NotNull(message = "ФИО не может быть пустым")
