@@ -40,7 +40,7 @@ public class FamilyTree {
     private LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "familyTree", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonIdentityReference(alwaysAsId = true)
+    //@JsonIdentityReference(alwaysAsId = true)
     @JsonProperty("memorialRelations")
     private List<MemorialRelation> memorialRelations;
 

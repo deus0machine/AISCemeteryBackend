@@ -43,8 +43,8 @@ public class User {
     @JsonIdentityReference(alwaysAsId = true)
     private List<FamilyTreeAccess> accessList;
 
-    @Column(name = "balance", nullable = false)
-    private Long balance;
+    @Column(name = "has_subscription", nullable = false)
+    private Boolean hasSubscription = false;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)

@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import ru.cemeterysystem.dto.FamilyTreeDTO;
 import ru.cemeterysystem.dto.FamilyTreeUpdateDTO;
 import ru.cemeterysystem.dto.MemorialRelationDTO;
 import ru.cemeterysystem.models.FamilyTree;
@@ -82,12 +83,12 @@ public class FamilyTreeController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<FamilyTree> updateFamilyTree(
+    public ResponseEntity<FamilyTreeDTO> updateFamilyTree(
             @PathVariable Long id,
             @RequestBody FamilyTreeUpdateDTO updateDTO) {
         try {
             User user = getCurrentUser();
-            FamilyTree updatedTree = familyTreeService.updateFamilyTree(id, updateDTO, user);
+            FamilyTreeDTO updatedTree = familyTreeService.updateFamilyTree(id, updateDTO, user);
             return ResponseEntity.ok(updatedTree);
         } catch (RuntimeException e) {
             logger.error("Error updating family tree {}: {}", id, e.getMessage(), e);

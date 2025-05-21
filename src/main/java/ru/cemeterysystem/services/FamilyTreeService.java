@@ -7,11 +7,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.cemeterysystem.dto.FamilyTreeUpdateDTO;
 import ru.cemeterysystem.dto.MemorialRelationDTO;
+import ru.cemeterysystem.dto.FamilyTreeDTO;
 import ru.cemeterysystem.models.*;
 import ru.cemeterysystem.repositories.FamilyTreeRepository;
 import ru.cemeterysystem.repositories.FamilyTreeAccessRepository;
 import ru.cemeterysystem.repositories.MemorialRelationRepository;
 import ru.cemeterysystem.repositories.MemorialRepository;
+import ru.cemeterysystem.mappers.FamilyTreeMapper;
 
 import java.util.List;
 
@@ -23,6 +25,7 @@ public class FamilyTreeService {
     private final FamilyTreeAccessRepository accessRepository;
     private final MemorialRelationRepository memorialRelationRepository;
     private final MemorialRepository memorialRepository;
+    private final FamilyTreeMapper familyTreeMapper;
 
     @Autowired
     public FamilyTreeService(
@@ -30,16 +33,18 @@ public class FamilyTreeService {
             FamilyTreeAccessService accessService,
             FamilyTreeAccessRepository accessRepository,
             MemorialRelationRepository memorialRelationRepository,
-            MemorialRepository memorialRepository) {
+            MemorialRepository memorialRepository,
+            FamilyTreeMapper familyTreeMapper) {
         this.familyTreeRepository = familyTreeRepository;
         this.accessService = accessService;
         this.accessRepository = accessRepository;
         this.memorialRelationRepository = memorialRelationRepository;
         this.memorialRepository = memorialRepository;
+        this.familyTreeMapper = familyTreeMapper;
     }
 
     @Transactional
-    public FamilyTree createFamilyTree(FamilyTree familyTree, User user) {
+    public FamilyTreeDTO createFamilyTree(FamilyTree familyTree, User user) {
         try {
             familyTree.setUser(user);
             FamilyTree savedTree = familyTreeRepository.save(familyTree);
@@ -52,7 +57,7 @@ public class FamilyTreeService {
             access.setGrantedById(user.getId());
             accessRepository.save(access);
             
-            return savedTree;
+            return familyTreeMapper.toDTO(savedTree);
         } catch (Exception e) {
             logger.error("Error creating family tree: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to create family tree", e);
@@ -60,13 +65,14 @@ public class FamilyTreeService {
     }
 
     @Transactional(readOnly = true)
-    public List<FamilyTree> getFamilyTreesByOwner(User user) {
+    public List<FamilyTreeDTO> getFamilyTreesByOwner(User user) {
         try {
             if (user == null) {
                 throw new IllegalArgumentException("User cannot be null");
             }
             logger.debug("Getting family trees for user with ID: {}", user.getId());
-            return familyTreeRepository.findByUser_Id(user.getId());
+            return familyTreeRepository.findByUser_Id(user.getId())
+                .stream().map(familyTreeMapper::toDTO).toList();
         } catch (Exception e) {
             logger.error("Error getting family trees for user {}: {}", user.getId(), e.getMessage(), e);
             throw new RuntimeException("Failed to get family trees", e);
@@ -74,9 +80,10 @@ public class FamilyTreeService {
     }
 
     @Transactional(readOnly = true)
-    public List<FamilyTree> getPublicFamilyTrees() {
+    public List<FamilyTreeDTO> getPublicFamilyTrees() {
         try {
-            return familyTreeRepository.findByIsPublicTrue();
+            return familyTreeRepository.findByIsPublicTrue()
+                .stream().map(familyTreeMapper::toDTO).toList();
         } catch (Exception e) {
             logger.error("Error getting public family trees: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to get public family trees", e);
@@ -84,12 +91,13 @@ public class FamilyTreeService {
     }
 
     @Transactional(readOnly = true)
-    public List<FamilyTree> getAccessibleFamilyTrees(User user) {
+    public List<FamilyTreeDTO> getAccessibleFamilyTrees(User user) {
         try {
             if (user == null) {
                 throw new IllegalArgumentException("User cannot be null");
             }
-            return familyTreeRepository.findByUserIdOrPublic(user.getId());
+            return familyTreeRepository.findByUserIdOrPublic(user.getId())
+                .stream().map(familyTreeMapper::toDTO).toList();
         } catch (Exception e) {
             logger.error("Error getting accessible family trees for user {}: {}", user.getId(), e.getMessage(), e);
             throw new RuntimeException("Failed to get accessible family trees", e);
@@ -97,7 +105,7 @@ public class FamilyTreeService {
     }
 
     @Transactional
-    public FamilyTree updateFamilyTree(Long id, FamilyTreeUpdateDTO updateDTO, User user) {
+    public FamilyTreeDTO updateFamilyTree(Long id, FamilyTreeUpdateDTO updateDTO, User user) {
         try {
             FamilyTree existingTree = familyTreeRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Family tree not found"));
@@ -110,7 +118,7 @@ public class FamilyTreeService {
             existingTree.setDescription(updateDTO.getDescription());
             existingTree.setPublic(updateDTO.isPublic());
             
-            return familyTreeRepository.save(existingTree);
+            return familyTreeMapper.toDTO(familyTreeRepository.save(existingTree));
         } catch (Exception e) {
             logger.error("Error updating family tree {}: {}", id, e.getMessage(), e);
             throw new RuntimeException("Failed to update family tree", e);
@@ -132,7 +140,7 @@ public class FamilyTreeService {
     }
 
     @Transactional(readOnly = true)
-    public FamilyTree getFamilyTreeById(Long id, User user) {
+    public FamilyTreeDTO getFamilyTreeById(Long id, User user) {
         try {
             FamilyTree tree = familyTreeRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Family tree not found"));
@@ -141,7 +149,7 @@ public class FamilyTreeService {
                 throw new RuntimeException("Insufficient permissions to view family tree");
             }
             
-            return tree;
+            return familyTreeMapper.toDTO(tree);
         } catch (Exception e) {
             logger.error("Error getting family tree {}: {}", id, e.getMessage(), e);
             throw new RuntimeException("Failed to get family tree", e);
@@ -156,9 +164,11 @@ public class FamilyTreeService {
         FamilyTree tree = familyTreeRepository.findById(treeId)
                 .orElseThrow(() -> new RuntimeException("Family tree not found"));
 
-        Memorial sourceMemorial = memorialRepository.findById(relationDTO.getSourceMemorialId())
+        Memorial sourceMemorial = memorialRepository.findById(
+                        relationDTO.getSourceMemorial() != null ? relationDTO.getSourceMemorial().getId() : null)
                 .orElseThrow(() -> new RuntimeException("Source memorial not found"));
-        Memorial targetMemorial = memorialRepository.findById(relationDTO.getTargetMemorialId())
+        Memorial targetMemorial = memorialRepository.findById(
+                        relationDTO.getTargetMemorial() != null ? relationDTO.getTargetMemorial().getId() : null)
                 .orElseThrow(() -> new RuntimeException("Target memorial not found"));
 
         MemorialRelation relation = new MemorialRelation();
@@ -171,8 +181,9 @@ public class FamilyTreeService {
     }
 
     @Transactional(readOnly = true)
-    public List<MemorialRelation> getRelations(Long treeId) {
-        return memorialRelationRepository.findByFamilyTreeId(treeId);
+    public List<MemorialRelationDTO> getRelations(Long treeId) {
+        List<MemorialRelation> relations = memorialRelationRepository.findByFamilyTreeId(treeId);
+        return relations.stream().map(familyTreeMapper::toRelationDTO).toList();
     }
 
     @Transactional

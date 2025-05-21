@@ -22,12 +22,12 @@ public class MemorialRelation {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "source_memorial_id", nullable = false)
-    @JsonIdentityReference(alwaysAsId = true)
+    //@JsonIdentityReference(alwaysAsId = true)
     private Memorial sourceMemorial;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "target_memorial_id", nullable = false)
-    @JsonIdentityReference(alwaysAsId = true)
+    //@JsonIdentityReference(alwaysAsId = true)
     private Memorial targetMemorial;
 
     @Enumerated(EnumType.STRING)

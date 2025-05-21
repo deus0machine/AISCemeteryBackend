@@ -56,7 +56,7 @@ public class UserController {
             response.put("contacts", user.getContacts());
             response.put("dateOfRegistration", user.getDateOfRegistration());
             response.put("login", user.getLogin());
-            response.put("balance", user.getBalance());
+            response.put("hasSubscription", user.getHasSubscription());
             response.put("role", user.getRole().name());
             response.put("token", token);
             return ResponseEntity.ok(response);

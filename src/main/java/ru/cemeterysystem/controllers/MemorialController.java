@@ -89,6 +89,13 @@ public class MemorialController {
     @PostMapping
     public MemorialDTO createMemorial(@RequestBody MemorialDTO dto) {
         User user = getCurrentUser();
+        
+        // Проверяем наличие подписки, если указаны местоположения
+        if ((dto.getMainLocation() != null || dto.getBurialLocation() != null) && 
+            user.getHasSubscription() != Boolean.TRUE) {
+            throw new IllegalStateException("Для указания местоположения требуется подписка");
+        }
+        
         return memorialService.createMemorial(dto, user.getId());
     }
 
@@ -102,6 +109,14 @@ public class MemorialController {
     @PutMapping("/{id}")
     public MemorialDTO updateMemorial(@PathVariable Long id,
                                       @RequestBody MemorialDTO dto) {
+        User user = getCurrentUser();
+        
+        // Проверяем наличие подписки, если указаны местоположения
+        if ((dto.getMainLocation() != null || dto.getBurialLocation() != null) && 
+            user.getHasSubscription() != Boolean.TRUE) {
+            throw new IllegalStateException("Для указания местоположения требуется подписка");
+        }
+        
         return memorialService.updateMemorial(id, dto);
     }
 
@@ -127,6 +142,14 @@ public class MemorialController {
     @PutMapping("/{id}/privacy")
     public ResponseEntity<Void> updateMemorialPrivacy(@PathVariable Long id,
                                                       @RequestBody boolean isPublic) {
+        // Если пытаемся сделать мемориал публичным, проверяем наличие подписки
+        if (isPublic) {
+            User user = getCurrentUser();
+            if (user.getHasSubscription() != Boolean.TRUE) {
+                throw new IllegalStateException("Для публикации мемориала требуется подписка");
+            }
+        }
+        
         memorialService.updateMemorialPrivacy(id, isPublic);
         return ResponseEntity.ok().build();
     }

@@ -56,7 +56,7 @@ public class UserService implements UserDetailsService {
             throw new IllegalArgumentException("Guest with this login already exists.");
         }
         user.setPassword(passwordEncoder.encode(user.getPassword())); // Хэшируем пароль
-        user.setBalance(10000L);
+        user.setHasSubscription(false);
         user.setDateOfRegistration(new Date());
         user.setRole(User.Role.USER);
         userRepository.save(user); // Сохраняем гостя в базу
