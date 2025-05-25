@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пользователи | Админ-панель</title>
+</head>
+<body>
+    <div th:fragment="content">
+        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <h1 class="h2">Управление пользователями</h1>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <form action="/admin/users" method="get" class="d-flex">
+                    <input type="text" name="search" th:value="${search}" class="form-control me-2" placeholder="Поиск по ФИО...">
+                    <button type="submit" class="btn btn-primary">Найти</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>ФИО</th>
+                        <th>Логин</th>
+                        <th>Контакты</th>
+                        <th>Дата регистрации</th>
+                        <th>Роль</th>
+                        <th>Подписка</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="user : ${users}">
+                        <td th:text="${user.id}"></td>
+                        <td th:text="${user.fio}"></td>
+                        <td th:text="${user.login}"></td>
+                        <td th:text="${user.contacts}"></td>
+                        <td th:text="${#dates.format(user.dateOfRegistration, 'dd.MM.yyyy')}"></td>
+                        <td>
+                            <span th:if="${user.role.name() == 'ADMIN'}" class="badge bg-danger">Администратор</span>
+                            <span th:if="${user.role.name() == 'USER'}" class="badge bg-primary">Пользователь</span>
+                        </td>
+                        <td>
+                            <span th:if="${user.hasSubscription}" class="badge bg-success">Активна</span>
+                            <span th:unless="${user.hasSubscription}" class="badge bg-secondary">Отсутствует</span>
+                        </td>
+                        <td>
+                            <div class="btn-group">
+                                <a th:href="@{'/admin/users/' + ${user.id}}" class="btn btn-sm btn-outline-secondary" title="Просмотр">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a th:href="@{'/admin/users/' + ${user.id} + '/edit'}" class="btn btn-sm btn-outline-primary" title="Редактировать">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <form th:action="@{'/admin/users/' + ${user.id} + '/toggle-status'}" method="post" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-outline-warning" title="Изменить статус подписки">
+                                        <i class="bi bi-toggle-on"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div th:if="${totalPages > 1}" class="pagination justify-content-center">
+            <nav>
+                <ul class="pagination">
+                    <li class="page-item" th:classappend="${currentPage == 0 ? 'disabled' : ''}">
+                        <a class="page-link" th:href="@{/admin/users(page=${currentPage - 1}, size=10, search=${search})}">Предыдущая</a>
+                    </li>
+                    <li class="page-item" th:each="i : ${#numbers.sequence(0, totalPages - 1)}" 
+                        th:classappend="${i == currentPage ? 'active' : ''}">
+                        <a class="page-link" th:href="@{/admin/users(page=${i}, size=10, search=${search})}" th:text="${i + 1}"></a>
+                    </li>
+                    <li class="page-item" th:classappend="${currentPage == totalPages - 1 ? 'disabled' : ''}">
+                        <a class="page-link" th:href="@{/admin/users(page=${currentPage + 1}, size=10, search=${search})}">Следующая</a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+</body>
+</html> 

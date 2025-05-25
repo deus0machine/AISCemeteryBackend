@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <title>Редактирование пользователя</title>
+</head>
+<body>
+<div th:fragment="content">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">
+            <i class="bi bi-person-gear me-2"></i>
+            Редактирование пользователя
+        </h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <a href="/admin/users" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i> Назад к списку
+            </a>
+        </div>
+    </div>
+
+    <div class="alert alert-success alert-dismissible fade show" role="alert" th:if="${successMessage}">
+        <i class="bi bi-check-circle-fill me-2"></i> <span th:text="${successMessage}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert" th:if="${errorMessage}">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i> <span th:text="${errorMessage}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Данные пользователя</h5>
+                </div>
+                <div class="card-body">
+                    <form th:action="@{/admin/users/{id}/edit(id=${user.id})}" method="post">
+                        <div class="row mb-3">
+                            <label for="id" class="col-sm-3 col-form-label">ID пользователя</label>
+                            <div class="col-sm-9">
+                                <input type="text" class="form-control" id="id" th:value="${user.id}" disabled>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <label for="fio" class="col-sm-3 col-form-label">ФИО</label>
+                            <div class="col-sm-9">
+                                <input type="text" class="form-control" id="fio" name="fio" th:value="${user.fio}" required>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <label for="login" class="col-sm-3 col-form-label">Логин</label>
+                            <div class="col-sm-9">
+                                <input type="text" class="form-control" id="login" name="login" th:value="${user.login}" required>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <label for="newPassword" class="col-sm-3 col-form-label">Новый пароль</label>
+                            <div class="col-sm-9">
+                                <input type="password" class="form-control" id="newPassword" name="newPassword" placeholder="Оставьте пустым, чтобы сохранить текущий пароль">
+                                <div class="form-text">Введите новый пароль, только если хотите его изменить.</div>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <label for="contacts" class="col-sm-3 col-form-label">Контакты</label>
+                            <div class="col-sm-9">
+                                <input type="text" class="form-control" id="contacts" name="contacts" th:value="${user.contacts}">
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <label for="role" class="col-sm-3 col-form-label">Роль</label>
+                            <div class="col-sm-9">
+                                <select class="form-select" id="role" name="role" required>
+                                    <option value="USER" th:selected="${user.role.name() == 'USER'}">Пользователь</option>
+                                    <option value="ADMIN" th:selected="${user.role.name() == 'ADMIN'}">Администратор</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <label for="dateOfRegistration" class="col-sm-3 col-form-label">Дата регистрации</label>
+                            <div class="col-sm-9">
+                                <input type="text" class="form-control" id="dateOfRegistration" 
+                                       th:value="${#dates.format(user.dateOfRegistration, 'dd.MM.yyyy')}" disabled>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-sm-3 col-form-label">Подписка</div>
+                            <div class="col-sm-9">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="hasSubscription" 
+                                           name="hasSubscription" th:checked="${user.hasSubscription}">
+                                    <label class="form-check-label" for="hasSubscription">
+                                        <span th:text="${user.hasSubscription ? 'Активна' : 'Не активна'}">Статус подписки</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a th:href="@{/admin/users}" class="btn btn-secondary me-md-2">Отмена</a>
+                            <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Информация</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Статус
+                            <span class="badge rounded-pill" 
+                                  th:classappend="${user.hasSubscription ? 'bg-success' : 'bg-secondary'}" 
+                                  th:text="${user.hasSubscription ? 'Активен' : 'Не активен'}">Статус</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Роль
+                            <span class="badge rounded-pill" 
+                                  th:classappend="${user.role.name() == 'ADMIN' ? 'bg-danger' : 'bg-primary'}" 
+                                  th:text="${user.role.name()}">Роль</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Действия</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-warning" type="button" data-bs-toggle="modal" data-bs-target="#resetPasswordModal">
+                            <i class="bi bi-key me-1"></i> Сбросить пароль
+                        </button>
+                        <button class="btn btn-danger" type="button" onclick="confirmDelete()">
+                            <i class="bi bi-trash me-1"></i> Удалить пользователя
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Модальное окно для подтверждения удаления -->
+    <div class="modal fade" id="deleteConfirmationModal" tabindex="-1" aria-labelledby="deleteConfirmationModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteConfirmationModalLabel">Подтверждение удаления</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Вы уверены, что хотите удалить пользователя <strong th:text="${user.fio}"></strong>?</p>
+                    <p class="text-danger">Это действие невозможно отменить!</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <form th:action="@{/admin/users/delete}" method="post">
+                        <input type="hidden" name="userId" th:value="${user.id}">
+                        <button type="submit" class="btn btn-danger">Удалить</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Модальное окно для сброса пароля -->
+    <div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="resetPasswordModalLabel">Сброс пароля</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form th:action="@{/admin/users/{id}/reset-password(id=${user.id})}" method="post">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="resetPassword" class="form-label">Новый пароль</label>
+                            <input type="password" class="form-control" id="resetPassword" name="newPassword" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="confirmResetPassword" class="form-label">Подтвердите пароль</label>
+                            <input type="password" class="form-control" id="confirmResetPassword" name="confirmPassword" required>
+                            <div class="invalid-feedback" id="passwordMismatch" style="display: none;">
+                                Пароли не совпадают
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary" id="resetPasswordButton">Сбросить пароль</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function confirmDelete() {
+            new bootstrap.Modal(document.getElementById('deleteConfirmationModal')).show();
+        }
+        
+        // Проверка совпадения паролей при сбросе
+        document.addEventListener('DOMContentLoaded', function() {
+            const resetPassword = document.getElementById('resetPassword');
+            const confirmResetPassword = document.getElementById('confirmResetPassword');
+            const passwordMismatch = document.getElementById('passwordMismatch');
+            const resetPasswordButton = document.getElementById('resetPasswordButton');
+            
+            function checkPasswordMatch() {
+                if (resetPassword.value !== confirmResetPassword.value) {
+                    passwordMismatch.style.display = 'block';
+                    resetPasswordButton.disabled = true;
+                    confirmResetPassword.classList.add('is-invalid');
+                } else {
+                    passwordMismatch.style.display = 'none';
+                    resetPasswordButton.disabled = false;
+                    confirmResetPassword.classList.remove('is-invalid');
+                }
+            }
+            
+            resetPassword.addEventListener('keyup', checkPasswordMatch);
+            confirmResetPassword.addEventListener('keyup', checkPasswordMatch);
+        });
+        
+        // Обновление текста для переключателя подписки
+        document.addEventListener('DOMContentLoaded', function() {
+            const hasSubscriptionCheckbox = document.getElementById('hasSubscription');
+            const hasSubscriptionLabel = hasSubscriptionCheckbox.nextElementSibling.querySelector('span');
+            
+            hasSubscriptionCheckbox.addEventListener('change', function() {
+                hasSubscriptionLabel.textContent = this.checked ? 'Активна' : 'Не активна';
+            });
+        });
+    </script>
+</div>
+</body>
+</html> 

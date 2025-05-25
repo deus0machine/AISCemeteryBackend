@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Информация о пользователе | Админ-панель</title>
+</head>
+<body>
+    <div th:fragment="content">
+        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <h1 class="h2">Информация о пользователе</h1>
+            <div class="btn-toolbar mb-2 mb-md-0">
+                <div class="btn-group me-2">
+                    <a th:href="@{'/admin/users/' + ${user.id} + '/edit'}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-pencil me-1"></i> Редактировать
+                    </a>
+                    <a href="/admin/users" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Назад к списку
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Основная информация</h5>
+                    </div>
+                    <div class="card-body">
+                        <table class="table">
+                            <tr>
+                                <th style="width: 30%">ID:</th>
+                                <td th:text="${user.id}"></td>
+                            </tr>
+                            <tr>
+                                <th>ФИО:</th>
+                                <td th:text="${user.fio}"></td>
+                            </tr>
+                            <tr>
+                                <th>Логин:</th>
+                                <td th:text="${user.login}"></td>
+                            </tr>
+                            <tr>
+                                <th>Контакты:</th>
+                                <td th:text="${user.contacts}"></td>
+                            </tr>
+                            <tr>
+                                <th>Дата регистрации:</th>
+                                <td th:text="${#dates.format(user.dateOfRegistration, 'dd.MM.yyyy')}"></td>
+                            </tr>
+                            <tr>
+                                <th>Роль:</th>
+                                <td>
+                                    <span th:if="${user.role.name() == 'ADMIN'}" class="badge bg-danger">Администратор</span>
+                                    <span th:if="${user.role.name() == 'USER'}" class="badge bg-primary">Пользователь</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Подписка:</th>
+                                <td>
+                                    <span th:if="${user.hasSubscription}" class="badge bg-success">Активна</span>
+                                    <span th:unless="${user.hasSubscription}" class="badge bg-secondary">Отсутствует</span>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Мемориалы пользователя</h5>
+                    </div>
+                    <div class="card-body">
+                        <div th:if="${user.memorials != null && !user.memorials.isEmpty()}">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Название</th>
+                                        <th>Действия</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="memorial : ${user.memorials}">
+                                        <td th:text="${memorial.id}"></td>
+                                        <td th:text="${memorial.name}"></td>
+                                        <td>
+                                            <a th:href="@{'/admin/memorials/' + ${memorial.id}}" class="btn btn-sm btn-outline-secondary">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div th:if="${user.memorials == null || user.memorials.isEmpty()}" class="alert alert-info">
+                            У пользователя нет мемориалов
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Семейные древа пользователя</h5>
+                    </div>
+                    <div class="card-body">
+                        <div th:if="${user.familyTrees != null && !user.familyTrees.isEmpty()}">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Название</th>
+                                        <th>Действия</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="tree : ${user.familyTrees}">
+                                        <td th:text="${tree.id}"></td>
+                                        <td th:text="${tree.name}"></td>
+                                        <td>
+                                            <a th:href="@{'/admin/family-trees/' + ${tree.id}}" class="btn btn-sm btn-outline-secondary">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div th:if="${user.familyTrees == null || user.familyTrees.isEmpty()}" class="alert alert-info">
+                            У пользователя нет семейных древ
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 

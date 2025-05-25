@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактирование пользователя | Админ-панель</title>
+</head>
+<body>
+    <div th:fragment="content">
+        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <h1 class="h2">Редактирование пользователя</h1>
+            <div class="btn-toolbar mb-2 mb-md-0">
+                <div class="btn-group me-2">
+                    <a th:href="@{'/admin/users/' + ${user.id}}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-eye me-1"></i> Просмотр
+                    </a>
+                    <a href="/admin/users" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Назад к списку
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Редактирование данных пользователя</h5>
+                    </div>
+                    <div class="card-body">
+                        <form th:action="@{'/admin/users/' + ${user.id}}" method="post">
+                            <div class="mb-3">
+                                <label for="id" class="form-label">ID</label>
+                                <input type="text" class="form-control" id="id" th:value="${user.id}" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label for="fio" class="form-label">ФИО</label>
+                                <input type="text" class="form-control" id="fio" name="fio" th:value="${user.fio}" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="login" class="form-label">Логин</label>
+                                <input type="text" class="form-control" id="login" th:value="${user.login}" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label for="contacts" class="form-label">Контакты</label>
+                                <input type="text" class="form-control" id="contacts" name="contacts" th:value="${user.contacts}">
+                            </div>
+                            <div class="mb-3">
+                                <label for="role" class="form-label">Роль</label>
+                                <select class="form-select" id="role" name="role" required>
+                                    <option th:each="roleOption : ${roles}" 
+                                            th:value="${roleOption}" 
+                                            th:selected="${roleOption == user.role}" 
+                                            th:text="${roleOption.name() == 'ADMIN' ? 'Администратор' : 'Пользователь'}">
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="hasSubscription" name="hasSubscription" th:checked="${user.hasSubscription}">
+                                <label class="form-check-label" for="hasSubscription">Подписка активна</label>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">Управление аккаунтом</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-4">
+                            <h6>Изменение статуса подписки</h6>
+                            <p>Текущий статус: 
+                                <span th:if="${user.hasSubscription}" class="badge bg-success">Активна</span>
+                                <span th:unless="${user.hasSubscription}" class="badge bg-secondary">Отсутствует</span>
+                            </p>
+                            <form th:action="@{'/admin/users/' + ${user.id} + '/toggle-status'}" method="post">
+                                <button type="submit" class="btn btn-warning">
+                                    <i class="bi bi-toggle-on me-1"></i> Изменить статус подписки
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 
