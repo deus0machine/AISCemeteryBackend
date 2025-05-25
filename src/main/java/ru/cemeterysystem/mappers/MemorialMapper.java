@@ -11,6 +11,8 @@ import java.time.format.DateTimeFormatter;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -56,6 +58,26 @@ public class MemorialMapper implements RowMapper<Memorial> {
         dto.setCreatedBy(userMapper.toDTO(memorial.getCreatedBy()));
         dto.setCreatedAt(memorial.getCreatedAt());
         dto.setUpdatedAt(memorial.getUpdatedAt());
+        
+        if (memorial.getEditors() != null) {
+            List<Long> editorIds = memorial.getEditors().stream()
+                .map(User::getId)
+                .collect(Collectors.toList());
+            dto.setEditorIds(editorIds);
+        }
+        
+        dto.setPendingChanges(memorial.isPendingChanges());
+        
+        // Маппинг полей ожидающих изменений
+        dto.setPendingPhotoUrl(memorial.getPendingPhotoUrl());
+        dto.setPendingBiography(memorial.getPendingBiography());
+        dto.setPendingBirthDate(memorial.getPendingBirthDate() != null ? 
+                memorial.getPendingBirthDate().format(DATE_FORMATTER) : null);
+        dto.setPendingDeathDate(memorial.getPendingDeathDate() != null ? 
+                memorial.getPendingDeathDate().format(DATE_FORMATTER) : null);
+        dto.setPendingMainLocation(memorial.getPendingMainLocation());
+        dto.setPendingBurialLocation(memorial.getPendingBurialLocation());
+        
         return dto;
     }
 

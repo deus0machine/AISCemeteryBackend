@@ -21,4 +21,22 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     
     // Находит уведомления, ожидающие ответа
     List<Notification> findByUserIdAndStatus(Long userId, Notification.NotificationStatus status);
+    
+    // Находит уведомления для конкретного мемориала с определенным типом и статусом
+    List<Notification> findByRelatedEntityIdAndTypeAndStatus(
+        Long relatedEntityId, 
+        Notification.NotificationType type, 
+        Notification.NotificationStatus status
+    );
+    
+    // Находит все уведомления, связанные с определенной сущностью
+    List<Notification> findByRelatedEntityId(Long relatedEntityId);
+    
+    // Находит уведомления пользователя для определенной сущности, с определенным типом и статусом
+    List<Notification> findByUserIdAndRelatedEntityIdAndTypeAndStatus(
+        Long userId,
+        Long relatedEntityId, 
+        Notification.NotificationType type, 
+        Notification.NotificationStatus status
+    );
 } 

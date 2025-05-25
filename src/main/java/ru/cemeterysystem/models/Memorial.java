@@ -16,7 +16,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Data
 @AllArgsConstructor
@@ -37,6 +39,16 @@ public class Memorial {
 
     @OneToMany(mappedBy = "sourceMemorial", cascade = CascadeType.ALL)
     private List<MemorialRelation> relations = new ArrayList<>();
+
+    // Редакторы мемориала (совместные владельцы)
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+        name = "memorial_editors",
+        joinColumns = @JoinColumn(name = "memorial_id"),
+        inverseJoinColumns = @JoinColumn(name = "user_id")
+    )
+    @JsonIdentityReference(alwaysAsId = true)
+    private Set<User> editors = new HashSet<>();
 
     @Column(name = "fio", nullable = false)
     @NotNull(message = "ФИО не может быть пустым")
@@ -94,6 +106,56 @@ public class Memorial {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    // Флаг, указывающий, требуются ли изменения подтверждения основным владельцем
+    @Column(name = "pending_changes", nullable = false, columnDefinition = "boolean default false")
+    private boolean pendingChanges = false;
+    
+    // Временное хранение предыдущего состояния мемориала
+    @Column(name = "previous_state", columnDefinition = "TEXT")
+    private String previousState;
+    
+    // Временное хранение предложенных изменений
+    @Column(name = "proposed_changes", columnDefinition = "TEXT")
+    private String proposedChanges;
+    
+    // Временный URL изображения при редактировании
+    @Column(name = "pending_photo_url")
+    private String pendingPhotoUrl;
+    
+    // Временные данные для биографии при редактировании
+    @Column(name = "pending_biography", columnDefinition = "TEXT")
+    private String pendingBiography;
+    
+    // Временные данные для даты рождения при редактировании
+    @Column(name = "pending_birth_date")
+    private LocalDate pendingBirthDate;
+    
+    // Временные данные для даты смерти при редактировании
+    @Column(name = "pending_death_date")
+    private LocalDate pendingDeathDate;
+    
+    // Временные данные для основного местоположения при редактировании
+    @Embedded
+    @AttributeOverrides({
+        @AttributeOverride(name = "latitude", column = @Column(name = "pending_main_latitude")),
+        @AttributeOverride(name = "longitude", column = @Column(name = "pending_main_longitude")),
+        @AttributeOverride(name = "address", column = @Column(name = "pending_main_address"))
+    })
+    private Location pendingMainLocation;
+    
+    // Временные данные для места захоронения при редактировании
+    @Embedded
+    @AttributeOverrides({
+        @AttributeOverride(name = "latitude", column = @Column(name = "pending_burial_latitude")),
+        @AttributeOverride(name = "longitude", column = @Column(name = "pending_burial_longitude")),
+        @AttributeOverride(name = "address", column = @Column(name = "pending_burial_address"))
+    })
+    private Location pendingBurialLocation;
+    
+    // ID пользователя, который внес последние изменения
+    @Column(name = "last_editor_id")
+    private Long lastEditorId;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -110,5 +172,30 @@ public class Memorial {
         this.fio = fio;
         this.deathDate = deathDate;
         this.birthDate = birthDate;
+    }
+    
+    // Метод для проверки, является ли пользователь редактором
+    public boolean isEditor(User user) {
+        return editors.contains(user);
+    }
+    
+    // Метод для проверки, является ли пользователь владельцем
+    public boolean isOwner(User user) {
+        return this.user.equals(user);
+    }
+    
+    // Метод для добавления редактора
+    public void addEditor(User editor) {
+        editors.add(editor);
+    }
+    
+    // Метод для удаления редактора
+    public void removeEditor(User editor) {
+        editors.remove(editor);
+    }
+
+    // Геттер для editors - убедимся, что он есть
+    public Set<User> getEditors() {
+        return editors;
     }
 }

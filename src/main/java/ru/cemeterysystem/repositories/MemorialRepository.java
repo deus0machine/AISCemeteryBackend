@@ -14,6 +14,11 @@ public interface MemorialRepository extends JpaRepository<Memorial, Long> {
     List<Memorial> findByFio(String fio);
     List<Memorial> findByUser_Id(Long userId);
     
+    List<Memorial> findByEditorsContaining(User user);
+    
+    @Query("SELECT m FROM Memorial m JOIN m.editors e WHERE e.id = :userId")
+    List<Memorial> findMemorialsWhereUserIsEditor(@Param("userId") Long userId);
+    
     @Query("SELECT m FROM Memorial m WHERE " +
            "(:query IS NULL OR LOWER(m.fio) LIKE LOWER(CONCAT('%', :query, '%'))) AND " +
            "(:location IS NULL OR LOWER(m.mainLocation.address) LIKE LOWER(CONCAT('%', :location, '%')) OR " +

@@ -22,9 +22,10 @@ public class UserController {
     private final JwtUtils jwtUtils;
 
     @GetMapping("/guest/get/{guestId}")
-    public ResponseEntity<Optional<User>> getGuestById(@PathVariable Long guestId) {
-        Optional<User> guest = userService.findById(guestId);
-        return ResponseEntity.ok(guest);
+    public ResponseEntity<User> getGuestById(@PathVariable Long guestId) {
+        return userService.findById(guestId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping("/register")

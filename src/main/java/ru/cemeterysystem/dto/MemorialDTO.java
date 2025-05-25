@@ -4,6 +4,7 @@ import lombok.Data;
 import ru.cemeterysystem.models.Location;
 import java.time.LocalDateTime;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 
 @Data
 public class MemorialDTO {
@@ -21,4 +22,21 @@ public class MemorialDTO {
     private UserDTO createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    
+    @JsonProperty("editors")
+    private List<Long> editorIds;
+    
+    @JsonProperty("is_editor")
+    private boolean isEditor;
+    
+    @JsonProperty("pendingChanges")
+    private boolean pendingChanges;
+    
+    // Поля для ожидающих изменений
+    private String pendingPhotoUrl;
+    private String pendingBiography;
+    private String pendingBirthDate;
+    private String pendingDeathDate;
+    private Location pendingMainLocation;
+    private Location pendingBurialLocation;
 } 

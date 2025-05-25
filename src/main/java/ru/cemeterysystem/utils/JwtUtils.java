@@ -72,12 +72,7 @@ public class JwtUtils {
     }
 
     private Key getSignInKey() {
-        byte[] keyBytes = new byte[SECRET_KEY.length() / 2];
-        for (int i = 0; i < keyBytes.length; i++) {
-            int index = i * 2;
-            int j = Integer.parseInt(SECRET_KEY.substring(index, index + 2), 16);
-            keyBytes[i] = (byte) j;
-        }
+        byte[] keyBytes = Decoders.BASE64.decode(SECRET_KEY);
         return Keys.hmacShaKeyFor(keyBytes);
     }
 }

@@ -55,7 +55,8 @@ public class Notification {
         TREE_ACCESS_REQUEST,      // Запрос на доступ к дереву
         MEMORIAL_COMMENT,         // Комментарий к мемориалу
         ANNIVERSARY,              // Годовщина
-        SYSTEM                    // Системное уведомление
+        SYSTEM,                   // Системное уведомление
+        MEMORIAL_EDIT             // Уведомление о изменении мемориала
     }
     
     public enum NotificationStatus {
