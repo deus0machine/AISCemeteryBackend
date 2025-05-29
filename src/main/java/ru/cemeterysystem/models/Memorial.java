@@ -123,6 +123,10 @@ public class Memorial {
     @Column(name = "pending_changes", nullable = false, columnDefinition = "boolean default false")
     private boolean pendingChanges = false;
     
+    // Флаг, указывающий, что изменения опубликованного мемориала находятся на модерации у администраторов
+    @Column(name = "changes_under_moderation", nullable = false, columnDefinition = "boolean default false")
+    private boolean changesUnderModeration = false;
+    
     // Временное хранение предыдущего состояния мемориала
     @Column(name = "previous_state", columnDefinition = "TEXT")
     private String previousState;
@@ -135,6 +139,10 @@ public class Memorial {
     @Column(name = "pending_photo_url")
     private String pendingPhotoUrl;
     
+    // Временные данные для ФИО при редактировании
+    @Column(name = "pending_fio")
+    private String pendingFio;
+    
     // Временные данные для биографии при редактировании
     @Column(name = "pending_biography", columnDefinition = "TEXT")
     private String pendingBiography;
@@ -146,6 +154,10 @@ public class Memorial {
     // Временные данные для даты смерти при редактировании
     @Column(name = "pending_death_date")
     private LocalDate pendingDeathDate;
+    
+    // Временные данные для публичности при редактировании
+    @Column(name = "pending_is_public")
+    private Boolean pendingIsPublic;
     
     // Временные данные для основного местоположения при редактировании
     @Embedded

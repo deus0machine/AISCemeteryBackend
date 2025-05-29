@@ -62,8 +62,13 @@ public class Notification {
         SYSTEM,                   // Системное уведомление
         MEMORIAL_EDIT,            // Уведомление о изменении мемориала
         MODERATION,               // Уведомление о модерации контента
+        CHANGES_REJECTED,         // Уведомление об отклонении изменений мемориала
         TECHNICAL,                // Техническое уведомление
-        USER_REQUEST              // Запрос от пользователя
+        USER_REQUEST,             // Запрос от пользователя
+        MEMORIAL_MODERATION,      // Новый мемориал на модерации
+        CHANGES_MODERATION,       // Изменения мемориала на модерации
+        MEMORIAL_APPROVED,        // Мемориал одобрен администратором
+        MEMORIAL_REJECTED         // Мемориал отклонен администратором
     }
     
     public enum NotificationStatus {

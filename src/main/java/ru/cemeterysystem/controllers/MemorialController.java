@@ -70,8 +70,21 @@ public class MemorialController {
      */
     @GetMapping("/my")
     public List<MemorialDTO> getMyMemorials() {
+        log.info("=== ЗАПРОС МОИ МЕМОРИАЛЫ ===");
         User user = getCurrentUser();
-        return memorialService.getMyMemorials(user.getId());
+        log.info("Получение 'моих мемориалов' для пользователя: {}", user.getLogin());
+        
+        List<MemorialDTO> memorials = memorialService.getMyMemorials(user.getId());
+        log.info("Найдено {} мемориалов для пользователя {}", memorials.size(), user.getLogin());
+        
+        // Логируем статус каждого мемориала
+        for (MemorialDTO memorial : memorials) {
+            log.info("Мемориал ID={}, '{}', publicationStatus={}, isPublic={}, pendingChanges={}, changesUnderModeration={}", 
+                    memorial.getId(), memorial.getFio(), memorial.getPublicationStatus(), 
+                    memorial.isPublic(), memorial.isPendingChanges(), memorial.isChangesUnderModeration());
+        }
+        
+        return memorials;
     }
 
     /**
@@ -218,6 +231,25 @@ public class MemorialController {
         
         log.info("Отправка мемориала ID={} на модерацию пользователем {}", id, user.getLogin());
         return memorialService.sendForModeration(id, user);
+    }
+
+    /**
+     * Отправляет изменения опубликованного мемориала на модерацию.
+     *
+     * @param id ID памятника
+     * @return обновленный мемориал
+     */
+    @PostMapping("/{id}/send-changes-for-moderation")
+    public MemorialDTO sendChangesForModeration(@PathVariable Long id) {
+        User user = getCurrentUser();
+        
+        // Проверяем наличие подписки
+        if (user.getHasSubscription() != Boolean.TRUE) {
+            throw new IllegalStateException("Для отправки изменений на модерацию требуется подписка");
+        }
+        
+        log.info("Отправка изменений мемориала ID={} на модерацию пользователем {}", id, user.getLogin());
+        return memorialService.sendChangesForModeration(id, user);
     }
 
     /**
@@ -372,5 +404,84 @@ public class MemorialController {
         public void setApprove(boolean approve) {
             this.approve = approve;
         }
+    }
+
+    /**
+     * Одобряет публикацию мемориала (для администраторов).
+     *
+     * @param id ID памятника
+     * @return обновленный мемориал
+     */
+    @PostMapping("/{id}/approve")
+    public MemorialDTO approveMemorial(@PathVariable Long id) {
+        User user = getCurrentUser();
+        
+        // Проверяем права администратора
+        if (user.getRole() != User.Role.ADMIN) {
+            throw new RuntimeException("Только администраторы могут одобрять публикацию мемориалов");
+        }
+        
+        log.info("Одобрение публикации мемориала ID={} администратором {}", id, user.getLogin());
+        return memorialService.moderateMemorial(id, true, user, null);
+    }
+    
+    /**
+     * Отклоняет публикацию мемориала с указанием причины (для администраторов).
+     *
+     * @param id ID памятника
+     * @param reason причина отклонения
+     * @return обновленный мемориал
+     */
+    @PostMapping("/{id}/reject")
+    public MemorialDTO rejectMemorial(@PathVariable Long id, @RequestBody String reason) {
+        User user = getCurrentUser();
+        
+        // Проверяем права администратора
+        if (user.getRole() != User.Role.ADMIN) {
+            throw new RuntimeException("Только администраторы могут отклонять публикацию мемориалов");
+        }
+        
+        log.info("Отклонение публикации мемориала ID={} администратором {}", id, user.getLogin());
+        return memorialService.moderateMemorial(id, false, user, reason);
+    }
+    
+    /**
+     * Одобряет изменения опубликованного мемориала (для администраторов).
+     *
+     * @param id ID памятника
+     * @return обновленный мемориал
+     */
+    @PostMapping("/{id}/admin/approve-changes")
+    public MemorialDTO approveChangesByAdmin(@PathVariable Long id) {
+        User user = getCurrentUser();
+        
+        // Проверяем права администратора
+        if (user.getRole() != User.Role.ADMIN) {
+            throw new RuntimeException("Только администраторы могут одобрять изменения мемориалов");
+        }
+        
+        log.info("Одобрение изменений мемориала ID={} администратором {}", id, user.getLogin());
+        return memorialService.approveChangesByAdmin(id, user);
+    }
+    
+    /**
+     * Отклоняет изменения опубликованного мемориала с указанием причины (для администраторов).
+     * Мемориал остается опубликованным с исходными данными.
+     *
+     * @param id ID памятника
+     * @param reason причина отклонения
+     * @return обновленный мемориал
+     */
+    @PostMapping("/{id}/admin/reject-changes")
+    public MemorialDTO rejectChangesByAdmin(@PathVariable Long id, @RequestBody String reason) {
+        User user = getCurrentUser();
+        
+        // Проверяем права администратора
+        if (user.getRole() != User.Role.ADMIN) {
+            throw new RuntimeException("Только администраторы могут отклонять изменения мемориалов");
+        }
+        
+        log.info("Отклонение изменений мемориала ID={} администратором {}", id, user.getLogin());
+        return memorialService.rejectChanges(id, reason, user);
     }
 }

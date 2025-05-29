@@ -71,15 +71,22 @@ public class MemorialMapper implements RowMapper<Memorial> {
         
         dto.setPendingChanges(memorial.isPendingChanges());
         
+        dto.setChangesUnderModeration(memorial.isChangesUnderModeration());
+        
         // Маппинг полей ожидающих изменений
         dto.setPendingPhotoUrl(memorial.getPendingPhotoUrl());
+        dto.setPendingFio(memorial.getPendingFio());
         dto.setPendingBiography(memorial.getPendingBiography());
         dto.setPendingBirthDate(memorial.getPendingBirthDate() != null ? 
                 memorial.getPendingBirthDate().format(DATE_FORMATTER) : null);
         dto.setPendingDeathDate(memorial.getPendingDeathDate() != null ? 
                 memorial.getPendingDeathDate().format(DATE_FORMATTER) : null);
+        dto.setPendingIsPublic(memorial.getPendingIsPublic());
         dto.setPendingMainLocation(memorial.getPendingMainLocation());
         dto.setPendingBurialLocation(memorial.getPendingBurialLocation());
+        
+        // Маппинг количества просмотров
+        dto.setViewCount(memorial.getViewCount() != null ? memorial.getViewCount() : 0);
         
         return dto;
     }

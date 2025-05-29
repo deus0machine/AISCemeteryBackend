@@ -33,14 +33,22 @@ public class MemorialDTO {
     @JsonProperty("pendingChanges")
     private boolean pendingChanges;
     
+    @JsonProperty("changesUnderModeration")
+    private boolean changesUnderModeration;
+    
     // Добавляем поле статуса публикации
     private PublicationStatus publicationStatus;
     
+    // Добавляем поле для количества просмотров
+    private Integer viewCount = 0;
+    
     // Поля для ожидающих изменений
     private String pendingPhotoUrl;
+    private String pendingFio;
     private String pendingBiography;
     private String pendingBirthDate;
     private String pendingDeathDate;
+    private Boolean pendingIsPublic;
     private Location pendingMainLocation;
     private Location pendingBurialLocation;
 } 

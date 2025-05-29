@@ -20,6 +20,7 @@ import ru.cemeterysystem.repositories.MemorialRepository;
 import ru.cemeterysystem.repositories.NotificationRepository;
 import ru.cemeterysystem.repositories.UserRepository;
 import ru.cemeterysystem.services.MemorialService;
+import ru.cemeterysystem.dto.MemorialDTO;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -220,7 +221,7 @@ public class AdminMemorialController {
         
         try {
             boolean approved = "approve".equals(action);
-            memorialService.moderateMemorial(id, approved, admin);
+            memorialService.moderateMemorial(id, approved, admin, null);
             
             if (approved) {
                 redirectAttributes.addFlashAttribute("successMessage", "Мемориал успешно опубликован");
@@ -256,7 +257,7 @@ public class AdminMemorialController {
         
         try {
             // Одобряем мемориал через сервис
-            memorialService.moderateMemorial(id, true, admin);
+            memorialService.moderateMemorial(id, true, admin, null);
             
             // Обновляем статус связанного уведомления о модерации
             List<Notification> moderationNotifications = notificationRepository.findByRelatedEntityIdAndType(
@@ -316,69 +317,258 @@ public class AdminMemorialController {
      * Обработчик POST-запроса для отклонения мемориала с указанием причины
      */
     @PostMapping("/{id}/reject")
-    public String rejectMemorialWithReason(
-            @PathVariable Long id,
-            @RequestParam("rejectionReason") String rejectionReason,
+    public String rejectMemorialPost(@PathVariable Long id, 
+                                @RequestParam(name = "reason", required = false) String reason,
             RedirectAttributes redirectAttributes) {
-        
-        // Получаем текущего администратора
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String login = authentication.getName();
-        User admin = userRepository.findByLogin(login)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        
-        // Проверяем, что пользователь действительно администратор
-        if (admin.getRole() != User.Role.ADMIN) {
-            redirectAttributes.addFlashAttribute("errorMessage", "Только администратор может отклонять мемориалы");
-            return "redirect:/memorials/" + id;
-        }
-        
         try {
-            Memorial memorial = memorialRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Memorial not found"));
-                
+            // Получаем текущего пользователя
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String login = authentication.getName();
+            User currentUser = userRepository.findByLogin(login)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
             // Отклоняем мемориал
-            memorialService.moderateMemorial(id, false, admin);
+            memorialService.moderateMemorial(id, false, currentUser, reason);
             
-            // Обновляем статус связанного уведомления о модерации
-            List<Notification> moderationNotifications = notificationRepository.findByRelatedEntityIdAndType(
-                id, Notification.NotificationType.MODERATION);
-            
-            for (Notification notification : moderationNotifications) {
-                if (notification.getStatus() == Notification.NotificationStatus.PENDING) {
-                    notification.setStatus(Notification.NotificationStatus.REJECTED);
-                    notification.setRead(true);
-                    notificationRepository.save(notification);
-                    log.info("Обновлен статус уведомления ID={} для мемориала ID={} на REJECTED", 
-                            notification.getId(), id);
-                }
-            }
-            
-            // Создаем дополнительное уведомление с причиной отклонения
-            if (rejectionReason != null && !rejectionReason.isEmpty()) {
-                Notification reasonNotification = new Notification();
-                reasonNotification.setUser(memorial.getCreatedBy());
-                reasonNotification.setSender(admin);
-                reasonNotification.setTitle("Причина отклонения публикации");
-                reasonNotification.setMessage("Причина отклонения мемориала '" + memorial.getFio() + "': " + rejectionReason);
-                reasonNotification.setType(Notification.NotificationType.MODERATION);
-                reasonNotification.setStatus(Notification.NotificationStatus.INFO);
-                reasonNotification.setRead(false);
-                reasonNotification.setUrgent(true);
-                reasonNotification.setCreatedAt(LocalDateTime.now());
-                reasonNotification.setRelatedEntityId(memorial.getId());
-                reasonNotification.setRelatedEntityName(memorial.getFio());
-                Notification savedNotification = notificationRepository.save(reasonNotification);
-                log.info("Создано дополнительное уведомление ID={} с причиной отклонения для мемориала ID={}", 
-                        savedNotification.getId(), id);
-            }
-            
-            redirectAttributes.addFlashAttribute("successMessage", "Публикация мемориала отклонена с указанием причины");
+            redirectAttributes.addFlashAttribute("successMessage", "Мемориал отклонен");
         } catch (Exception e) {
-            log.error("Ошибка при отклонении мемориала ID={}: {}", id, e.getMessage(), e);
+            log.error("Ошибка при отклонении мемориала: {}", e.getMessage(), e);
             redirectAttributes.addFlashAttribute("errorMessage", "Ошибка при отклонении мемориала: " + e.getMessage());
         }
         
-        return "redirect:/memorials/" + id;
+        return "redirect:/admin/memorials/" + id;
+    }
+
+    @GetMapping("/{id}")
+    public String viewMemorial(@PathVariable Long id, Model model) {
+        log.info("=== АДМИН ПРОСМАТРИВАЕТ МЕМОРИАЛ ===");
+        log.info("AdminMemorialController.viewMemorial: запрос на просмотр мемориала ID={}", id);
+        
+        Optional<Memorial> optionalMemorial = memorialRepository.findById(id);
+        if (optionalMemorial.isEmpty()) {
+            log.error("Мемориал ID={} не найден", id);
+            return "redirect:/admin/memorials?error=Memorial+not+found";
+        }
+        
+        Memorial memorial = optionalMemorial.get();
+        log.info("Найден мемориал ID={}, ФИО='{}', changesUnderModeration={}, publicationStatus={}", 
+                id, memorial.getFio(), memorial.isChangesUnderModeration(), memorial.getPublicationStatus());
+        
+        // Получаем текущего пользователя
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String login = authentication.getName();
+        log.info("Текущий пользователь: {}", login);
+        
+        User currentUser = userRepository.findByLogin(login).orElse(null);
+        
+        if (currentUser == null) {
+            log.error("Пользователь {} не найден в базе данных", login);
+            return "redirect:/login";
+        }
+        
+        log.info("Найден пользователь: ID={}, роль={}", currentUser.getId(), currentUser.getRole());
+        
+        // Проверяем права доступа
+        boolean isAdmin = currentUser.getRole() == User.Role.ADMIN;
+        if (!isAdmin) {
+            log.error("Пользователь {} не является администратором!", currentUser.getLogin());
+            return "redirect:/admin/memorials?error=Access+denied";
+        }
+        
+        log.info("AdminMemorialController.viewMemorial: мемориал ID={}, changesUnderModeration={}, currentUser={}, role={}", 
+                id, memorial.isChangesUnderModeration(), currentUser.getLogin(), currentUser.getRole());
+        
+        // Получаем мемориал через сервис, чтобы админ видел изменения на модерации
+        MemorialDTO memorialDto = memorialService.getMemorialByIdForUser(id, currentUser);
+        
+        log.info("AdminMemorialController.viewMemorial: получен DTO для админа - ID={}, ФИО='{}', changesUnderModeration={}", 
+                memorialDto.getId(), memorialDto.getFio(), memorialDto.isChangesUnderModeration());
+        
+        model.addAttribute("memorial", memorialDto);
+        model.addAttribute("isAdmin", true);
+        
+        // Если мемориал находится на модерации, добавляем соответствующие параметры
+        if (memorial.getPublicationStatus() == Memorial.PublicationStatus.PENDING_MODERATION) {
+            model.addAttribute("needsModeration", true);
+            log.info("УСТАНОВЛЕН ФЛАГ needsModeration=true для мемориала ID={}", id);
+        } else {
+            log.info("ФЛАГ needsModeration НЕ установлен, так как publicationStatus={}", memorial.getPublicationStatus());
+        }
+        
+        // ИСПРАВЛЕНО: Используем DTO для проверки изменений на модерации
+        if (memorialDto.isChangesUnderModeration()) {
+            model.addAttribute("changesNeedModeration", true);
+            log.info("УСТАНОВЛЕН ФЛАГ changesNeedModeration=true для мемориала ID={}", id);
+        } else {
+            log.info("ФЛАГ changesNeedModeration НЕ установлен для мемориала ID={}", id);
+        }
+        
+        log.info("ИТОГОВЫЕ ФЛАГИ для admin/memorial-view: needsModeration={}, changesNeedModeration={}", 
+                model.getAttribute("needsModeration"), 
+                model.getAttribute("changesNeedModeration"));
+        
+        return "admin/memorial-view";
+    }
+    
+    @PostMapping("/{id}/approve")
+    public String approveMemorialPost(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        log.info("=== ОДОБРЕНИЕ ПУБЛИКАЦИИ МЕМОРИАЛА ===");
+        log.info("approveMemorialPost: запрос на одобрение мемориала ID={}", id);
+        
+        try {
+            // ПРОВЕРКА: получаем мемориал и проверяем, что он требует модерации
+            Optional<Memorial> checkMemorial = memorialRepository.findById(id);
+            if (checkMemorial.isPresent()) {
+                Memorial mem = checkMemorial.get();
+                log.warn("ВНИМАНИЕ! approveMemorialPost вызван для мемориала ID={} со статусом: " +
+                        "publicationStatus={}, changesUnderModeration={}", 
+                        id, mem.getPublicationStatus(), mem.isChangesUnderModeration());
+                
+                // Если мемориал уже опубликован И имеет изменения на модерации,
+                // то это неправильный метод!
+                if (mem.getPublicationStatus() == Memorial.PublicationStatus.PUBLISHED && 
+                    mem.isChangesUnderModeration()) {
+                    log.error("ОШИБКА! Для одобрения ИЗМЕНЕНИЙ нужно использовать /approve-changes, а не /approve!");
+                    redirectAttributes.addFlashAttribute("errorMessage", 
+                            "Неверный метод! Используйте кнопку 'Одобрить изменения' для модерации изменений.");
+                    return "redirect:/admin/memorials/" + id;
+                }
+            }
+            
+            // Получаем текущего пользователя
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String login = authentication.getName();
+            log.info("Текущий пользователь: {}", login);
+            
+            User currentUser = userRepository.findByLogin(login)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            log.info("Найден пользователь: ID={}, роль={}", currentUser.getId(), currentUser.getRole());
+            
+            // ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА: читаем мемориал до изменений
+            Optional<Memorial> memorialBeforeOpt = memorialRepository.findById(id);
+            if (memorialBeforeOpt.isPresent()) {
+                Memorial memorialBefore = memorialBeforeOpt.get();
+                log.info("СОСТОЯНИЕ ДО МОДЕРАЦИИ: ID={}, publicationStatus={}, isPublic={}", 
+                        id, memorialBefore.getPublicationStatus(), memorialBefore.isPublic());
+            } else {
+                log.error("МЕМОРИАЛ ID={} НЕ НАЙДЕН В БД!", id);
+                redirectAttributes.addFlashAttribute("errorMessage", "Мемориал не найден");
+                return "redirect:/admin/memorials/" + id;
+            }
+            
+            log.info("Вызываем memorialService.moderateMemorial({}, true, {}, null)", id, currentUser.getLogin());
+            
+            // Одобряем мемориал
+            MemorialDTO result = memorialService.moderateMemorial(id, true, currentUser, null);
+            
+            log.info("Результат moderateMemorial: ID={}, publicationStatus={}, isPublic={}", 
+                    result.getId(), result.getPublicationStatus(), result.isPublic());
+            
+            // ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА: читаем мемориал ПОСЛЕ изменений
+            Optional<Memorial> memorialAfterOpt = memorialRepository.findById(id);
+            if (memorialAfterOpt.isPresent()) {
+                Memorial memorialAfter = memorialAfterOpt.get();
+                log.info("СОСТОЯНИЕ ПОСЛЕ МОДЕРАЦИИ: ID={}, publicationStatus={}, isPublic={}", 
+                        id, memorialAfter.getPublicationStatus(), memorialAfter.isPublic());
+                
+                // Проверяем, действительно ли изменения применились
+                if (memorialAfter.getPublicationStatus() != Memorial.PublicationStatus.PUBLISHED) {
+                    log.error("ОШИБКА! Мемориал ID={} после одобрения имеет статус {}, а должен быть PUBLISHED!", 
+                            id, memorialAfter.getPublicationStatus());
+                }
+                if (!memorialAfter.isPublic()) {
+                    log.error("ОШИБКА! Мемориал ID={} после одобрения имеет isPublic={}, а должен быть true!", 
+                            id, memorialAfter.isPublic());
+                }
+            }
+            
+            redirectAttributes.addFlashAttribute("successMessage", "Мемориал успешно одобрен и опубликован");
+        } catch (Exception e) {
+            log.error("ОШИБКА при одобрении мемориала ID={}: {}", id, e.getMessage(), e);
+            redirectAttributes.addFlashAttribute("errorMessage", "Ошибка при одобрении мемориала: " + e.getMessage());
+        }
+        
+        log.info("Перенаправляем на /admin/memorials/{}", id);
+        return "redirect:/admin/memorials/" + id;
+    }
+    
+    @PostMapping("/{id}/approve-changes")
+    public String approveChanges(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        log.info("=== АДМИНИСТРАТОР ОДОБРЯЕТ ИЗМЕНЕНИЯ ===");
+        log.info("Получен запрос на одобрение изменений мемориала ID={}", id);
+        
+        try {
+            // ПРОВЕРКА: получаем мемориал и проверяем его состояние
+            Optional<Memorial> checkMemorial = memorialRepository.findById(id);
+            if (checkMemorial.isPresent()) {
+                Memorial mem = checkMemorial.get();
+                log.info("approveChanges: мемориал ID={} имеет статус: " +
+                        "publicationStatus={}, changesUnderModeration={}, pendingChanges={}", 
+                        id, mem.getPublicationStatus(), mem.isChangesUnderModeration(), mem.isPendingChanges());
+                
+                // Проверяем, что действительно есть изменения на модерации
+                if (!mem.isChangesUnderModeration()) {
+                    log.error("ОШИБКА! Мемориал ID={} не имеет изменений на модерации!", id);
+                    redirectAttributes.addFlashAttribute("errorMessage", 
+                            "У мемориала нет изменений, ожидающих модерации.");
+                    return "redirect:/admin/memorials/" + id;
+                }
+            }
+            
+            // Получаем текущего пользователя
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String login = authentication.getName();
+            log.info("Текущий пользователь: {}", login);
+            
+            User currentUser = userRepository.findByLogin(login)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            log.info("Найден пользователь: ID={}, роль={}", currentUser.getId(), currentUser.getRole());
+            
+            // Проверяем, что пользователь - администратор
+            if (currentUser.getRole() != User.Role.ADMIN) {
+                log.error("Пользователь {} не является администратором!", currentUser.getLogin());
+                redirectAttributes.addFlashAttribute("errorMessage", "Только администратор может одобрять изменения");
+                return "redirect:/admin/memorials/" + id;
+            }
+            
+            log.info("Вызываем memorialService.approveChangesByAdmin({}, {})", id, currentUser.getLogin());
+            
+            // Используем специальный метод для администраторов
+            memorialService.approveChangesByAdmin(id, currentUser);
+            
+            log.info("Изменения мемориала ID={} успешно одобрены администратором {}", id, currentUser.getLogin());
+            redirectAttributes.addFlashAttribute("successMessage", "Изменения мемориала одобрены");
+        } catch (Exception e) {
+            log.error("ОШИБКА при одобрении изменений мемориала ID={}: {}", id, e.getMessage(), e);
+            redirectAttributes.addFlashAttribute("errorMessage", "Ошибка при одобрении изменений: " + e.getMessage());
+        }
+        
+        log.info("Перенаправляем на /admin/memorials/{}", id);
+        return "redirect:/admin/memorials/" + id;
+    }
+    
+    @PostMapping("/{id}/reject-changes")
+    public String rejectChanges(@PathVariable Long id, 
+                               @RequestParam(name = "reason", required = false) String reason,
+                               RedirectAttributes redirectAttributes) {
+        try {
+            // Получаем текущего пользователя
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String login = authentication.getName();
+            User currentUser = userRepository.findByLogin(login)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            // Отклоняем изменения
+            memorialService.rejectChanges(id, reason, currentUser);
+            
+            redirectAttributes.addFlashAttribute("successMessage", "Изменения мемориала отклонены");
+        } catch (Exception e) {
+            log.error("Ошибка при отклонении изменений: {}", e.getMessage(), e);
+            redirectAttributes.addFlashAttribute("errorMessage", "Ошибка при отклонении изменений: " + e.getMessage());
+        }
+        
+        return "redirect:/admin/memorials/" + id;
     }
 } 

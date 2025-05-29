@@ -156,8 +156,11 @@ public class NotificationService {
             
             // Установка заголовка и сообщения в зависимости от типа и статуса
             if (notification.getType() == Notification.NotificationType.MEMORIAL_OWNERSHIP) {
-                responseNotification.setType(Notification.NotificationType.SYSTEM);
-                responseNotification.setStatus(Notification.NotificationStatus.INFO);
+                // Используем тот же тип MEMORIAL_OWNERSHIP для ответного уведомления
+                responseNotification.setType(Notification.NotificationType.MEMORIAL_OWNERSHIP);
+                responseNotification.setStatus(accept ? 
+                    Notification.NotificationStatus.ACCEPTED : 
+                    Notification.NotificationStatus.REJECTED);
                 
                 if (accept) {
                     responseNotification.setTitle("Запрос на совместное владение принят");

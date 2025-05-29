@@ -273,82 +273,89 @@ public class MemorialService {
         Memorial memorial = memorialRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Memorial not found"));
         
-        log.info("getMemorialByIdForUser: Запрос мемориала ID={} для пользователя ID={}, login={}", 
-                id, currentUser != null ? currentUser.getId() : "null", 
-                currentUser != null ? currentUser.getLogin() : "null");
-        
-        // Проверяем, является ли пользователь владельцем или редактором
-        boolean isOwner = currentUser != null && memorial.getCreatedBy().equals(currentUser);
-        boolean isEditor = false;
-        
-        // Проверяем, есть ли текущий пользователь в списке редакторов
-        if (currentUser != null && memorial.getEditors() != null) {
-            // Выводим список редакторов для отладки
-            List<Long> editorIds = memorial.getEditors().stream()
-                .map(User::getId)
-                .collect(Collectors.toList());
-            
-            log.info("getMemorialByIdForUser: Мемориал ID={} имеет {} редакторов: {}", 
-                   id, editorIds.size(), editorIds);
-                   
-            // Проверяем каждого редактора и сравниваем ID
-            for (User editor : memorial.getEditors()) {
-                log.info("getMemorialByIdForUser: Проверка редактора ID={} для мемориала ID={}, текущий пользователь ID={}", 
-                        editor.getId(), memorial.getId(), currentUser.getId());
-                
-                if (editor.getId().equals(currentUser.getId())) {
-                    isEditor = true;
-                    log.info("getMemorialByIdForUser: НАЙДЕНО СОВПАДЕНИЕ! Пользователь ID={} является редактором мемориала ID={}", 
-                            currentUser.getId(), memorial.getId());
-                    break;
-                }
-            }
-            
-            log.info("getMemorialByIdForUser: Проверка статуса редактора: мемориал ID={}, пользователь={}, is_editor={}, в списке редакторов: {}", 
-                   memorial.getId(), currentUser.getLogin(), isEditor, editorIds);
-        }
-        
-        // Если есть ожидающие изменения и текущий пользователь не владелец и не редактор,
-        // возвращаем предыдущее состояние мемориала
-        if (memorial.isPendingChanges() && !isOwner && !isEditor) {
-            try {
-                if (memorial.getPreviousState() != null && !memorial.getPreviousState().isEmpty()) {
-                    ObjectMapper objectMapper = new ObjectMapper();
-                    objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
-                    objectMapper.disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-                    objectMapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-                    MemorialDTO previousDto = objectMapper.readValue(memorial.getPreviousState(), MemorialDTO.class);
-                    
-                    // Обновляем ID и редакторов, которые не хранятся в previousState
-                    previousDto.setId(memorial.getId());
-                    previousDto.setEditorIds(memorial.getEditors().stream()
-                        .map(User::getId)
-                        .collect(Collectors.toList()));
-                    
-                    // Устанавливаем флаг редактора на основе нашей проверки
-                    previousDto.setEditor(isEditor);
-                    
-                    // Устанавливаем флаг pendingChanges в false для внешних пользователей
-                    previousDto.setPendingChanges(false);
-                    
-                    return previousDto;
-                }
-            } catch (Exception e) {
-                log.error("Ошибка при восстановлении предыдущего состояния мемориала: {}", e.getMessage());
-            }
-        }
-        
         MemorialDTO dto = memorialMapper.toDTO(memorial);
         
-        // Устанавливаем флаг редактора на основе нашей проверки
-        dto.setEditor(isEditor);
+        // Определяем права доступа пользователя
+        boolean isOwner = memorial.getCreatedBy().equals(currentUser);
+        boolean isEditor = memorial.isEditor(currentUser);
+        boolean isAdmin = currentUser.getRole() == User.Role.ADMIN;
         
-        // Показываем флаг pendingChanges только владельцу и редакторам
-        if (!isOwner && !isEditor) {
-            dto.setPendingChanges(false);
+        log.info("getMemorialByIdForUser ID={}: пользователь={}, роль={}, isOwner={}, isEditor={}, isAdmin={}, changesUnderModeration={}", 
+                id, currentUser.getLogin(), currentUser.getRole(), isOwner, isEditor, isAdmin, memorial.isChangesUnderModeration());
+        
+        // Если администратор просматривает мемориал с изменениями на модерации,
+        // показываем ему мемориал с примененными изменениями для принятия решения
+        if (isAdmin && memorial.isChangesUnderModeration()) {
+            log.info("АДМИН ПРОСМАТРИВАЕТ МЕМОРИАЛ С ИЗМЕНЕНИЯМИ: ID={}, pending поля существуют: fio={}, bio={}, photo={}", 
+                    id, memorial.getPendingFio() != null, memorial.getPendingBiography() != null, memorial.getPendingPhotoUrl() != null);
+            
+            // Создаем DTO с примененными изменениями для предварительного просмотра
+            MemorialDTO previewDto = memorialMapper.toDTO(memorial);
+            
+            // Применяем все pending изменения для предварительного просмотра
+            if (memorial.getPendingFio() != null) {
+                log.info("Применяем pending ФИО: '{}' -> '{}'", previewDto.getFio(), memorial.getPendingFio());
+                previewDto.setFio(memorial.getPendingFio());
+            }
+            if (memorial.getPendingPhotoUrl() != null) {
+                log.info("Применяем pending фото: '{}' -> '{}'", previewDto.getPhotoUrl(), memorial.getPendingPhotoUrl());
+                previewDto.setPhotoUrl(memorial.getPendingPhotoUrl());
+            }
+            if (memorial.getPendingBiography() != null) {
+                log.info("Применяем pending биографию: '{}' -> '{}'", 
+                        previewDto.getBiography() != null ? previewDto.getBiography().substring(0, Math.min(50, previewDto.getBiography().length())) : "null", 
+                        memorial.getPendingBiography().substring(0, Math.min(50, memorial.getPendingBiography().length())));
+                previewDto.setBiography(memorial.getPendingBiography());
+            }
+            if (memorial.getPendingBirthDate() != null) {
+                log.info("Применяем pending дату рождения: '{}' -> '{}'", previewDto.getBirthDate(), memorial.getPendingBirthDate().toString());
+                previewDto.setBirthDate(memorial.getPendingBirthDate().toString());
+            }
+            if (memorial.getPendingDeathDate() != null) {
+                log.info("Применяем pending дату смерти: '{}' -> '{}'", previewDto.getDeathDate(), memorial.getPendingDeathDate().toString());
+                previewDto.setDeathDate(memorial.getPendingDeathDate().toString());
+            }
+            if (memorial.getPendingIsPublic() != null) {
+                log.info("Применяем pending публичность: '{}' -> '{}'", previewDto.isPublic(), memorial.getPendingIsPublic());
+                previewDto.setPublic(memorial.getPendingIsPublic());
+            }
+            if (memorial.getPendingMainLocation() != null) {
+                log.info("Применяем pending основное местоположение");
+                previewDto.setMainLocation(memorial.getPendingMainLocation());
+            }
+            if (memorial.getPendingBurialLocation() != null) {
+                log.info("Применяем pending место захоронения");
+                previewDto.setBurialLocation(memorial.getPendingBurialLocation());
+            }
+            
+            // Показываем флаг изменений на модерации
+            previewDto.setChangesUnderModeration(true);
+            previewDto.setEditor(isEditor);
+            
+            log.info("ВОЗВРАЩАЕТСЯ ПРЕДВАРИТЕЛЬНЫЙ ПРОСМОТР С ИЗМЕНЕНИЯМИ ДЛЯ АДМИНА: ФИО='{}', биография='{}'", 
+                    previewDto.getFio(), 
+                    previewDto.getBiography() != null ? previewDto.getBiography().substring(0, Math.min(50, previewDto.getBiography().length())) : "null");
+            return previewDto;
         }
         
-        log.info("getMemorialByIdForUser: Возвращается мемориал ID={} с флагом is_editor={}", memorial.getId(), isEditor);
+        // Если пользователь НЕ является владельцем/админом, и изменения на модерации - 
+        // скрываем индикатор changesUnderModeration и не показываем pending поля
+        if (!isOwner && !isAdmin && memorial.isChangesUnderModeration()) {
+            dto.setChangesUnderModeration(false); // Скрываем индикатор от обычных пользователей
+            // Очищаем pending поля, чтобы обычные пользователи не видели изменения на модерации
+            dto.setPendingPhotoUrl(null);
+            dto.setPendingBiography(null);
+            dto.setPendingBirthDate(null);
+            dto.setPendingDeathDate(null);
+            dto.setPendingMainLocation(null);
+            dto.setPendingBurialLocation(null);
+        }
+        
+        // Устанавливаем флаг редактора для текущего пользователя
+        dto.setEditor(isEditor);
+        
+        log.info("Мемориал ID={} получен пользователем {} (владелец: {}, редактор: {}, админ: {})", 
+                id, currentUser.getLogin(), isOwner, isEditor, isAdmin);
         
         return dto;
     }
@@ -392,16 +399,37 @@ public class MemorialService {
             throw new RuntimeException("Cannot edit memorial that is under moderation");
         }
         
-        boolean isEditor = !memorial.getCreatedBy().equals(user) && memorial.isEditor(user);
-        log.info("Обновление мемориала ID={}, пользователь={} (ID={}), isEditor={}",
-                id, user.getLogin(), user.getId(), isEditor);
+        // Проверяем, находятся ли изменения мемориала на модерации
+        if (memorial.isChangesUnderModeration()) {
+            log.error("Попытка обновить мемориал ID={} с изменениями на модерации. Пользователь ID={}, логин={}",
+                    id, user.getId(), user.getLogin());
+            throw new RuntimeException("Cannot edit memorial with changes under moderation");
+        }
         
-        // Обновляем поля мемориала
+        boolean isOwner = memorial.getCreatedBy().equals(user);
+        boolean isEditor = !isOwner && memorial.isEditor(user);
+        
+        log.info("Обновление мемориала ID={}, пользователь={} (ID={}), isOwner={}, isEditor={}, статус={}",
+                id, user.getLogin(), user.getId(), isOwner, isEditor, memorial.getPublicationStatus());
+        
+        // Определяем, нужно ли сохранять изменения как pending
+        boolean shouldUsePendingFields = false;
+        
         if (isEditor) {
-            // Если редактор - сохраняем как предложенные изменения
+            // Редакторы всегда сохраняют в pending поля
+            shouldUsePendingFields = true;
+        } else if (isOwner) {
+            // Владельцы используют pending поля только для опубликованных мемориалов
+            shouldUsePendingFields = memorial.getPublicationStatus() == Memorial.PublicationStatus.PUBLISHED;
+        }
+        
+        if (shouldUsePendingFields) {
+            log.info("Сохранение изменений в pending поля для мемориала ID={}", id);
+            // Сохраняем как предложенные изменения (для редакторов или для опубликованных мемориалов)
             updateMemorialPendingFields(memorial, memorialDTO, user);
         } else {
-            // Если владелец - применяем изменения сразу
+            log.info("Прямое применение изменений для мемориала ID={}", id);
+            // Прямое применение изменений (для неопубликованных мемориалов владельца)
             updateMemorialFields(memorial, memorialDTO);
         }
         
@@ -443,24 +471,32 @@ public class MemorialService {
         
         // Если было изменение через редактора, сбрасываем ожидающие изменения
         memorial.setPendingChanges(false);
+        memorial.setPendingFio(null);
         memorial.setPendingBiography(null);
         memorial.setPendingBirthDate(null);
         memorial.setPendingDeathDate(null);
+        memorial.setPendingIsPublic(null);
         memorial.setPendingMainLocation(null);
         memorial.setPendingBurialLocation(null);
-        memorial.setPendingPhotoUrl(null);
         memorial.setLastEditorId(null);
     }
     
     /**
-     * Обновляет поля мемориала из DTO для редактора (в ожидающие изменения)
+     * Обновляет поля мемориала из DTO для редактора или владельца (в ожидающие изменения)
      */
     private void updateMemorialPendingFields(Memorial memorial, MemorialDTO dto, User editor) {
         boolean hasChanges = false;
+        boolean isOwner = memorial.getCreatedBy().equals(editor);
         
+        // ФИО может быть изменено владельцем даже в pending режиме
         if (dto.getFio() != null && !dto.getFio().equals(memorial.getFio())) {
+            if (isOwner) {
+                memorial.setPendingFio(dto.getFio());
+                hasChanges = true;
+            } else {
             // ФИО не может быть изменено редактором, только владельцем
             log.warn("Редактор пытается изменить ФИО мемориала, это разрешено только владельцу");
+            }
         }
         
         if (dto.getBirthDate() != null) {
@@ -498,6 +534,10 @@ public class MemorialService {
         }
         
         // Публичность может быть изменена только владельцем
+        if (isOwner && dto.isPublic() != memorial.isPublic()) {
+            memorial.setPendingIsPublic(dto.isPublic());
+            hasChanges = true;
+        }
         
         if (hasChanges) {
             memorial.setPendingChanges(true);
@@ -518,8 +558,13 @@ public class MemorialService {
                 }
             }
             
-            // Создаем уведомление для владельца
+            // Если владелец редактирует опубликованный мемориал, то он должен сам отправить на модерацию
+            // Если редактор - создаем уведомление для владельца
+            if (!isOwner) {
             createPendingChangesNotification(memorial, editor);
+            } else {
+                log.info("Владелец отредактировал опубликованный мемориал ID={}. Требуется отправка на модерацию.", memorial.getId());
+            }
         }
     }
 
@@ -631,6 +676,7 @@ public class MemorialService {
     
     /**
      * Получает мемориалы, ожидающие подтверждения изменений
+     * Исключает мемориалы с изменениями на модерации у админа
      * 
      * @param currentUser текущий пользователь
      * @return список мемориалов с изменениями
@@ -641,9 +687,9 @@ public class MemorialService {
         // Получаем мемориалы, владельцем которых является текущий пользователь
         List<Memorial> ownedMemorials = memorialRepository.findByCreatedBy(currentUser);
         
-        // Фильтруем только те, которые имеют ожидающие изменения
+        // Фильтруем только те, которые имеют ожидающие изменения И НЕ находятся на модерации у админа
         List<Memorial> editedOwnedMemorials = ownedMemorials.stream()
-            .filter(Memorial::isPendingChanges)
+            .filter(memorial -> memorial.isPendingChanges() && !memorial.isChangesUnderModeration())
             .collect(Collectors.toList());
         
         memorialsWithPendingChanges.addAll(editedOwnedMemorials);
@@ -651,12 +697,15 @@ public class MemorialService {
         // Получаем мемориалы, где пользователь является редактором
         List<Memorial> editedMemorials = memorialRepository.findByEditorsContaining(currentUser);
         
-        // Фильтруем только те, которые имеют ожидающие изменения
+        // Фильтруем только те, которые имеют ожидающие изменения И НЕ находятся на модерации у админа
         List<Memorial> editedAsEditorMemorials = editedMemorials.stream()
-            .filter(Memorial::isPendingChanges)
+            .filter(memorial -> memorial.isPendingChanges() && !memorial.isChangesUnderModeration())
             .collect(Collectors.toList());
         
         memorialsWithPendingChanges.addAll(editedAsEditorMemorials);
+        
+        log.info("Получено {} мемориалов с ожидающими изменениями для пользователя {} (исключая модерацию админом)", 
+                memorialsWithPendingChanges.size(), currentUser.getLogin());
         
         return memorialsWithPendingChanges.stream()
             .map(memorial -> {
@@ -714,13 +763,63 @@ public class MemorialService {
             throw new RuntimeException("Memorial has no pending changes");
         }
         
+        boolean isPublished = memorial.getPublicationStatus() == Memorial.PublicationStatus.PUBLISHED;
+        
         if (approve) {
-            log.info("Подтверждены изменения для мемориала ID={}", memorialId);
+            log.info("Владелец принимает изменения для мемориала ID={}, isPublished={}", memorialId, isPublished);
+            
+            if (isPublished) {
+                // Для опубликованных мемориалов отправляем изменения на модерацию админу
+                log.info("Опубликованный мемориал ID={}: отправляем изменения на модерацию админу", memorialId);
+                
+                // Устанавливаем флаг "Изменения на модерации у админа"
+                memorial.setChangesUnderModeration(true);
+                memorial = memorialRepository.save(memorial);
+                
+                // Создаем уведомление для администраторов о необходимости модерации изменений
+                createChangesModerationNotification(memorial, currentUser);
+                
+                // Создаем уведомление для редактора о том, что изменения приняты владельцем и отправлены на модерацию
+                Long savedLastEditorId = memorial.getLastEditorId();
+                if (savedLastEditorId != null) {
+                    User editor = userRepository.findById(savedLastEditorId).orElse(null);
+                    if (editor != null) {
+                        Notification notification = new Notification();
+                        notification.setUser(editor);
+                        notification.setSender(currentUser);
+                        notification.setTitle("Изменения приняты и отправлены на модерацию");
+                        notification.setMessage(String.format(
+                            "Ваши изменения для мемориала \"%s\" были приняты владельцем и отправлены на модерацию администратору.",
+                            memorial.getFio()
+                        ));
+                        notification.setType(Notification.NotificationType.SYSTEM);
+                        notification.setStatus(Notification.NotificationStatus.INFO);
+                        notification.setRelatedEntityId(memorial.getId());
+                        notification.setRelatedEntityName(memorial.getFio());
+                        notification.setCreatedAt(LocalDateTime.now());
+                        notification.setRead(false);
+                        
+                        notificationRepository.save(notification);
+                        log.info("Создано уведомление для редактора ID={} о принятии изменений и отправке на модерацию", editor.getId());
+                    }
+                }
+                
+                log.info("Изменения мемориала ID={} приняты владельцем и отправлены на модерацию админу", memorialId);
+            } else {
+                // Для неопубликованных мемориалов применяем изменения сразу (старая логика)
+                log.info("Неопубликованный мемориал ID={}: применяем изменения сразу", memorialId);
             
             try {
                 // Применяем ожидающие изменения
                 
-                // 1. Обрабатываем фото
+                    // 1. Обрабатываем ФИО
+                    if (memorial.getPendingFio() != null) {
+                        log.info("Применяем ожидающее ФИО для мемориала ID={}", memorialId);
+                        memorial.setFio(memorial.getPendingFio());
+                        memorial.setPendingFio(null);
+                    }
+                    
+                    // 2. Обрабатываем фото
                 if (memorial.getPendingPhotoUrl() != null && !memorial.getPendingPhotoUrl().isEmpty()) {
                     log.info("Применяем ожидающее фото для мемориала ID={}", memorialId);
                     
@@ -734,14 +833,14 @@ public class MemorialService {
                     memorial.setPendingPhotoUrl(null);
                 }
                 
-                // 2. Обрабатываем биографию
+                    // 3. Обрабатываем биографию
                 if (memorial.getPendingBiography() != null) {
                     log.info("Применяем ожидающую биографию для мемориала ID={}", memorialId);
                     memorial.setBiography(memorial.getPendingBiography());
                     memorial.setPendingBiography(null);
                 }
                 
-                // 3. Обрабатываем даты
+                    // 4. Обрабатываем даты
                 if (memorial.getPendingBirthDate() != null) {
                     log.info("Применяем ожидающую дату рождения для мемориала ID={}", memorialId);
                     memorial.setBirthDate(memorial.getPendingBirthDate());
@@ -754,7 +853,14 @@ public class MemorialService {
                     memorial.setPendingDeathDate(null);
                 }
                 
-                // 4. Обрабатываем местоположения
+                    // 5. Обрабатываем публичность
+                    if (memorial.getPendingIsPublic() != null) {
+                        log.info("Применяем ожидающую публичность для мемориала ID={}", memorialId);
+                        memorial.setPublic(memorial.getPendingIsPublic());
+                        memorial.setPendingIsPublic(null);
+                    }
+                    
+                    // 6. Обрабатываем местоположения
                 if (memorial.getPendingMainLocation() != null) {
                     log.info("Применяем ожидающее основное местоположение для мемориала ID={}", memorialId);
                     memorial.setMainLocation(memorial.getPendingMainLocation());
@@ -767,30 +873,6 @@ public class MemorialService {
                     memorial.setPendingBurialLocation(null);
                 }
                 
-                // Если есть и старое поле proposedChanges, тоже обрабатываем его для совместимости
-                if (memorial.getProposedChanges() != null && !memorial.getProposedChanges().isEmpty()) {
-                    log.info("Найдены также предложенные изменения в старом формате, применяем их");
-                    
-                    // Здесь оставляем старый код для обратной совместимости
-                    ObjectMapper objectMapper = new ObjectMapper();
-                    objectMapper.configure(com.fasterxml.jackson.databind.SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
-                    objectMapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-                    objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
-                    objectMapper.disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-                    
-                    log.info("JSON с предложенными изменениями: {}", memorial.getProposedChanges());
-                    
-                    try {
-                        MemorialDTO proposedDto = objectMapper.readValue(memorial.getProposedChanges(), MemorialDTO.class);
-                        log.info("Успешно десериализованы предложенные изменения: {}", proposedDto.getFio());
-                        
-                        // Применяем предложенные изменения
-                        updateMemorialFromDTO(memorial, proposedDto);
-                    } catch (Exception e) {
-                        log.error("Ошибка при десериализации предложенных изменений: {}", e.getMessage(), e);
-                    }
-                }
-                
                 // Сбрасываем флаг ожидающих изменений и все временные данные
                 memorial.setPendingChanges(false);
                 memorial.setPreviousState(null);
@@ -798,21 +880,20 @@ public class MemorialService {
                 
                 // Сохраняем изменения
                 memorial = memorialRepository.saveAndFlush(memorial);
-                log.info("Успешно применены все ожидающие изменения для мемориала ID={}", memorialId);
+                    log.info("Успешно применены все ожидающие изменения для неопубликованного мемориала ID={}", memorialId);
                 
                 // Создаем уведомление для редактора о том, что изменения приняты
-                if (memorial.getLastEditorId() != null) {
-                    User editor = userRepository.findById(memorial.getLastEditorId())
-                        .orElse(null);
-                    
+                    Long savedLastEditorId = memorial.getLastEditorId();
+                    if (savedLastEditorId != null) {
+                        User editor = userRepository.findById(savedLastEditorId).orElse(null);
                     if (editor != null) {
                         Notification notification = new Notification();
                         notification.setUser(editor);
                         notification.setSender(currentUser);
                         notification.setTitle("Изменения в мемориале приняты");
-                        notification.setMessage("Ваши изменения для мемориала \"" + memorial.getFio() + "\" были одобрены.");
-                        notification.setType(Notification.NotificationType.MEMORIAL_EDIT);
-                        notification.setStatus(Notification.NotificationStatus.ACCEPTED);
+                            notification.setMessage("Ваши изменения для мемориала \"" + memorial.getFio() + "\" были приняты владельцем.");
+                            notification.setType(Notification.NotificationType.SYSTEM);
+                            notification.setStatus(Notification.NotificationStatus.INFO);
                         notification.setRelatedEntityId(memorial.getId());
                         notification.setRelatedEntityName(memorial.getFio());
                         notification.setCreatedAt(LocalDateTime.now());
@@ -822,18 +903,30 @@ public class MemorialService {
                         log.info("Создано уведомление для редактора ID={} о принятии изменений", editor.getId());
                     }
                 }
+                    
+                    // Очищаем lastEditorId
+                    memorial.setLastEditorId(null);
             } catch (Exception e) {
                 log.error("Ошибка при применении ожидающих изменений: {}", e.getMessage(), e);
                 throw new RuntimeException("Ошибка при применении изменений: " + e.getMessage());
+                }
             }
         } else {
             log.info("Отклонены изменения для мемориала ID={}", memorialId);
             
             // При отклонении изменений очищаем все временные данные
+            // Удаляем pending фото из хранилища, если есть
+            if (memorial.getPendingPhotoUrl() != null) {
+                log.info("Удаляем pending фото из хранилища при отклонении владельцем: {}", memorial.getPendingPhotoUrl());
+                fileStorageService.deleteFile(memorial.getPendingPhotoUrl());
+            }
+            
             memorial.setPendingPhotoUrl(null);
+            memorial.setPendingFio(null);
             memorial.setPendingBiography(null);
             memorial.setPendingBirthDate(null);
             memorial.setPendingDeathDate(null);
+            memorial.setPendingIsPublic(null);
             memorial.setPendingMainLocation(null);
             memorial.setPendingBurialLocation(null);
             memorial.setPendingChanges(false);
@@ -854,8 +947,8 @@ public class MemorialService {
                     notification.setUser(editor);
                     notification.setSender(currentUser);
                     notification.setTitle("Изменения в мемориале отклонены");
-                    notification.setMessage("Ваши изменения для мемориала \"" + memorial.getFio() + "\" были отклонены.");
-                    notification.setType(Notification.NotificationType.MEMORIAL_EDIT);
+                    notification.setMessage("Ваши изменения для мемориала \"" + memorial.getFio() + "\" были отклонены владельцем.");
+                    notification.setType(Notification.NotificationType.SYSTEM);
                     notification.setStatus(Notification.NotificationStatus.REJECTED);
                     notification.setRelatedEntityId(memorial.getId());
                     notification.setRelatedEntityName(memorial.getFio());
@@ -870,26 +963,15 @@ public class MemorialService {
             memorial.setLastEditorId(null);
         }
         
-        // Еще раз принудительно сбрасываем флаг ожидания изменений
+        // Еще раз принудительно сбрасываем флаг ожидания изменений (только для неопубликованных или отклоненных)
+        if (!isPublished || !approve) {
         memorial.setPendingChanges(false);
+        }
         
         // Выполняем завершающее сохранение и проверяем флаги
         memorial = memorialRepository.saveAndFlush(memorial);
-        log.info("Завершено подтверждение/отклонение изменений мемориала ID={}, финальное состояние pendingChanges={}", 
-                memorial.getId(), memorial.isPendingChanges());
-        
-        // Для обновления кэша и состояния в БД, перезагружаем мемориал из репозитория
-        memorial = memorialRepository.findById(memorial.getId())
-            .orElseThrow(() -> new RuntimeException("Memorial not found after save"));
-        
-        // Последняя проверка - если pendingChanges все еще true после всех обновлений, сбрасываем еще раз
-        if (memorial.isPendingChanges()) {
-            log.warn("ВНИМАНИЕ! После сохранения мемориал ID={} все еще имеет флаг pendingChanges=true", memorial.getId());
-            // Принудительно обновляем флаг еще раз, если он все еще true
-            memorial.setPendingChanges(false);
-            memorial = memorialRepository.saveAndFlush(memorial);
-            log.info("Принудительно сброшен флаг pendingChanges для мемориала ID={}", memorial.getId());
-        }
+        log.info("Завершено подтверждение/отклонение изменений мемориала ID={}, финальное состояние pendingChanges={}, changesUnderModeration={}", 
+                memorial.getId(), memorial.isPendingChanges(), memorial.isChangesUnderModeration());
         
         return memorialMapper.toDTO(memorial);
     }
@@ -917,212 +999,81 @@ public class MemorialService {
         // Проверяем, является ли пользователь редактором или владельцем
         boolean isEditor = memorial.isEditor(currentUser);
         boolean isOwner = memorial.getCreatedBy().equals(currentUser);
+        boolean isPublished = memorial.getPublicationStatus() == Memorial.PublicationStatus.PUBLISHED;
         
-        log.info("Загрузка фото для мемориала ID={}: пользователь={}, isEditor={}, isOwner={}", 
-                id, currentUser.getLogin(), isEditor, isOwner);
+        log.info("Загрузка фото для мемориала ID={}: пользователь={}, isEditor={}, isOwner={}, isPublished={}", 
+                id, currentUser.getLogin(), isEditor, isOwner, isPublished);
+        
+        // Проверяем права доступа
+        if (!isOwner && !isEditor) {
+            throw new RuntimeException("Нет прав для загрузки фото");
+        }
         
         // Сохраняем фото в хранилище (в любом случае)
         String photoUrl = fileStorageService.storeFile(file);
         
-        // Если пользователь - редактор (но не владелец)
+        // Определяем, нужно ли использовать pending поля
+        boolean shouldUsePendingFields = false;
+        
         if (isEditor && !isOwner) {
-            log.info("Загрузка фото редактором. ID мемориала: {}, редактор: {}", id, currentUser.getLogin());
-            
-            try {
-                // Проверяем, есть ли уже ожидающее изменение фото
-                boolean hasPendingPhotoAlready = memorial.getPendingPhotoUrl() != null && !memorial.getPendingPhotoUrl().isEmpty();
-                
-                // Сохраняем текущее состояние фото (если есть)
-                String oldPhotoUrl = memorial.getPhotoUrl();
-                
-                // Сохраняем информацию о новом фото в pendingPhotoUrl
+            // Редакторы всегда используют pending поля
+            shouldUsePendingFields = true;
+        } else if (isOwner && isPublished) {
+            // Владельцы опубликованных мемориалов тоже используют pending поля
+            shouldUsePendingFields = true;
+        }
+        
+        if (shouldUsePendingFields) {
+            log.info("Сохранение фото в pending поле для мемориала ID={}", id);
+            // Сохраняем как pending изменение
                 memorial.setPendingPhotoUrl(photoUrl);
-                
-                // Устанавливаем флаг ожидания изменений
                 memorial.setPendingChanges(true);
-                
-                // Запоминаем, кто внес изменения
                 memorial.setLastEditorId(currentUser.getId());
                 
-                // Если previousState еще не сохранен (первое изменение)
+            // Сохраняем предыдущее состояние, если еще не сохранено
                 if (memorial.getPreviousState() == null) {
+                try {
                     ObjectMapper objectMapper = new ObjectMapper();
-                    objectMapper.configure(com.fasterxml.jackson.databind.SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
-                    objectMapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
                     objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
                     objectMapper.disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+                    objectMapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
                     
-                    // Преобразуем мемориал в DTO и сохраняем как previousState
                     MemorialDTO currentDto = memorialMapper.toDTO(memorial);
-                    String previousState = objectMapper.writeValueAsString(currentDto);
-                    memorial.setPreviousState(previousState);
+                    memorial.setPreviousState(objectMapper.writeValueAsString(currentDto));
+                } catch (Exception e) {
+                    log.error("Ошибка при сохранении предыдущего состояния мемориала: {}", e.getMessage(), e);
                 }
-                
-                // Формируем текст изменения фото
-                StringBuilder photoChangeDetails = new StringBuilder();
-                photoChangeDetails.append("- Загружено новое фото:\n");
-                photoChangeDetails.append("  URL фото: ").append(photoUrl).append("\n\n");
-                
-                // Проверяем, есть ли уже уведомление о ожидающих изменениях для этого мемориала
-                List<Notification> existingNotifications = notificationRepository.findByRelatedEntityIdAndTypeAndStatus(
-                    memorial.getId(), 
-                    Notification.NotificationType.MEMORIAL_EDIT, 
-                    Notification.NotificationStatus.PENDING
-                );
-                
-                Notification notification;
-                
-                if (!existingNotifications.isEmpty()) {
-                    // Обновляем существующее уведомление
-                    notification = existingNotifications.get(0);
-                    
-                    // Обновляем сообщение, сохраняя существующие изменения
-                    String currentMessage = notification.getMessage();
-                    
-                    if (currentMessage.contains("=== ИЗМЕНЕНИЯ ===")) {
-                        // Находим позицию начала списка изменений и добавляем новую информацию о фото
-                        int changeStartPos = currentMessage.indexOf("=== ИЗМЕНЕНИЯ ===") + "=== ИЗМЕНЕНИЯ ===\n".length();
-                        
-                        // Сохраняем существующее содержимое и добавляем информацию о фото в начало
-                        String existingChanges = currentMessage.substring(changeStartPos);
-                        String newMessage = currentMessage.substring(0, changeStartPos) + 
-                                          photoChangeDetails.toString() + 
-                                          existingChanges;
-                        
-                        notification.setMessage(newMessage);
-                    } else {
-                        // Если формат сообщения отличается, создаем новое сообщение целиком
-                        String newMessage = "Редактор " + currentUser.getFio() +
-                            " внес изменения в мемориал \"" + memorial.getFio() +
-                            "\". Требуется ваше подтверждение.\n\n=== ИЗМЕНЕНИЯ ===\n" + 
-                            photoChangeDetails.toString();
-                        
-                        notification.setMessage(newMessage);
-                    }
-                    
-                    notification.setCreatedAt(LocalDateTime.now());
-                    notification.setRead(false);
-                    
-                    log.info("Обновлено существующее уведомление ID={} для мемориала ID={}", 
-                            notification.getId(), memorial.getId());
-                } else {
-                    // Создаем новое уведомление
-                    notification = new Notification();
-                    notification.setTitle("Изменения в мемориале");
-                    
-                    String message = "Редактор " + currentUser.getFio() +
-                        " внес изменения в мемориал \"" + memorial.getFio() +
-                        "\". Требуется ваше подтверждение.\n\n=== ИЗМЕНЕНИЯ ===\n" + 
-                        photoChangeDetails.toString();
-                    
-                    notification.setMessage(message);
-                    notification.setUser(memorial.getCreatedBy());
-                    notification.setSender(currentUser);
-                    notification.setType(Notification.NotificationType.MEMORIAL_EDIT);
-                    notification.setStatus(Notification.NotificationStatus.PENDING);
-                    notification.setRelatedEntityId(memorial.getId());
-                    notification.setRelatedEntityName(memorial.getFio());
-                    notification.setCreatedAt(LocalDateTime.now());
-                    notification.setRead(false);
-                    
-                    log.info("Создано новое уведомление о изменении мемориала ID={} для владельца ID={}", 
-                            memorial.getId(), memorial.getCreatedBy().getId());
-                }
-                
-                // Сохраняем уведомление
-                notification = notificationRepository.save(notification);
-                log.info("Сохранено уведомление ID={} для мемориала ID={}", 
-                        notification.getId(), memorial.getId());
-                
-                // Создаем уведомление для редактора о том, что его изменения ожидают подтверждения
-                // Проверяем, есть ли уже уведомление для редактора
-                List<Notification> existingEditorNotifications = notificationRepository.findByUserIdAndRelatedEntityIdAndTypeAndStatus(
-                    currentUser.getId(),
-                    memorial.getId(),
-                    Notification.NotificationType.MEMORIAL_EDIT,
-                    Notification.NotificationStatus.INFO
-                );
-                
-                if (!existingEditorNotifications.isEmpty()) {
-                    // Если уже есть уведомление для редактора, не создаем новое
-                    log.info("Уведомление для редактора ID={} уже существует, не создаем новое", currentUser.getId());
-                } else {
-                    // Получаем системного пользователя
-                    User systemUser = userRepository.findByLogin("system")
-                            .orElseGet(() -> {
-                                User system = new User();
-                                system.setLogin("system");
-                                system.setFio("Система");
-                                system.setDateOfRegistration(new Date());
-                                system.setPassword("system_password");
-                                system.setRole(User.Role.USER);
-                                system.setHasSubscription(false);
-                                return userRepository.save(system);
-                            });
-                    
-                    // Создаем информационное уведомление для редактора
-                    Notification editorNotification = new Notification();
-                    editorNotification.setTitle("Ваши изменения ожидают подтверждения");
-                    editorNotification.setMessage("Вы внесли изменения в мемориал \"" + memorial.getFio() + 
-                            "\". Изменения будут видны после подтверждения владельцем.");
-                    
-                    // Получатель - редактор (текущий пользователь)
-                    editorNotification.setUser(currentUser);
-                    
-                    // Отправитель - система
-                    editorNotification.setSender(systemUser);
-                    
-                    editorNotification.setType(Notification.NotificationType.MEMORIAL_EDIT);
-                    editorNotification.setStatus(Notification.NotificationStatus.INFO); // Информационное уведомление
-                    editorNotification.setRelatedEntityId(memorial.getId());
-                    editorNotification.setRelatedEntityName(memorial.getFio());
-                    editorNotification.setCreatedAt(LocalDateTime.now());
-                    editorNotification.setRead(false);
-                    
-                    // Сохраняем уведомление для редактора
-                    Notification savedEditorNotification = notificationRepository.save(editorNotification);
-                    log.info("Создано информационное уведомление ID={} для редактора ID={} о изменениях", 
-                            savedEditorNotification.getId(), currentUser.getId());
-                }
-                
-                // Сохраняем мемориал
-                memorialRepository.save(memorial);
-                
-                log.info("Сохранены ожидающие изменения фото для мемориала ID={}", memorial.getId());
-                
-                // Возвращаем URL, но фактически он еще не применен к мемориалу
-                return photoUrl;
-                
-            } catch (Exception e) {
-                log.error("Ошибка при обработке фото от редактора: {}", e.getMessage(), e);
-                
-                // В случае ошибки всё равно возвращаем URL, чтобы не терять фото
-                return photoUrl;
             }
+                
+            // Если редактор - создаем уведомление для владельца
+            if (isEditor && !isOwner) {
+                createPendingChangesNotification(memorial, currentUser);
+                } else {
+                log.info("Владелец изменил фото опубликованного мемориала ID={}. Требуется отправка на модерацию.", memorial.getId());
+            }
+            
+                memorialRepository.save(memorial);
+            log.info("Фото сохранено как pending изменение для мемориала ID={}", id);
+                return photoUrl;
         } else {
-            // Если владелец - применяем изменения сразу
+            log.info("Прямое применение фото для неопубликованного мемориала ID={}", id);
+            // Прямое применение (для неопубликованных мемориалов владельца)
             if (memorial.getPhotoUrl() != null) {
                 fileStorageService.deleteFile(memorial.getPhotoUrl());
             }
             
-            // Применяем новое фото
             memorial.setPhotoUrl(photoUrl);
-            
-            // Сбрасываем pendingPhotoUrl, если было
             memorial.setPendingPhotoUrl(null);
             
             memorialRepository.save(memorial);
+            log.info("Фото напрямую применено для мемориала ID={}", id);
             return photoUrl;
         }
     }
 
-    /**
-     * Удаляет мемориал по ID
-     *
-     * @param id ID мемориала для удаления
-     */
     @Transactional
     public void deleteMemorial(Long id) {
+        // ... существующий код удаления мемориала ...
         Memorial memorial = memorialRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Memorial not found"));
         
@@ -1147,39 +1098,16 @@ public class MemorialService {
             fileStorageService.deleteFile(memorial.getPendingPhotoUrl());
         }
         
-        // Удаляем уведомления, связанные с этим мемориалом
-        List<Notification> notifications = notificationRepository.findByRelatedEntityId(memorial.getId());
-        if (!notifications.isEmpty()) {
-            notificationRepository.deleteAll(notifications);
-            log.info("Удалено {} уведомлений, связанных с мемориалом ID={}", notifications.size(), id);
-        }
-        
         // Удаляем мемориал
         memorialRepository.delete(memorial);
         log.info("Удален мемориал ID={}", id);
     }
 
-    /**
-     * Обновляет приватность мемориала (публичный/непубличный)
-     *
-     * @param id ID мемориала
-     * @param isPublic новый статус приватности
-     */
     @Transactional
     public void updateMemorialPrivacy(Long id, boolean isPublic) {
+        // ... существующий код обновления приватности ...
         Memorial memorial = memorialRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Memorial not found"));
-        
-        // Получаем текущего пользователя
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String login = authentication.getName();
-        User currentUser = userRepository.findByLogin(login)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        
-        // Проверяем права доступа - только владелец может изменять приватность
-        if (!memorial.getCreatedBy().equals(currentUser)) {
-            throw new RuntimeException("Only memorial owner can update privacy settings");
-        }
         
         memorial.setPublic(isPublic);
         memorialRepository.save(memorial);
@@ -1187,12 +1115,6 @@ public class MemorialService {
         log.info("Обновлена приватность мемориала ID={}, isPublic={}", id, isPublic);
     }
 
-    /**
-     * Отправляет мемориал на модерацию
-     * @param id ID мемориала
-     * @param user текущий пользователь
-     * @return обновленный мемориал
-     */
     @Transactional
     public MemorialDTO sendForModeration(Long id, User user) {
         Memorial memorial = memorialRepository.findById(id)
@@ -1216,59 +1138,112 @@ public class MemorialService {
         return memorialMapper.toDTO(savedMemorial);
     }
     
-    /**
-     * Создает уведомление о запросе на модерацию мемориала
-     */
+    @Transactional
+    public MemorialDTO sendChangesForModeration(Long id, User user) {
+        Memorial memorial = memorialRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Memorial not found"));
+        
+        // Проверяем, что пользователь является владельцем
+        if (!memorial.getCreatedBy().equals(user)) {
+            throw new RuntimeException("Only memorial owner can send changes for moderation");
+        }
+        
+        // Проверяем, что мемориал опубликован
+        if (memorial.getPublicationStatus() != Memorial.PublicationStatus.PUBLISHED) {
+            throw new RuntimeException("Only published memorials can have changes sent for moderation");
+        }
+        
+        // Проверяем, что изменения не находятся уже на модерации
+        if (memorial.isChangesUnderModeration()) {
+            throw new RuntimeException("Memorial changes are already under moderation");
+        }
+        
+        // Устанавливаем флаг "Изменения на модерации"
+        memorial.setChangesUnderModeration(true);
+        
+        Memorial savedMemorial = memorialRepository.save(memorial);
+        
+        // Создаем уведомление для администраторов о необходимости модерации изменений
+        createChangesModerationNotification(savedMemorial, user);
+        
+        log.info("Изменения мемориала ID={} отправлены на модерацию пользователем ID={}", id, user.getId());
+        
+        return memorialMapper.toDTO(savedMemorial);
+    }
+
     private void createModerationNotification(Memorial memorial, User sender) {
+        try {
         // Находим всех администраторов
         List<User> admins = userRepository.findByRole(User.Role.ADMIN);
         
         for (User admin : admins) {
             Notification notification = new Notification();
+                notification.setType(Notification.NotificationType.MODERATION);
             notification.setUser(admin);
             notification.setSender(sender);
             notification.setTitle("Запрос на публикацию мемориала");
-            notification.setMessage("Пользователь '" + sender.getFio() + "' запрашивает публикацию мемориала '" + memorial.getFio() + "'");
-            notification.setType(Notification.NotificationType.MODERATION);
+                
+                String message = String.format(
+                    "Пользователь %s отправил мемориал \"%s\" на модерацию.\n\n" +
+                    "Требуется ваше решение об одобрении или отклонении публикации.",
+                    sender.getFio() != null ? sender.getFio() : sender.getLogin(),
+                    memorial.getFio()
+                );
+                
+                notification.setMessage(message);
             notification.setStatus(Notification.NotificationStatus.PENDING);
-            notification.setRead(false);
-            notification.setUrgent(false);
-            notification.setCreatedAt(LocalDateTime.now());
             notification.setRelatedEntityId(memorial.getId());
             notification.setRelatedEntityName(memorial.getFio());
+                notification.setRead(false);
+                notification.setCreatedAt(LocalDateTime.now());
             
             notificationRepository.save(notification);
-            log.info("Создано уведомление о модерации для администратора {}", admin.getFio());
+                log.info("Уведомление о модерации создано для администратора {}", admin.getLogin());
+            }
+        } catch (Exception e) {
+            log.error("Ошибка при создании уведомления о модерации: {}", e.getMessage(), e);
         }
-
-        // ВАЖНО: Это отдельное информационное уведомление для пользователя
-        // Оно имеет тип SYSTEM, чтобы не отображаться в списке модерации у администраторов
-        Notification senderNotification = new Notification();
-        senderNotification.setUser(sender);
-        senderNotification.setSender(sender); // Самому себе
-        senderNotification.setTitle("Мемориал отправлен на модерацию");
-        senderNotification.setMessage("Ваш мемориал '" + memorial.getFio() + "' отправлен на модерацию и будет опубликован после одобрения администратором.");
-        senderNotification.setType(Notification.NotificationType.SYSTEM); // Меняем тип на SYSTEM для отделения от уведомлений модерации
-        senderNotification.setStatus(Notification.NotificationStatus.INFO); // Информационное - не требует действий
-        senderNotification.setRead(false);
-        senderNotification.setUrgent(false);
-        senderNotification.setCreatedAt(LocalDateTime.now());
-        senderNotification.setRelatedEntityId(memorial.getId());
-        senderNotification.setRelatedEntityName(memorial.getFio());
-        
-        notificationRepository.save(senderNotification);
-        log.info("Создано информационное уведомление для отправителя {} о начале модерации", sender.getFio());
     }
-    
-    /**
-     * Обрабатывает решение администратора по публикации мемориала
-     * @param id ID мемориала
-     * @param approved одобрено или отклонено
-     * @param admin администратор, принявший решение
-     * @return обновленный мемориал
-     */
+
+    private void createChangesModerationNotification(Memorial memorial, User owner) {
+        try {
+            // Находим всех администраторов
+            List<User> admins = userRepository.findByRole(User.Role.ADMIN);
+            
+            for (User admin : admins) {
+                Notification notification = new Notification();
+                notification.setType(Notification.NotificationType.MODERATION);
+                notification.setUser(admin);
+                notification.setSender(owner);
+                notification.setTitle("Изменения мемориала на модерации");
+                
+                String message = String.format(
+                    "Пользователь %s отправил изменения мемориала \"%s\" на модерацию.\n\n" +
+                    "Требуется ваше решение об одобрении или отклонении изменений.",
+                    owner.getFio() != null ? owner.getFio() : owner.getLogin(),
+                    memorial.getFio()
+                );
+                
+                notification.setMessage(message);
+                notification.setStatus(Notification.NotificationStatus.PENDING);
+                notification.setRelatedEntityId(memorial.getId());
+                notification.setRelatedEntityName(memorial.getFio());
+                notification.setRead(false);
+                notification.setCreatedAt(LocalDateTime.now());
+                
+                notificationRepository.save(notification);
+                log.info("Уведомление о модерации изменений создано для администратора {}", admin.getLogin());
+            }
+        } catch (Exception e) {
+            log.error("Ошибка при создании уведомления о модерации изменений: {}", e.getMessage(), e);
+        }
+    }
+
     @Transactional
-    public MemorialDTO moderateMemorial(Long id, boolean approved, User admin) {
+    public MemorialDTO moderateMemorial(Long id, boolean approved, User admin, String reason) {
+        log.info("=== МОДЕРАЦИЯ МЕМОРИАЛА ===");
+        log.info("moderateMemorial: ID={}, approved={}, admin={}, reason='{}'", id, approved, admin.getLogin(), reason);
+        
         // Проверяем, что пользователь является администратором
         if (admin.getRole() != User.Role.ADMIN) {
             throw new RuntimeException("Unauthorized access");
@@ -1277,100 +1252,408 @@ public class MemorialService {
         Memorial memorial = memorialRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Memorial not found"));
         
+        log.info("Найден мемориал ID={}, текущий статус: {}, isPublic: {}", 
+                id, memorial.getPublicationStatus(), memorial.isPublic());
+        
         if (approved) {
             // Публикуем мемориал
+            log.info("ОДОБРЯЕМ мемориал ID={}: устанавливаем PUBLISHED и isPublic=true", id);
             memorial.setPublicationStatus(Memorial.PublicationStatus.PUBLISHED);
             memorial.setPublic(true);
         } else {
             // Отклоняем публикацию
+            log.info("ОТКЛОНЯЕМ мемориал ID={}: устанавливаем REJECTED и isPublic=false, причина: '{}'", id, reason);
             memorial.setPublicationStatus(Memorial.PublicationStatus.REJECTED);
             memorial.setPublic(false);
         }
         
+        log.info("Сохраняем мемориал ID={} с новым статусом: {}, isPublic: {}", 
+                id, memorial.getPublicationStatus(), memorial.isPublic());
+        
         Memorial savedMemorial = memorialRepository.save(memorial);
         
+        log.info("Мемориал ID={} сохранен в БД! Финальный статус: {}, isPublic: {}", 
+                id, savedMemorial.getPublicationStatus(), savedMemorial.isPublic());
+        
         // Создаем уведомление для владельца мемориала
-        createModerationResponseNotification(savedMemorial, admin, approved);
+        createModerationResponseNotification(savedMemorial, admin, approved, reason);
         
         log.info("Модерация мемориала ID={}: {}", id, approved ? "одобрен" : "отклонен");
         
-        return memorialMapper.toDTO(savedMemorial);
+        MemorialDTO result = memorialMapper.toDTO(savedMemorial);
+        log.info("Возвращаем DTO: ID={}, publicationStatus={}, isPublic={}", 
+                result.getId(), result.getPublicationStatus(), result.isPublic());
+        
+        return result;
     }
-    
-    /**
-     * Создает уведомление о решении по модерации мемориала
-     */
-    private void createModerationResponseNotification(Memorial memorial, User admin, boolean approved) {
-        User owner = memorial.getCreatedBy();
+
+    private void createModerationResponseNotification(Memorial memorial, User admin, boolean approved, String reason) {
+        try {
+        log.info("=== СОЗДАНИЕ УВЕДОМЛЕНИЯ О РЕЗУЛЬТАТЕ МОДЕРАЦИИ ===");
+        log.info("createModerationResponseNotification: ID={}, approved={}, reason='{}'", memorial.getId(), approved, reason);
         
         Notification notification = new Notification();
-        notification.setUser(owner);
+            notification.setUser(memorial.getCreatedBy());
         notification.setSender(admin);
         
         if (approved) {
-            notification.setTitle("Мемориал опубликован");
-            notification.setMessage("Ваш мемориал '" + memorial.getFio() + "' был одобрен и опубликован на сайте.");
-            notification.setStatus(Notification.NotificationStatus.ACCEPTED);
+                notification.setType(Notification.NotificationType.SYSTEM);
+                notification.setStatus(Notification.NotificationStatus.INFO); // Информационное уведомление
+                notification.setTitle("Мемориал одобрен");
+                notification.setMessage(String.format(
+                    "Ваш мемориал \"%s\" был одобрен администратором и опубликован.\n\n" +
+                    "Теперь он доступен для просмотра всем пользователям.",
+                    memorial.getFio()
+                ));
         } else {
-            notification.setTitle("Мемориал не опубликован");
-            notification.setMessage("Ваш мемориал '" + memorial.getFio() + "' не был одобрен администратором и не будет опубликован на сайте.");
-            notification.setStatus(Notification.NotificationStatus.REJECTED);
-        }
-        
-        notification.setType(Notification.NotificationType.MODERATION);
+                notification.setType(Notification.NotificationType.SYSTEM);
+                notification.setStatus(Notification.NotificationStatus.INFO); // Информационное уведомление
+                notification.setTitle("Мемориал отклонен");
+                
+                String message = String.format(
+                    "Ваш мемориал \"%s\" был отклонен администратором.\n\n",
+                    memorial.getFio()
+                );
+                
+                // Добавляем причину отклонения, если она указана
+                if (reason != null && !reason.trim().isEmpty()) {
+                    log.info("Добавляем причину отклонения в сообщение: '{}'", reason.trim());
+                    message += String.format("Причина отклонения: %s\n\n", reason.trim());
+                } else {
+                    log.warn("Причина отклонения пуста или не указана: reason='{}'", reason);
+                }
+                
+                message += "Вы можете внести изменения и повторно отправить его на модерацию.";
+                
+                notification.setMessage(message);
+                log.info("Финальное сообщение уведомления: '{}'", message);
+            }
+            
+            notification.setRelatedEntityId(memorial.getId());
+            notification.setRelatedEntityName(memorial.getFio());
         notification.setRead(false);
-        notification.setUrgent(true); // Делаем уведомление срочным для привлечения внимания
         notification.setCreatedAt(LocalDateTime.now());
-        notification.setRelatedEntityId(memorial.getId());
-        notification.setRelatedEntityName(memorial.getFio());
-        
-        Notification savedNotification = notificationRepository.save(notification);
-        log.info("Создано уведомление ID={} о результате модерации для владельца {} ({})", 
-                savedNotification.getId(), owner.getFio(), owner.getId());
+            
+            notificationRepository.save(notification);
+            log.info("Уведомление о результате модерации ({}) создано для пользователя {}", 
+                    approved ? "одобрение" : "отклонение", memorial.getCreatedBy().getLogin());
+        } catch (Exception e) {
+            log.error("Ошибка при создании уведомления о результате модерации: {}", e.getMessage(), e);
+        }
     }
 
-    /**
-     * Создает уведомление о предложенных изменениях от редактора
-     */
     private void createPendingChangesNotification(Memorial memorial, User editor) {
-        User owner = memorial.getCreatedBy();
-        
-        // Создаем уведомление для владельца о предложенных изменениях
-        Notification notification = new Notification();
-        notification.setUser(owner);
-        notification.setSender(editor);
-        notification.setTitle("Предложены изменения в мемориале");
-        notification.setMessage("Редактор " + editor.getFio() + " предложил изменения в мемориале '" 
-                + memorial.getFio() + "'. Требуется ваше подтверждение.");
-        notification.setType(Notification.NotificationType.MEMORIAL_EDIT);
-        notification.setStatus(Notification.NotificationStatus.PENDING);
-        notification.setRead(false);
-        notification.setUrgent(false);
-        notification.setCreatedAt(LocalDateTime.now());
+        try {
+            Notification notification = new Notification();
+            notification.setType(Notification.NotificationType.MEMORIAL_EDIT);
+            notification.setUser(memorial.getCreatedBy());
+            notification.setSender(editor);
+            notification.setTitle("Предложены изменения к мемориалу");
+            
+            String message = String.format(
+                "Пользователь %s предложил изменения к вашему мемориалу \"%s\".\n\n" +
+                "Просмотрите предложенные изменения и одобрите или отклоните их.",
+                editor.getFio() != null ? editor.getFio() : editor.getLogin(),
+                memorial.getFio()
+            );
+            
+            notification.setMessage(message);
         notification.setRelatedEntityId(memorial.getId());
         notification.setRelatedEntityName(memorial.getFio());
+            notification.setRead(false);
+            notification.setCreatedAt(LocalDateTime.now());
+            
+            notificationRepository.save(notification);
+            log.info("Уведомление о предложенных изменениях создано для владельца {}", memorial.getCreatedBy().getLogin());
+        } catch (Exception e) {
+            log.error("Ошибка при создании уведомления о предложенных изменениях: {}", e.getMessage(), e);
+        }
+    }
+
+    @Transactional
+    public MemorialDTO rejectChanges(Long id, String reason, User admin) {
+        log.info("=== ОТКЛОНЕНИЕ ИЗМЕНЕНИЙ МЕМОРИАЛА ===");
+        log.info("rejectChanges: ID={}, admin={}, reason='{}'", id, admin.getLogin(), reason);
         
-        Notification savedNotification = notificationRepository.save(notification);
-        log.info("Создано уведомление ID={} о предложенных изменениях для владельца {} ({})", 
-                savedNotification.getId(), owner.getFio(), owner.getId());
+        Memorial memorial = memorialRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Memorial not found"));
         
-        // Создаем информационное уведомление для редактора
-        Notification editorNotification = new Notification();
-        editorNotification.setUser(editor);
-        editorNotification.setSender(editor); // Самому себе
-        editorNotification.setTitle("Изменения предложены");
-        editorNotification.setMessage("Ваши изменения в мемориале '" + memorial.getFio() 
-                + "' предложены владельцу и будут применены после его подтверждения.");
-        editorNotification.setType(Notification.NotificationType.MEMORIAL_EDIT);
-        editorNotification.setStatus(Notification.NotificationStatus.INFO); // Для исходящих - INFO
-        editorNotification.setRead(false);
-        editorNotification.setUrgent(false);
-        editorNotification.setCreatedAt(LocalDateTime.now());
-        editorNotification.setRelatedEntityId(memorial.getId());
-        editorNotification.setRelatedEntityName(memorial.getFio());
+        // Проверяем права доступа - только администраторы
+        if (admin.getRole() != User.Role.ADMIN) {
+            throw new RuntimeException("Только администраторы могут отклонять изменения");
+        }
         
-        Notification savedEditorNotification = notificationRepository.save(editorNotification);
-        log.info("Создано уведомление ID={} для редактора {} о предложенных изменениях", 
-                savedEditorNotification.getId(), editor.getFio());
+        // Проверяем, что изменения действительно на модерации
+        if (!memorial.isChangesUnderModeration()) {
+            throw new RuntimeException("У мемориала нет изменений на модерации");
+        }
+        
+        // Очищаем все pending поля и снимаем флаг модерации
+        memorial.setChangesUnderModeration(false);
+        
+        // Сохраняем ID редактора перед очисткой для создания уведомлений
+        Long savedLastEditorId = memorial.getLastEditorId();
+        
+        // Удаляем pending фото из хранилища, если есть
+        if (memorial.getPendingPhotoUrl() != null) {
+            log.info("Удаляем pending фото из хранилища: {}", memorial.getPendingPhotoUrl());
+            fileStorageService.deleteFile(memorial.getPendingPhotoUrl());
+        }
+        
+        memorial.setPendingPhotoUrl(null);
+        memorial.setPendingFio(null);
+        memorial.setPendingBiography(null);
+        memorial.setPendingBirthDate(null);
+        memorial.setPendingDeathDate(null);
+        memorial.setPendingIsPublic(null);
+        memorial.setPendingMainLocation(null);
+        memorial.setPendingBurialLocation(null);
+        memorial.setPendingChanges(false);
+        memorial.setPreviousState(null);
+        memorial.setProposedChanges(null);
+        memorial.setLastEditorId(null);
+        
+        // ВАЖНО: НЕ изменяем publicationStatus - мемориал остается опубликованным
+        
+        memorial = memorialRepository.save(memorial);
+        
+        // Отправляем уведомления об отклонении изменений
+        createChangesRejectionNotification(memorial, admin, reason, savedLastEditorId);
+        
+        log.info("Изменения мемориала ID={} отклонены администратором {}", id, admin.getLogin());
+        return memorialMapper.toDTO(memorial);
+    }
+
+    private void createChangesRejectionNotification(Memorial memorial, User admin, String reason, Long savedLastEditorId) {
+        try {
+        log.info("=== СОЗДАНИЕ УВЕДОМЛЕНИЙ ОБ ОТКЛОНЕНИИ ИЗМЕНЕНИЙ ===");
+        log.info("createChangesRejectionNotification: ID={}, reason='{}', editorId={}", memorial.getId(), reason, savedLastEditorId);
+        
+        // 1. Создаем уведомление для владельца мемориала
+        Notification ownerNotification = new Notification();
+        ownerNotification.setType(Notification.NotificationType.SYSTEM);
+        ownerNotification.setStatus(Notification.NotificationStatus.INFO);
+        ownerNotification.setUser(memorial.getCreatedBy());
+        ownerNotification.setSender(admin);
+        ownerNotification.setTitle("Изменения мемориала отклонены");
+        
+        String ownerMessage = String.format(
+            "Изменения вашего мемориала \"%s\" были отклонены администратором.\n\n",
+            memorial.getFio()
+        );
+        
+        // Добавляем причину отклонения, если она указана
+        if (reason != null && !reason.trim().isEmpty()) {
+            log.info("Добавляем причину отклонения изменений в сообщение: '{}'", reason.trim());
+            ownerMessage += String.format("Причина отклонения: %s\n\n", reason.trim());
+        } else {
+            log.warn("Причина отклонения изменений пуста или не указана: reason='{}'", reason);
+        }
+        
+        ownerMessage += "Вы можете внести изменения и повторно отправить их на модерацию.";
+        
+        ownerNotification.setMessage(ownerMessage);
+        ownerNotification.setRelatedEntityId(memorial.getId());
+        ownerNotification.setRelatedEntityName(memorial.getFio());
+        ownerNotification.setRead(false);
+        ownerNotification.setCreatedAt(LocalDateTime.now());
+        
+        notificationRepository.save(ownerNotification);
+        log.info("Уведомление об отклонении изменений создано для владельца {} с причиной: {}", 
+                memorial.getCreatedBy().getLogin(), reason != null ? reason : "не указана");
+        
+        // 2. Создаем уведомление для редактора, если он есть
+        if (savedLastEditorId != null) {
+            User editor = userRepository.findById(savedLastEditorId).orElse(null);
+            if (editor != null) {
+                Notification editorNotification = new Notification();
+                editorNotification.setType(Notification.NotificationType.SYSTEM);
+                editorNotification.setStatus(Notification.NotificationStatus.INFO);
+                editorNotification.setUser(editor);
+                editorNotification.setSender(admin);
+                editorNotification.setTitle("Ваши изменения мемориала отклонены");
+                
+                String editorMessage = String.format(
+                    "Ваши изменения для мемориала \"%s\" были отклонены администратором.\n\n",
+                    memorial.getFio()
+                );
+                
+                // Добавляем причину отклонения, если она указана
+                if (reason != null && !reason.trim().isEmpty()) {
+                    editorMessage += String.format("Причина отклонения: %s\n\n", reason.trim());
+                }
+                
+                editorMessage += "Вы можете внести новые изменения и повторно отправить их владельцу на рассмотрение.";
+                
+                editorNotification.setMessage(editorMessage);
+                editorNotification.setRelatedEntityId(memorial.getId());
+                editorNotification.setRelatedEntityName(memorial.getFio());
+                editorNotification.setRead(false);
+                editorNotification.setCreatedAt(LocalDateTime.now());
+                
+                notificationRepository.save(editorNotification);
+                log.info("Уведомление об отклонении изменений создано для редактора {} с причиной: {}", 
+                        editor.getLogin(), reason != null ? reason : "не указана");
+            } else {
+                log.warn("Редактор с ID={} не найден для создания уведомления об отклонении", savedLastEditorId);
+            }
+        } else {
+            log.info("Редактор не указан, уведомление создано только для владельца");
+        }
+        
+        } catch (Exception e) {
+            log.error("Ошибка при создании уведомлений об отклонении изменений: {}", e.getMessage(), e);
+        }
+    }
+
+    @Transactional
+    public MemorialDTO approveChangesByAdmin(Long memorialId, User admin) {
+        log.info("Администратор {} одобряет изменения мемориала ID={}", admin.getLogin(), memorialId);
+        
+        Memorial memorial = memorialRepository.findById(memorialId)
+            .orElseThrow(() -> new RuntimeException("Memorial not found"));
+        
+        // Проверяем права доступа - только администраторы
+        if (admin.getRole() != User.Role.ADMIN) {
+            throw new RuntimeException("Только администраторы могут одобрять изменения");
+        }
+        
+        // Проверяем, что изменения действительно на модерации
+        if (!memorial.isChangesUnderModeration()) {
+            throw new RuntimeException("У мемориала нет изменений на модерации");
+        }
+        
+        try {
+            log.info("Применяем изменения для мемориала ID={} администратором", memorialId);
+            
+            // Применяем ожидающие изменения
+            
+            // 1. Обрабатываем ФИО
+            if (memorial.getPendingFio() != null) {
+                log.info("Применяем pending ФИО для мемориала ID={}", memorialId);
+                memorial.setFio(memorial.getPendingFio());
+                memorial.setPendingFio(null);
+            }
+            
+            // 2. Обрабатываем фото
+            if (memorial.getPendingPhotoUrl() != null && !memorial.getPendingPhotoUrl().isEmpty()) {
+                log.info("Применяем pending фото для мемориала ID={}", memorialId);
+                
+                // Удаляем старое фото, если есть
+                if (memorial.getPhotoUrl() != null) {
+                    fileStorageService.deleteFile(memorial.getPhotoUrl());
+                }
+                
+                // Применяем новое фото
+                memorial.setPhotoUrl(memorial.getPendingPhotoUrl());
+                memorial.setPendingPhotoUrl(null);
+            }
+            
+            // 3. Обрабатываем биографию
+            if (memorial.getPendingBiography() != null) {
+                log.info("Применяем pending биографию для мемориала ID={}", memorialId);
+                memorial.setBiography(memorial.getPendingBiography());
+                memorial.setPendingBiography(null);
+            }
+            
+            // 4. Обрабатываем даты
+            if (memorial.getPendingBirthDate() != null) {
+                log.info("Применяем pending дату рождения для мемориала ID={}", memorialId);
+                memorial.setBirthDate(memorial.getPendingBirthDate());
+                memorial.setPendingBirthDate(null);
+            }
+            
+            if (memorial.getPendingDeathDate() != null) {
+                log.info("Применяем pending дату смерти для мемориала ID={}", memorialId);
+                memorial.setDeathDate(memorial.getPendingDeathDate());
+                memorial.setPendingDeathDate(null);
+            }
+            
+            // 5. Обрабатываем публичность
+            if (memorial.getPendingIsPublic() != null) {
+                log.info("Применяем pending публичность для мемориала ID={}", memorialId);
+                memorial.setPublic(memorial.getPendingIsPublic());
+                memorial.setPendingIsPublic(null);
+            }
+            
+            // 6. Обрабатываем местоположения
+            if (memorial.getPendingMainLocation() != null) {
+                log.info("Применяем pending основное местоположение для мемориала ID={}", memorialId);
+                memorial.setMainLocation(memorial.getPendingMainLocation());
+                memorial.setPendingMainLocation(null);
+            }
+            
+            if (memorial.getPendingBurialLocation() != null) {
+                log.info("Применяем pending место захоронения для мемориала ID={}", memorialId);
+                memorial.setBurialLocation(memorial.getPendingBurialLocation());
+                memorial.setPendingBurialLocation(null);
+            }
+            
+            // Очищаем флаги и временные данные
+            memorial.setChangesUnderModeration(false);
+            memorial.setPendingChanges(false);
+            memorial.setPreviousState(null);
+            memorial.setProposedChanges(null);
+            
+            // Сохраняем изменения
+            memorial = memorialRepository.saveAndFlush(memorial);
+            log.info("Успешно применены все ожидающие изменения для мемориала ID={} администратором", memorialId);
+            
+            // Сохраняем lastEditorId перед созданием уведомлений
+            Long savedLastEditorId = memorial.getLastEditorId();
+            
+            // Создаем уведомление для владельца о том, что изменения приняты
+            if (savedLastEditorId != null) {
+                User editor = userRepository.findById(savedLastEditorId)
+                    .orElse(null);
+                
+                if (editor != null) {
+                    Notification notification = new Notification();
+                    notification.setUser(editor);
+                    notification.setSender(admin);
+                    notification.setTitle("Изменения в мемориале приняты");
+                    notification.setMessage("Ваши изменения для мемориала \"" + memorial.getFio() + "\" были одобрены администратором.");
+                    notification.setType(Notification.NotificationType.SYSTEM);
+                    notification.setStatus(Notification.NotificationStatus.INFO); // Информационное уведомление
+        notification.setRelatedEntityId(memorial.getId());
+        notification.setRelatedEntityName(memorial.getFio());
+                    notification.setCreatedAt(LocalDateTime.now());
+                    notification.setRead(false);
+                    
+                    notificationRepository.save(notification);
+                    log.info("Создано уведомление для редактора ID={} о принятии изменений администратором", editor.getId());
+                }
+            }
+            
+            // Также создаем уведомление для владельца мемориала
+            Notification ownerNotification = new Notification();
+            ownerNotification.setUser(memorial.getCreatedBy());
+            ownerNotification.setSender(admin);
+            ownerNotification.setTitle("Изменения в мемориале одобрены");
+            ownerNotification.setMessage("Изменения в вашем мемориале \"" + memorial.getFio() + "\" были одобрены администратором.");
+            ownerNotification.setType(Notification.NotificationType.SYSTEM);
+            ownerNotification.setStatus(Notification.NotificationStatus.INFO); // Информационное уведомление
+            ownerNotification.setRelatedEntityId(memorial.getId());
+            ownerNotification.setRelatedEntityName(memorial.getFio());
+            ownerNotification.setCreatedAt(LocalDateTime.now());
+            ownerNotification.setRead(false);
+            
+            notificationRepository.save(ownerNotification);
+            log.info("Создано уведомление для владельца ID={} о одобрении изменений администратором", memorial.getCreatedBy().getId());
+            
+            // Теперь очищаем lastEditorId
+            memorial.setLastEditorId(null);
+            
+        } catch (Exception e) {
+            log.error("Ошибка при применении ожидающих изменений администратором: {}", e.getMessage(), e);
+            throw new RuntimeException("Ошибка при применении изменений: " + e.getMessage());
+        }
+        
+        // Финальное сохранение и проверка флагов
+        memorial = memorialRepository.saveAndFlush(memorial);
+        log.info("Завершено одобрение изменений мемориала ID={} администратором, финальное состояние pendingChanges={}, changesUnderModeration={}", 
+                memorial.getId(), memorial.isPendingChanges(), memorial.isChangesUnderModeration());
+        
+        return memorialMapper.toDTO(memorial);
     }
 }

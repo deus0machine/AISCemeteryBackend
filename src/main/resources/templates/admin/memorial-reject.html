@@ -46,7 +46,7 @@
                         <form th:action="@{/admin/memorials/{id}/reject(id=${memorialId})}" method="post">
                             <div class="mb-4">
                                 <label for="rejectionReason" class="form-label">Причина отклонения</label>
-                                <textarea class="form-control" id="rejectionReason" name="rejectionReason" rows="5" placeholder="Опишите причину отклонения публикации мемориала..." required></textarea>
+                                <textarea class="form-control" id="rejectionReason" name="reason" rows="5" placeholder="Опишите причину отклонения публикации мемориала..." required></textarea>
                                 <div class="form-text">Это сообщение будет отправлено владельцу мемориала</div>
                             </div>
                             
