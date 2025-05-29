@@ -23,6 +23,7 @@ public class DataLoader implements CommandLineRunner {
     private final FamilyTreeAccessRepository familyTreeAccessRepository;
     private final MemorialRelationRepository memorialRelationRepository;
     private final FamilyTreeVersionRepository familyTreeVersionRepository;
+    private final NotificationRepository notificationRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -32,6 +33,7 @@ public class DataLoader implements CommandLineRunner {
                      FamilyTreeAccessRepository familyTreeAccessRepository,
                      MemorialRelationRepository memorialRelationRepository,
                      FamilyTreeVersionRepository familyTreeVersionRepository,
+                     NotificationRepository notificationRepository,
                      PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.memorialRepository = memorialRepository;
@@ -39,6 +41,7 @@ public class DataLoader implements CommandLineRunner {
         this.familyTreeAccessRepository = familyTreeAccessRepository;
         this.memorialRelationRepository = memorialRelationRepository;
         this.familyTreeVersionRepository = familyTreeVersionRepository;
+        this.notificationRepository = notificationRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -107,6 +110,7 @@ public class DataLoader implements CommandLineRunner {
             Memorial burial7 = new Memorial(admin, "Сергеев Иван Андреевич", LocalDate.of(1995, 9, 1), LocalDate.of(1925, 4, 7));
             burial7.setCreatedBy(admin);
             burial7.setPublic(true);
+            burial7.setPublicationStatus(Memorial.PublicationStatus.PUBLISHED);
             Memorial burial8 = new Memorial(admin, "Сергеева Ольга Николаевна", LocalDate.of(1998, 6, 14), LocalDate.of(1928, 12, 15));
             burial8.setCreatedBy(admin);
             logger.info("Saving memorials to database...");
@@ -145,6 +149,65 @@ public class DataLoader implements CommandLineRunner {
             relations.add(createRelation(familyTree, burial7, burial8, MemorialRelation.RelationType.SPOUSE)); // Супруги
 
             memorialRelationRepository.saveAll(relations);
+            
+            // Создаем тестовое уведомление для администратора о публикации мемориала
+            Notification notification = new Notification();
+            notification.setUser(admin);
+            notification.setSender(null); // Системное уведомление
+            notification.setTitle("Мемориал опубликован");
+            notification.setMessage("Мемориал '" + burial7.getFio() + "' был успешно опубликован на сайте.");
+            notification.setType(Notification.NotificationType.SYSTEM);
+            notification.setStatus(Notification.NotificationStatus.INFO);
+            notification.setRelatedEntityId(burial7.getId());
+            notification.setRelatedEntityName(burial7.getFio());
+            notification.setCreatedAt(LocalDateTime.now());
+            notification.setRead(false);
+            notification.setUrgent(false);
+
+            notificationRepository.save(notification);
+            logger.info("Test notification created for admin");
+            
+            // Создаем тестовое уведомление о запросе на модерацию мемориала
+            Notification moderationNotification = new Notification();
+            moderationNotification.setUser(admin); // Для администратора
+            moderationNotification.setSender(user); // От обычного пользователя
+            moderationNotification.setTitle("Запрос на публикацию мемориала");
+            moderationNotification.setMessage("Пользователь '" + user.getFio() + "' запрашивает публикацию мемориала '" + burial1.getFio() + "'");
+            moderationNotification.setType(Notification.NotificationType.MODERATION);
+            moderationNotification.setStatus(Notification.NotificationStatus.PENDING);
+            moderationNotification.setRelatedEntityId(burial1.getId());
+            moderationNotification.setRelatedEntityName(burial1.getFio());
+            moderationNotification.setCreatedAt(LocalDateTime.now().minusHours(2)); // Создано 2 часа назад
+            moderationNotification.setRead(false);
+            moderationNotification.setUrgent(true); // Пометим как важное
+
+            // Изменяем статус мемориала на "На модерации"
+            burial1.setPublicationStatus(Memorial.PublicationStatus.PENDING_MODERATION);
+            memorialRepository.save(burial1);
+            
+            notificationRepository.save(moderationNotification);
+            logger.info("Test moderation notification created for admin");
+            
+            // Создаем тестовое уведомление о ранее отклоненном мемориале
+            Notification rejectedNotification = new Notification();
+            rejectedNotification.setUser(user); // Для пользователя
+            rejectedNotification.setSender(admin); // От администратора
+            rejectedNotification.setTitle("Мемориал не опубликован");
+            rejectedNotification.setMessage("Ваш мемориал '" + burial4.getFio() + "' не был одобрен администратором и не будет опубликован на сайте.");
+            rejectedNotification.setType(Notification.NotificationType.SYSTEM);
+            rejectedNotification.setStatus(Notification.NotificationStatus.INFO);
+            rejectedNotification.setRelatedEntityId(burial4.getId());
+            rejectedNotification.setRelatedEntityName(burial4.getFio());
+            rejectedNotification.setCreatedAt(LocalDateTime.now().minusDays(1)); // Создано день назад
+            rejectedNotification.setRead(true); // Уже прочитано
+            rejectedNotification.setUrgent(false);
+            
+            // Изменяем статус мемориала на "Отклонен"
+            burial4.setPublicationStatus(Memorial.PublicationStatus.REJECTED);
+            memorialRepository.save(burial4);
+            
+            notificationRepository.save(rejectedNotification);
+            logger.info("Test rejected notification created for user");
 
             logger.info("Test data initialization completed successfully");
         } else {

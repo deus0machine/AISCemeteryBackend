@@ -48,6 +48,10 @@ public class Notification {
 
     @Column(nullable = false)
     private boolean read = false;
+    
+    // Флаг срочности уведомления
+    @Column(nullable = false)
+    private boolean urgent = false;
 
     public enum NotificationType {
         INFO,                     // Информационное уведомление
@@ -56,7 +60,10 @@ public class Notification {
         MEMORIAL_COMMENT,         // Комментарий к мемориалу
         ANNIVERSARY,              // Годовщина
         SYSTEM,                   // Системное уведомление
-        MEMORIAL_EDIT             // Уведомление о изменении мемориала
+        MEMORIAL_EDIT,            // Уведомление о изменении мемориала
+        MODERATION,               // Уведомление о модерации контента
+        TECHNICAL,                // Техническое уведомление
+        USER_REQUEST              // Запрос от пользователя
     }
     
     public enum NotificationStatus {

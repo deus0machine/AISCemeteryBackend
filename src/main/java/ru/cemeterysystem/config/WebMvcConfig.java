@@ -1,6 +1,7 @@
 package ru.cemeterysystem.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.format.FormatterRegistry;
 import org.springframework.format.datetime.DateFormatter;
@@ -54,7 +55,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
      */
     @Override
     public void addViewControllers(ViewControllerRegistry registry) {
-        registry.addViewController("/login").setViewName("login");
         registry.addViewController("/access-denied").setViewName("access-denied");
     }
     
@@ -63,6 +63,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
      */
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        // Статические ресурсы должны быть явно определены, чтобы не конфликтовали с контроллерами
         registry.addResourceHandler("/static/**")
                 .addResourceLocations("classpath:/static/");
         registry.addResourceHandler("/css/**")
@@ -71,5 +72,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .addResourceLocations("classpath:/static/js/");
         registry.addResourceHandler("/images/**")
                 .addResourceLocations("classpath:/static/images/");
+                
+        // Использовать более низкий приоритет для ресурсов, чтобы контроллеры имели преимущество
+        registry.setOrder(2); // Более низкий приоритет, чем у контроллеров
     }
 } 

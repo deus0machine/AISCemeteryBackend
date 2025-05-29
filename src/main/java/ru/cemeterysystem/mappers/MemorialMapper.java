@@ -59,6 +59,9 @@ public class MemorialMapper implements RowMapper<Memorial> {
         dto.setCreatedAt(memorial.getCreatedAt());
         dto.setUpdatedAt(memorial.getUpdatedAt());
         
+        // Добавляем копирование статуса публикации
+        dto.setPublicationStatus(memorial.getPublicationStatus());
+        
         if (memorial.getEditors() != null) {
             List<Long> editorIds = memorial.getEditors().stream()
                 .map(User::getId)
@@ -97,6 +100,10 @@ public class MemorialMapper implements RowMapper<Memorial> {
         memorial.setPhotoUrl(dto.getPhotoUrl());
         memorial.setPublic(dto.isPublic());
         memorial.setTreeId(dto.getTreeId());
+        
+        // Добавляем копирование статуса публикации
+        memorial.setPublicationStatus(dto.getPublicationStatus());
+        
         return memorial;
     }
 }

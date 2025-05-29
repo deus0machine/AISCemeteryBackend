@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактирование мемориала | Система управления кладбищем</title>
+
+    <!-- Подключение ресурсов -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #198754;
+            --danger-color: #dc3545;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f8f9fa;
+        }
+
+        /* Сайдбар */
+        .sidebar {
+            background: var(--primary-color);
+            min-height: 100vh;
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.7);
+            border-left: 3px solid transparent;
+        }
+
+        .sidebar .nav-link.active {
+            background: rgba(255,255,255,0.1);
+            border-left-color: var(--secondary-color);
+            color: white;
+        }
+
+        /* Основной контент */
+        .main-content {
+            background: #f8f9fa;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* Карточки */
+        .card-modern {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            background-color: #fff;
+            border-bottom: 1px solid #eaeaea;
+            padding: 15px 20px;
+        }
+
+        .card-title {
+            margin-bottom: 0;
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        /* Кнопки действий */
+        .btn-action {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+        }
+
+        /* Превью фотографии */
+        .photo-preview {
+            width: 180px;
+            height: 180px;
+            border-radius: 12px;
+            background-size: cover;
+            background-position: center;
+            background-color: #e9ecef;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6c757d;
+            font-size: 2rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .photo-preview:hover {
+            opacity: 0.9;
+        }
+
+        /* Адаптивность */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                z-index: 1000;
+                transform: translateX(-100%);
+            }
+
+            .sidebar.active {
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+<body>
+<!-- Шапка -->
+<header class="navbar navbar-dark bg-primary shadow-sm">
+    <div class="container-fluid">
+        <button class="navbar-toggler d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <a class="navbar-brand" href="/admin">
+            <i class="bi bi-building-gear me-2"></i>Администрирование
+        </a>
+        <div class="dropdown">
+            <a href="#" class="text-white text-decoration-none dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="bi bi-person-circle me-2"></i>
+                <span sec:authentication="name"></span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="#"><i class="bi bi-gear me-2"></i>Настройки</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <form th:action="@{/logout}" method="post">
+                        <button class="dropdown-item" type="submit">
+                            <i class="bi bi-box-arrow-right me-2"></i>Выйти
+                        </button>
+                    </form>
+                </li>
+            </ul>
+        </div>
+    </div>
+</header>
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- Боковое меню -->
+        <nav class="col-md-3 col-lg-2 sidebar collapse d-md-block" id="sidebarMenu">
+            <div class="position-sticky pt-3">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin">
+                            <i class="bi bi-speedometer2 me-2"></i>Панель управления
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/users">
+                            <i class="bi bi-people-fill me-2"></i>Пользователи
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/admin/memorials">
+                            <i class="bi bi-bookmark-heart me-2"></i>Мемориалы
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/family-trees">
+                            <i class="bi bi-diagram-3 me-2"></i>Семейные древа
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/notifications">
+                            <i class="bi bi-bell me-2"></i>Уведомления
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/reports">
+                            <i class="bi bi-bar-chart me-2"></i>Отчеты
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/settings">
+                            <i class="bi bi-gear me-2"></i>Настройки
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <!-- Основной контент -->
+        <main class="col-md-9 ms-sm-auto col-lg-10 main-content">
+            <!-- Хлебные крошки -->
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/admin">Главная</a></li>
+                    <li class="breadcrumb-item"><a href="/admin/memorials">Мемориалы</a></li>
+                    <li class="breadcrumb-item active">Редактирование</li>
+                </ol>
+            </nav>
+
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h4 mb-0">
+                    <i class="bi bi-bookmark-heart me-2"></i>Редактирование мемориала
+                </h1>
+                <a href="/admin/memorials" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i>Назад
+                </a>
+            </div>
+
+            <!-- Уведомления об успехе/ошибке -->
+            <div class="alert alert-success alert-dismissible fade show" role="alert" th:if="${successMessage}">
+                <i class="bi bi-check-circle-fill me-2"></i> <span th:text="${successMessage}"></span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            <div class="alert alert-danger alert-dismissible fade show" role="alert" th:if="${errorMessage}">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i> <span th:text="${errorMessage}"></span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card-modern">
+                        <div class="card-header">
+                            <h5 class="card-title">Данные мемориала</h5>
+                        </div>
+                        <div class="card-body">
+                            <form th:action="@{/admin/memorials/{id}/edit(id=${memorial.id})}" method="post" enctype="multipart/form-data">
+                                <div class="row mb-3">
+                                    <label for="id" class="col-sm-3 col-form-label">ID мемориала</label>
+                                    <div class="col-sm-9">
+                                        <input type="text" class="form-control" id="id" th:value="${memorial.id}" disabled>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <label for="fio" class="col-sm-3 col-form-label">ФИО</label>
+                                    <div class="col-sm-9">
+                                        <input type="text" class="form-control" id="fio" name="fio" th:value="${memorial.fio}" required>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <label for="birthDate" class="col-sm-3 col-form-label">Дата рождения</label>
+                                    <div class="col-sm-9">
+                                        <input type="date" class="form-control" id="birthDate" name="birthDate" 
+                                               th:value="${memorial.birthDate != null ? #temporals.format(memorial.birthDate, 'yyyy-MM-dd') : ''}">
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <label for="deathDate" class="col-sm-3 col-form-label">Дата смерти</label>
+                                    <div class="col-sm-9">
+                                        <input type="date" class="form-control" id="deathDate" name="deathDate" 
+                                               th:value="${memorial.deathDate != null ? #temporals.format(memorial.deathDate, 'yyyy-MM-dd') : ''}">
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <label for="biography" class="col-sm-3 col-form-label">Биография</label>
+                                    <div class="col-sm-9">
+                                        <textarea class="form-control" id="biography" name="biography" rows="4" th:text="${memorial.biography}"></textarea>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <label for="burialLocation" class="col-sm-3 col-form-label">Место захоронения</label>
+                                    <div class="col-sm-9">
+                                        <input type="text" class="form-control" id="burialLocation" name="burialLocation" th:value="${memorial.burialLocation}">
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <label class="col-sm-3 col-form-label">Фотография</label>
+                                    <div class="col-sm-9">
+                                        <div class="mb-3">
+                                            <div class="photo-preview" 
+                                                 th:style="${memorial.photoUrl != null ? 'background-image: url(' + memorial.photoUrl + ');' : ''}"
+                                                 onclick="document.getElementById('photoFile').click()">
+                                                <i class="bi bi-camera" th:if="${memorial.photoUrl == null}"></i>
+                                            </div>
+                                        </div>
+                                        <input type="file" class="form-control d-none" id="photoFile" name="photoFile" accept="image/*">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('photoFile').click()">
+                                            <i class="bi bi-upload me-1"></i>Загрузить фото
+                                        </button>
+                                        <button type="button" class="btn btn-outline-danger btn-sm ms-2" th:if="${memorial.photoUrl != null}" onclick="removePhoto()">
+                                            <i class="bi bi-trash me-1"></i>Удалить фото
+                                        </button>
+                                        <input type="hidden" name="removePhoto" id="removePhoto" value="false">
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <label for="userId" class="col-sm-3 col-form-label">Владелец</label>
+                                    <div class="col-sm-9">
+                                        <select class="form-select" id="userId" name="userId" required>
+                                            <option value="">Выберите владельца</option>
+                                            <option th:each="user : ${users}" 
+                                                    th:value="${user.id}" 
+                                                    th:text="${user.fio + ' (' + user.login + ')'}"
+                                                    th:selected="${memorial.user != null && memorial.user.id == user.id}">
+                                                Иванов Иван (ivanov)
+                                            </option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-sm-3 col-form-label">Опубликован</div>
+                                    <div class="col-sm-9">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="isPublic" 
+                                                   name="isPublic" th:checked="${memorial.isPublic}">
+                                            <label class="form-check-label" for="isPublic">
+                                                <span th:text="${memorial.isPublic ? 'Да' : 'Нет'}">Статус публикации</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <label for="creationDate" class="col-sm-3 col-form-label">Дата создания</label>
+                                    <div class="col-sm-9">
+                                        <input type="text" class="form-control" id="creationDate" 
+                                               th:value="${memorial.createdAt != null ? #temporals.format(memorial.createdAt, 'dd.MM.yyyy HH:mm') : ''}" disabled>
+                                    </div>
+                                </div>
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <a th:href="@{/admin/memorials}" class="btn btn-secondary me-md-2">Отмена</a>
+                                    <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="card-modern mb-4">
+                        <div class="card-header">
+                            <h5 class="card-title">Информация</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    Статус
+                                    <span class="badge rounded-pill" 
+                                          th:classappend="${memorial.isPublic ? 'bg-success' : 'bg-secondary'}" 
+                                          th:text="${memorial.isPublic ? 'Опубликован' : 'Не опубликован'}">Статус</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    Просмотры
+                                    <span class="badge rounded-pill bg-primary" th:text="${memorial.viewCount != null ? memorial.viewCount : '0'}">0</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    Комментарии
+                                    <span class="badge rounded-pill bg-info">0</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="card-modern">
+                        <div class="card-header">
+                            <h5 class="card-title">Действия</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <a th:href="@{/memorials/{id}(id=${memorial.id})}" class="btn btn-outline-primary" target="_blank">
+                                    <i class="bi bi-eye me-1"></i> Просмотреть на сайте
+                                </a>
+                                <button class="btn btn-outline-success" th:if="${!memorial.isPublic}" onclick="publishMemorial()">
+                                    <i class="bi bi-check-circle me-1"></i> Опубликовать
+                                </button>
+                                <button class="btn btn-outline-warning" th:if="${memorial.isPublic}" onclick="unpublishMemorial()">
+                                    <i class="bi bi-eye-slash me-1"></i> Снять с публикации
+                                </button>
+                                <button class="btn btn-danger" type="button" onclick="confirmDelete()">
+                                    <i class="bi bi-trash me-1"></i> Удалить мемориал
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- Модальное окно для подтверждения удаления -->
+<div class="modal fade" id="deleteConfirmationModal" tabindex="-1" aria-labelledby="deleteConfirmationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteConfirmationModalLabel">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Подтверждение удаления
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы уверены, что хотите удалить мемориал <strong th:text="${memorial.fio}"></strong>?</p>
+                <p class="text-danger">Это действие невозможно отменить!</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <form th:action="@{/admin/memorials/delete}" method="post">
+                    <input type="hidden" name="memorialId" th:value="${memorial.id}">
+                    <button type="submit" class="btn btn-danger">Удалить</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Скрипты -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Адаптивное меню
+    document.addEventListener('DOMContentLoaded', () => {
+        const sidebar = document.getElementById('sidebarMenu');
+        document.querySelector('.navbar-toggler').addEventListener('click', () => {
+            sidebar.classList.toggle('show');
+        });
+    });
+
+    // Функция для подтверждения удаления
+    function confirmDelete() {
+        new bootstrap.Modal(document.getElementById('deleteConfirmationModal')).show();
+    }
+    
+    // Функция для удаления фото
+    function removePhoto() {
+        document.getElementById('removePhoto').value = 'true';
+        document.querySelector('.photo-preview').style.backgroundImage = 'none';
+        document.querySelector('.photo-preview').innerHTML = '<i class="bi bi-camera"></i>';
+    }
+    
+    // Предварительный просмотр выбранного фото
+    document.getElementById('photoFile').addEventListener('change', function() {
+        if (this.files && this.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.querySelector('.photo-preview').style.backgroundImage = `url(${e.target.result})`;
+                document.querySelector('.photo-preview').innerHTML = '';
+                document.getElementById('removePhoto').value = 'false';
+            };
+            reader.readAsDataURL(this.files[0]);
+        }
+    });
+    
+    // Функция для публикации мемориала
+    function publishMemorial() {
+        document.getElementById('isPublic').checked = true;
+        document.getElementById('isPublic').nextElementSibling.querySelector('span').textContent = 'Да';
+    }
+    
+    // Функция для снятия с публикации
+    function unpublishMemorial() {
+        document.getElementById('isPublic').checked = false;
+        document.getElementById('isPublic').nextElementSibling.querySelector('span').textContent = 'Нет';
+    }
+    
+    // Обновление текста для переключателя публикации
+    document.addEventListener('DOMContentLoaded', function() {
+        const isPublicCheckbox = document.getElementById('isPublic');
+        const isPublicLabel = isPublicCheckbox.nextElementSibling.querySelector('span');
+        
+        isPublicCheckbox.addEventListener('change', function() {
+            isPublicLabel.textContent = this.checked ? 'Да' : 'Нет';
+        });
+    });
+</script>
+</body>
+</html> 

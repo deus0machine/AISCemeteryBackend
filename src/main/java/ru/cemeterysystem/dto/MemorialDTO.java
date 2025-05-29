@@ -2,6 +2,7 @@ package ru.cemeterysystem.dto;
 
 import lombok.Data;
 import ru.cemeterysystem.models.Location;
+import ru.cemeterysystem.models.Memorial.PublicationStatus;
 import java.time.LocalDateTime;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
@@ -31,6 +32,9 @@ public class MemorialDTO {
     
     @JsonProperty("pendingChanges")
     private boolean pendingChanges;
+    
+    // Добавляем поле статуса публикации
+    private PublicationStatus publicationStatus;
     
     // Поля для ожидающих изменений
     private String pendingPhotoUrl;

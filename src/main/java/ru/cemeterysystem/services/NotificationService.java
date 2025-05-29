@@ -14,6 +14,7 @@ import ru.cemeterysystem.repositories.UserRepository;
 import ru.cemeterysystem.dto.NotificationDTO;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -38,6 +39,7 @@ public class NotificationService {
     // Получить отправленные пользователем уведомления
     public List<NotificationDTO> getSentNotifications(Long userId) {
         return notificationRepository.findBySenderId(userId).stream()
+                .filter(notification -> !notification.getUser().getId().equals(notification.getSender().getId()))
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
@@ -244,5 +246,158 @@ public class NotificationService {
                 notification.getUser().getId());
         
         return dto;
+    }
+    
+    // --- Методы для административного интерфейса ---
+    
+    // Отметить все уведомления как прочитанные
+    @Transactional
+    public long markAllAsRead() {
+        List<Notification> unreadNotifications = notificationRepository.findByReadFalse();
+        for (Notification notification : unreadNotifications) {
+            notification.setRead(true);
+        }
+        notificationRepository.saveAll(unreadNotifications);
+        return unreadNotifications.size();
+    }
+    
+    // Отметить одно уведомление как прочитанное для админ-панели
+    public boolean markAsReadAdmin(Long id) {
+        try {
+            Optional<Notification> notification = notificationRepository.findById(id);
+            if (notification.isPresent()) {
+                Notification notif = notification.get();
+                notif.setRead(true);
+                notificationRepository.save(notif);
+                return true;
+            }
+            return false;
+        } catch (Exception e) {
+            log.error("Error marking notification as read: {}", e.getMessage(), e);
+            return false;
+        }
+    }
+    
+    // Создать административное уведомление
+    @Transactional
+    public Notification createNotification(String type, String title, String content, boolean urgent, Long[] recipientIds) {
+        Notification notification = new Notification();
+        notification.setTitle(title);
+        notification.setMessage(content);
+        notification.setCreatedAt(LocalDateTime.now());
+        notification.setRead(false);
+        notification.setUrgent(urgent);
+        
+        // Определяем тип уведомления
+        Notification.NotificationType notificationType;
+        switch (type) {
+            case "moderation":
+                notificationType = Notification.NotificationType.MODERATION;
+                break;
+            case "technical":
+                notificationType = Notification.NotificationType.TECHNICAL;
+                break;
+            case "user":
+                notificationType = Notification.NotificationType.USER_REQUEST;
+                break;
+            case "system":
+            default:
+                notificationType = Notification.NotificationType.SYSTEM;
+                break;
+        }
+        notification.setType(notificationType);
+        notification.setStatus(Notification.NotificationStatus.INFO);
+        
+        // Если указаны конкретные получатели
+        if (recipientIds != null && recipientIds.length > 0) {
+            List<User> recipients = userRepository.findAllById(Arrays.asList(recipientIds));
+            
+            // Создаем отдельные уведомления для каждого получателя
+            for (User recipient : recipients) {
+                Notification userNotification = new Notification();
+                userNotification.setTitle(title);
+                userNotification.setMessage(content);
+                userNotification.setCreatedAt(LocalDateTime.now());
+                userNotification.setRead(false);
+                userNotification.setUrgent(urgent);
+                userNotification.setType(notificationType);
+                userNotification.setStatus(Notification.NotificationStatus.INFO);
+                userNotification.setUser(recipient);
+                
+                notificationRepository.save(userNotification);
+            }
+            
+            return notification; // Возвращаем оригинальное уведомление как шаблон
+        } else {
+            // Для уведомлений, которые не привязаны к конкретным пользователям
+            // Например, системные уведомления, которые видны только в админке
+            
+            // Получаем администратора системы как владельца уведомления
+            Optional<User> adminUser = userRepository.findByRole(User.Role.ADMIN).stream().findFirst();
+            if (adminUser.isPresent()) {
+                notification.setUser(adminUser.get());
+                return notificationRepository.save(notification);
+            } else {
+                log.error("Не найден администратор для системного уведомления");
+                return null;
+            }
+        }
+    }
+
+    @Transactional
+    public long cleanupExcessNotifications() {
+        try {
+            // Получаем общее количество перед удалением
+            long beforeCount = notificationRepository.count();
+            
+            // Получаем все прочитанные уведомления
+            List<Notification> readNotifications = notificationRepository.findAll()
+                .stream()
+                .filter(n -> n.isRead() && 
+                       (n.getStatus() == Notification.NotificationStatus.ACCEPTED || 
+                        n.getStatus() == Notification.NotificationStatus.REJECTED || 
+                        n.getStatus() == Notification.NotificationStatus.INFO))
+                .collect(Collectors.toList());
+                
+            // Логируем количество прочитанных уведомлений
+            log.info("Найдено {} прочитанных уведомлений для удаления", readNotifications.size());
+            
+            // Проверяем наличие тестового уведомления среди прочитанных
+            List<Notification> keepNotifications = readNotifications.stream()
+                .filter(n -> n.getTitle() != null && n.getTitle().equals("Мемориал опубликован") && 
+                       n.getMessage() != null && n.getMessage().contains("Сергеев Иван Андреевич"))
+                .collect(Collectors.toList());
+                
+            // Если найдено тестовое уведомление среди прочитанных, не удаляем его
+            if (!keepNotifications.isEmpty()) {
+                log.info("Найдено тестовое уведомление из DataLoader среди прочитанных - оно будет сохранено");
+                
+                // Получаем ID тестового уведомления, которое нужно сохранить
+                List<Long> idsToKeep = keepNotifications.stream()
+                    .map(Notification::getId)
+                    .filter(id -> id != null)
+                    .collect(Collectors.toList());
+                    
+                // Удаляем все прочитанные, кроме тестового
+                readNotifications.stream()
+                    .filter(n -> !idsToKeep.contains(n.getId()))
+                    .forEach(notificationRepository::delete);
+            } else {
+                // Удаляем все прочитанные уведомления
+                readNotifications.forEach(notificationRepository::delete);
+            }
+            
+            // Подсчитываем, сколько было удалено
+            long afterCount = notificationRepository.count();
+            long deletedCount = beforeCount - afterCount;
+            
+            log.info("Очистка уведомлений: удалено {} прочитанных уведомлений, оставлено {}", 
+                    deletedCount, afterCount);
+            
+            return deletedCount;
+        } catch (Exception e) {
+            log.error("Ошибка при очистке уведомлений: {}", e.getMessage(), e);
+            return 0;
+        }
     }
 } 

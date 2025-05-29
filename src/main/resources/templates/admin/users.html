@@ -4,768 +4,514 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Управление пользователями | Система управления кладбищем</title>
-    <!-- Bootstrap CSS -->
+
+    <!-- Подключение ресурсов -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
     <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #198754;
+            --danger-color: #dc3545;
+        }
+
         body {
             font-family: 'Roboto', sans-serif;
             background-color: #f8f9fa;
-            color: #333;
         }
-        
-        /* Стили для таблиц */
-        .table-custom {
-            border-radius: 0.5rem;
-            overflow: hidden;
-            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-        }
-        
-        .table-custom thead th {
-            background-color: #f8f9fa;
-            border-top: none;
-            font-weight: 600;
-            text-transform: uppercase;
-            font-size: 0.75rem;
-            letter-spacing: 0.5px;
-            color: #6c757d;
-        }
-        
-        .table-custom tbody tr:hover {
-            background-color: rgba(13, 110, 253, 0.05);
-        }
-        
-        /* Стили для карточек */
-        .card {
-            border-radius: 0.75rem;
-            border: none;
-            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-            margin-bottom: 1.5rem;
-            overflow: hidden;
-        }
-        
-        .card-header {
-            background-color: #fff;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.075);
-            padding: 1rem 1.25rem;
-        }
-        
-        /* Стили для вкладок */
-        .nav-tabs {
-            border-bottom: 2px solid #dee2e6;
-            margin-bottom: 1.5rem;
-        }
-        
-        .nav-tabs .nav-link {
-            border: none;
-            border-bottom: 2px solid transparent;
-            border-radius: 0;
-            margin-bottom: -2px;
-            padding: 0.75rem 1rem;
-            font-weight: 500;
-            color: #6c757d;
-        }
-        
-        .nav-tabs .nav-link:hover {
-            border-color: transparent;
-            color: #0d6efd;
-        }
-        
-        .nav-tabs .nav-link.active {
-            color: #0d6efd;
-            border-bottom-color: #0d6efd;
-        }
-        
-        /* Стили для пагинации */
-        .pagination .page-link {
-            border-radius: 0.25rem;
-            margin: 0 0.125rem;
-            color: #0d6efd;
-            border: 1px solid #dee2e6;
-        }
-        
-        .pagination .page-item.active .page-link {
-            background-color: #0d6efd;
-            border-color: #0d6efd;
-        }
-        
-        /* Стили для аватаров пользователей */
-        .avatar-circle {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            color: #495057;
-            background-color: #e9ecef;
-        }
-        
-        /* Стили для бейджей */
-        .badge-role {
-            padding: 0.5em 0.75em;
-            font-weight: 500;
-            letter-spacing: 0.5px;
-        }
-        
-        .badge-role.admin {
-            background-color: #dc3545;
-            color: white;
-        }
-        
-        .badge-role.user {
-            background-color: #0d6efd;
-            color: white;
-        }
-        
-        .badge-subscription {
-            padding: 0.5em 0.75em;
-            font-weight: 500;
-        }
-        
-        .badge-subscription.active {
-            background-color: #198754;
-            color: white;
-        }
-        
-        .badge-subscription.inactive {
-            background-color: #6c757d;
-            color: white;
-        }
-        
-        /* Стили для боковой панели */
+
+        /* Сайдбар */
         .sidebar {
-            position: fixed;
-            top: 0;
-            bottom: 0;
-            left: 0;
-            z-index: 100;
-            padding: 48px 0 0;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-            background-color: #2c3e50;
-            transition: all 0.3s;
+            background: var(--primary-color);
+            min-height: 100vh;
+            transition: transform 0.3s ease;
         }
-        
-        .sidebar-sticky {
-            height: calc(100vh - 48px);
-            overflow-x: hidden;
-            overflow-y: auto;
+
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.7);
+            border-left: 3px solid transparent;
         }
-        
-        .nav-link {
-            padding: 0.75rem 1.25rem;
-            font-weight: 500;
-            color: rgba(255, 255, 255, 0.8);
-            border-left: 4px solid transparent;
-            transition: all 0.2s;
+
+        .sidebar .nav-link.active {
+            background: rgba(255,255,255,0.1);
+            border-left-color: var(--secondary-color);
+            color: white;
         }
-        
-        .nav-link:hover {
-            color: #fff;
-            background-color: rgba(255, 255, 255, 0.1);
-            border-left-color: #3498db;
+
+        /* Основной контент */
+        .main-content {
+            background: #f8f9fa;
+            min-height: 100vh;
+            padding: 20px;
         }
-        
-        .nav-link.active {
-            color: #fff;
-            background-color: #1a252f;
-            border-left-color: #3498db;
+
+        /* Карточки */
+        .card-modern {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         }
-        
-        .nav-link i {
-            margin-right: 0.5rem;
-            font-size: 1.1rem;
+
+        /* Таблицы */
+        .table-modern {
+            border-radius: 8px;
+            overflow: hidden;
         }
-        
-        /* Стили для кнопок действий */
+
+        .table-modern thead {
+            background: #f8f9fa;
+        }
+
+        /* Кнопки действий */
         .btn-action {
-            width: 32px;
-            height: 32px;
+            width: 36px;
+            height: 36px;
             padding: 0;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            border-radius: 0.25rem;
-            margin-right: 0.25rem;
+            border-radius: 8px;
         }
-        
-        /* Анимация для alert */
-        .alert {
-            animation: fadeInDown 0.5s ease;
-        }
-        
-        @keyframes fadeInDown {
-            from {
-                opacity: 0;
-                transform: translateY(-20px);
+
+        /* Адаптивность */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                z-index: 1000;
+                transform: translateX(-100%);
             }
-            to {
-                opacity: 1;
-                transform: translateY(0);
+
+            .sidebar.active {
+                transform: translateX(0);
             }
         }
     </style>
 </head>
 <body>
-    <!-- Навигационная панель -->
-    <header class="navbar navbar-dark sticky-top bg-dark flex-md-nowrap p-0 shadow">
-        <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3" href="/admin">
-            <i class="bi bi-building-gear me-2"></i> Администрирование
-        </a>
-        <button class="navbar-toggler position-absolute d-md-none collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="false" aria-label="Toggle navigation">
+<!-- Шапка -->
+<header class="navbar navbar-dark bg-primary shadow-sm">
+    <div class="container-fluid">
+        <button class="navbar-toggler d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu">
             <span class="navbar-toggler-icon"></span>
         </button>
-        <div class="w-100"></div>
-        <div class="navbar-nav">
-            <div class="nav-item text-nowrap d-flex align-items-center">
-                <span class="text-white me-3" sec:authentication="name">Username</span>
-                <form th:action="@{/logout}" method="post">
-                    <button class="nav-link px-3 bg-dark border-0" type="submit">
-                        <i class="bi bi-box-arrow-right me-1"></i> Выйти
-                    </button>
+        <a class="navbar-brand" href="/admin">
+            <i class="bi bi-building-gear me-2"></i>Администрирование
+        </a>
+        <div class="dropdown">
+            <a href="#" class="text-white text-decoration-none dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="bi bi-person-circle me-2"></i>
+                <span sec:authentication="name"></span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="#"><i class="bi bi-gear me-2"></i>Настройки</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <form th:action="@{/logout}" method="post">
+                        <button class="dropdown-item" type="submit">
+                            <i class="bi bi-box-arrow-right me-2"></i>Выйти
+                        </button>
+                    </form>
+                </li>
+            </ul>
+        </div>
+    </div>
+</header>
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- Боковое меню -->
+        <nav class="col-md-3 col-lg-2 sidebar collapse d-md-block" id="sidebarMenu">
+            <div class="position-sticky pt-3">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin">
+                            <i class="bi bi-speedometer2 me-2"></i>Панель управления
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/admin/users">
+                            <i class="bi bi-people-fill me-2"></i>Пользователи
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/memorials">
+                            <i class="bi bi-bookmark-heart me-2"></i>Мемориалы
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/family-trees">
+                            <i class="bi bi-diagram-3 me-2"></i>Семейные древа
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/notifications">
+                            <i class="bi bi-bell me-2"></i>Уведомления
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/reports">
+                            <i class="bi bi-bar-chart me-2"></i>Отчеты
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/settings">
+                            <i class="bi bi-gear me-2"></i>Настройки
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <!-- Основной контент -->
+        <main class="col-md-9 ms-sm-auto col-lg-10 main-content">
+            <!-- Хлебные крошки -->
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/admin">Главная</a></li>
+                    <li class="breadcrumb-item active">Пользователи</li>
+                </ol>
+            </nav>
+
+            <!-- Заголовок и кнопки -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h4 mb-0"><i class="bi bi-people me-2"></i>Управление пользователями</h1>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                    <i class="bi bi-plus-lg me-2"></i>Добавить
+                </button>
+            </div>
+
+            <!-- Оповещения -->
+            <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle me-2"></i>
+                <span th:text="${successMessage}"></span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button>
+            </div>
+            
+            <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <span th:text="${errorMessage}"></span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button>
+            </div>
+
+            <!-- Поиск пользователей -->
+            <div class="card-modern mb-4">
+                <div class="card-body">
+                    <form th:action="@{/admin/users}" method="get" class="row g-3">
+                        <div class="col-md-10">
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                <input type="text" class="form-control" name="search" th:value="${param.search}" placeholder="Поиск по ФИО...">
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary w-100">Найти</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Вкладки -->
+            <div class="card-modern">
+                <div class="card-body">
+                    <ul class="nav nav-tabs mb-4">
+                        <li class="nav-item">
+                            <a class="nav-link active" data-bs-toggle="tab" href="#all-users">Все</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#admins">Администраторы</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#subscribers">Подписчики</a>
+                        </li>
+                    </ul>
+
+                    <!-- Контент вкладок -->
+                    <div class="tab-content">
+                        <!-- Все пользователи -->
+                        <div class="tab-pane fade show active" id="all-users">
+                            <div class="table-responsive">
+                                <table class="table table-modern table-hover">
+                                    <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Пользователь</th>
+                                        <th>Контакты</th>
+                                        <th>Статус</th>
+                                        <th>Действия</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="user : ${users.content}">
+                                        <td th:text="${user.id}">1</td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 40px; height: 40px;">
+                                                    <span th:text="${#strings.substring(user.fio, 0, 1)}">И</span>
+                                                </div>
+                                                <div>
+                                                    <div class="fw-medium" th:text="${user.fio}">Иванов Иван</div>
+                                                    <small class="text-muted" th:text="${'@' + user.login}">@user123</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td th:text="${user.contacts}">user@example.com</td>
+                                        <td>
+                                            <span th:if="${user.hasSubscription}" class="badge bg-success rounded-pill">
+                                                <i class="bi bi-check-circle me-1"></i>Активен
+                                            </span>
+                                            <span th:unless="${user.hasSubscription}" class="badge bg-secondary rounded-pill">
+                                                <i class="bi bi-x-circle me-1"></i>Неактивен
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex gap-2">
+                                                <a th:href="@{/admin/users/{id}/edit(id=${user.id})}" class="btn btn-action btn-outline-primary">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                                <button class="btn btn-action btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteUserModal" th:data-user-id="${user.id}" th:data-user-name="${user.fio}">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- Пагинация -->
+                            <div th:if="${users.totalPages > 1}" class="d-flex justify-content-center mt-4">
+                                <nav>
+                                    <ul class="pagination">
+                                        <li class="page-item" th:classappend="${users.first ? 'disabled' : ''}">
+                                            <a class="page-link" th:href="@{/admin/users(page=${users.number - 1}, size=${users.size}, search=${param.search})}" aria-label="Предыдущая">
+                                                <span aria-hidden="true">&laquo;</span>
+                                            </a>
+                                        </li>
+                                        <li th:each="i : ${#numbers.sequence(0, users.totalPages - 1)}" 
+                                            th:classappend="${i == users.number ? 'active' : ''}" class="page-item">
+                                            <a class="page-link" th:href="@{/admin/users(page=${i}, size=${users.size}, search=${param.search})}" th:text="${i + 1}">1</a>
+                                        </li>
+                                        <li class="page-item" th:classappend="${users.last ? 'disabled' : ''}">
+                                            <a class="page-link" th:href="@{/admin/users(page=${users.number + 1}, size=${users.size}, search=${param.search})}" aria-label="Следующая">
+                                                <span aria-hidden="true">&raquo;</span>
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </nav>
+                            </div>
+                        </div>
+
+                        <!-- Администраторы -->
+                        <div class="tab-pane fade" id="admins">
+                            <div class="table-responsive">
+                                <table class="table table-modern table-hover">
+                                    <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Пользователь</th>
+                                        <th>Контакты</th>
+                                        <th>Статус</th>
+                                        <th>Действия</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="user : ${users.content}" th:if="${user.role == 'ADMIN' || user.role == 'ROLE_ADMIN'}">
+                                        <td th:text="${user.id}">1</td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 40px; height: 40px;">
+                                                    <span th:text="${#strings.substring(user.fio, 0, 1)}">И</span>
+                                                </div>
+                                                <div>
+                                                    <div class="fw-medium" th:text="${user.fio}">Иванов Иван</div>
+                                                    <small class="text-muted" th:text="${'@' + user.login}">@user123</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td th:text="${user.contacts}">user@example.com</td>
+                                        <td>
+                                            <span th:if="${user.hasSubscription}" class="badge bg-success rounded-pill">
+                                                <i class="bi bi-check-circle me-1"></i>Активен
+                                            </span>
+                                            <span th:unless="${user.hasSubscription}" class="badge bg-secondary rounded-pill">
+                                                <i class="bi bi-x-circle me-1"></i>Неактивен
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex gap-2">
+                                                <a th:href="@{/admin/users/{id}/edit(id=${user.id})}" class="btn btn-action btn-outline-primary">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                                <button class="btn btn-action btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteUserModal" th:data-user-id="${user.id}" th:data-user-name="${user.fio}">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Подписчики -->
+                        <div class="tab-pane fade" id="subscribers">
+                            <div class="table-responsive">
+                                <table class="table table-modern table-hover">
+                                    <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Пользователь</th>
+                                        <th>Контакты</th>
+                                        <th>Статус</th>
+                                        <th>Действия</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="user : ${users.content}" th:if="${user.hasSubscription}">
+                                        <td th:text="${user.id}">1</td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 40px; height: 40px;">
+                                                    <span th:text="${#strings.substring(user.fio, 0, 1)}">И</span>
+                                                </div>
+                                                <div>
+                                                    <div class="fw-medium" th:text="${user.fio}">Иванов Иван</div>
+                                                    <small class="text-muted" th:text="${'@' + user.login}">@user123</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td th:text="${user.contacts}">user@example.com</td>
+                                        <td>
+                                            <span class="badge bg-success rounded-pill">
+                                                <i class="bi bi-check-circle me-1"></i>Активен
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex gap-2">
+                                                <a th:href="@{/admin/users/{id}/edit(id=${user.id})}" class="btn btn-action btn-outline-primary">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                                <button class="btn btn-action btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteUserModal" th:data-user-id="${user.id}" th:data-user-name="${user.fio}">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- Модальное окно удаления -->
+<div class="modal fade" id="deleteUserModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Удаление пользователя</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы уверены, что хотите удалить пользователя <span id="userName"></span>?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <form th:action="@{/admin/users/delete}" method="post">
+                    <input type="hidden" name="userId" id="userIdToDelete">
+                    <button type="submit" class="btn btn-danger">Удалить</button>
                 </form>
             </div>
         </div>
-    </header>
-
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Боковое меню -->
-            <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
-                <div class="position-sticky pt-3 sidebar-sticky">
-                    <ul class="nav flex-column">
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin">
-                                <i class="bi bi-speedometer2"></i> Панель управления
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link active" href="/admin/users">
-                                <i class="bi bi-people"></i> Пользователи
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin/memorials">
-                                <i class="bi bi-bookmark-heart"></i> Мемориалы
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin/family-trees">
-                                <i class="bi bi-diagram-3"></i> Семейные древа
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin/notifications">
-                                <i class="bi bi-bell"></i> Уведомления
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin/reports">
-                                <i class="bi bi-bar-chart"></i> Отчеты
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin/settings">
-                                <i class="bi bi-gear"></i> Настройки
-                            </a>
-                        </li>
-                    </ul>
-
-                    <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
-                        <span>Система</span>
-                    </h6>
-                    <ul class="nav flex-column mb-2">
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin/logs">
-                                <i class="bi bi-file-text"></i> Журналы
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin/backups">
-                                <i class="bi bi-database"></i> Резервные копии
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </nav>
-
-            <!-- Основной контент -->
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2"><i class="bi bi-people me-2 text-primary"></i>Управление пользователями</h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <div class="btn-group me-2">
-                            <a href="/admin/users/export" class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-download me-1"></i> Экспорт
-                            </a>
-                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
-                                <i class="bi bi-person-plus me-1"></i> Добавить пользователя
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Алерты для отображения сообщений -->
-                <div class="alert alert-success alert-dismissible fade show" role="alert" th:if="${successMessage}">
-                    <i class="bi bi-check-circle-fill me-2"></i> <span th:text="${successMessage}"></span>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-                <div class="alert alert-danger alert-dismissible fade show" role="alert" th:if="${errorMessage}">
-                    <i class="bi bi-exclamation-triangle-fill me-2"></i> <span th:text="${errorMessage}"></span>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-
-                <!-- Вкладки для разных секций управления пользователями -->
-                <ul class="nav nav-tabs" id="userTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="all-users-tab" data-bs-toggle="tab" data-bs-target="#all-users" 
-                                type="button" role="tab" aria-controls="all-users" aria-selected="true">
-                            <i class="bi bi-people me-1"></i> Все пользователи
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="admins-tab" data-bs-toggle="tab" data-bs-target="#admins" 
-                                type="button" role="tab" aria-controls="admins" aria-selected="false">
-                            <i class="bi bi-shield-lock me-1"></i> Администраторы
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="subscribers-tab" data-bs-toggle="tab" data-bs-target="#subscribers" 
-                                type="button" role="tab" aria-controls="subscribers" aria-selected="false">
-                            <i class="bi bi-star me-1"></i> Подписчики
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="recent-tab" data-bs-toggle="tab" data-bs-target="#recent" 
-                                type="button" role="tab" aria-controls="recent" aria-selected="false">
-                            <i class="bi bi-clock-history me-1"></i> Недавно зарегистрированные
-                        </button>
-                    </li>
-                </ul>
-
-                <!-- Содержимое вкладок -->
-                <div class="tab-content" id="userTabsContent">
-                    <!-- Вкладка: Все пользователи -->
-                    <div class="tab-pane fade show active" id="all-users" role="tabpanel" aria-labelledby="all-users-tab">
-                        <div class="card shadow-sm">
-                            <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-                                <h5 class="card-title m-0">Список пользователей</h5>
-                                <form class="d-flex" th:action="@{/admin/users}" method="get">
-                                    <div class="input-group">
-                                        <input class="form-control" type="search" placeholder="Поиск по ФИО" 
-                                               aria-label="Search" name="search" th:value="${param.search}">
-                                        <button class="btn btn-primary" type="submit">
-                                            <i class="bi bi-search"></i>
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                            <div class="card-body p-0">
-                                <div class="table-responsive">
-                                    <table class="table table-hover align-middle mb-0 table-custom">
-                                        <thead>
-                                            <tr>
-                                                <th scope="col">ID</th>
-                                                <th scope="col">Пользователь</th>
-                                                <th scope="col">Контакты</th>
-                                                <th scope="col">Роль</th>
-                                                <th scope="col">Дата регистрации</th>
-                                                <th scope="col">Подписка</th>
-                                                <th scope="col" class="text-end">Действия</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr th:each="user : ${users}">
-                                                <td th:text="${user.id}">1</td>
-                                                <td>
-                                                    <div class="d-flex align-items-center">
-                                                        <div class="avatar-circle me-2">
-                                                            <span th:text="${#strings.substring(user.fio, 0, 1)}">И</span>
-                                                        </div>
-                                                        <div>
-                                                            <div class="fw-medium" th:text="${user.fio}">Иванов Иван Иванович</div>
-                                                            <div class="small text-muted" th:text="${user.login}">user123</div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td th:text="${user.contacts}">example@mail.ru</td>
-                                                <td>
-                                                    <span class="badge rounded-pill badge-role" 
-                                                          th:classappend="${user.role.name() == 'ADMIN' ? 'admin' : 'user'}" 
-                                                          th:text="${user.role.name()}">USER</span>
-                                                </td>
-                                                <td th:text="${#dates.format(user.dateOfRegistration, 'dd.MM.yyyy')}">01.01.2023</td>
-                                                <td>
-                                                    <span class="badge rounded-pill badge-subscription" 
-                                                          th:classappend="${user.hasSubscription ? 'active' : 'inactive'}" 
-                                                          th:text="${user.hasSubscription ? 'Активна' : 'Не активна'}">Активна</span>
-                                                </td>
-                                                <td class="text-end">
-                                                    <div class="btn-group">
-                                                        <a th:href="@{/admin/users/{id}/edit(id=${user.id})}" class="btn btn-sm btn-outline-primary btn-action" data-bs-toggle="tooltip" title="Редактировать">
-                                                            <i class="bi bi-pencil"></i>
-                                                        </a>
-                                                        <button class="btn btn-sm btn-outline-success btn-action" 
-                                                                th:onclick="'toggleSubscription(' + ${user.id} + ')'"
-                                                                data-bs-toggle="tooltip" th:title="${user.hasSubscription ? 'Отключить подписку' : 'Включить подписку'}">
-                                                            <i class="bi" th:classappend="${user.hasSubscription ? 'bi-x-circle' : 'bi-check-circle'}"></i>
-                                                        </button>
-                                                        <button class="btn btn-sm btn-outline-danger btn-action" 
-                                                                th:onclick="'confirmDelete(' + ${user.id} + ', \'' + ${user.fio} + '\')'"
-                                                                data-bs-toggle="tooltip" title="Удалить">
-                                                            <i class="bi bi-trash"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            <tr th:if="${users.empty}">
-                                                <td colspan="7" class="text-center py-4">
-                                                    <div class="text-muted">
-                                                        <i class="bi bi-people fs-3 d-block mb-2"></i>
-                                                        Пользователи не найдены
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                                
-                                <!-- Пагинация -->
-                                <div th:if="${users.totalPages > 1}" class="d-flex justify-content-center py-3">
-                                    <nav aria-label="Навигация по страницам">
-                                        <ul class="pagination">
-                                            <li class="page-item" th:classappend="${users.first ? 'disabled' : ''}">
-                                                <a class="page-link" th:href="@{/admin/users(page=0, size=${users.size}, search=${param.search})}" aria-label="Первая">
-                                                    <span aria-hidden="true">&laquo;&laquo;</span>
-                                                </a>
-                                            </li>
-                                            <li class="page-item" th:classappend="${users.first ? 'disabled' : ''}">
-                                                <a class="page-link" th:href="@{/admin/users(page=${users.number - 1}, size=${users.size}, search=${param.search})}" aria-label="Предыдущая">
-                                                    <span aria-hidden="true">&laquo;</span>
-                                                </a>
-                                            </li>
-                                            <li class="page-item" th:each="i : ${#numbers.sequence(0, users.totalPages - 1)}" 
-                                                th:if="${i >= users.number - 2 and i <= users.number + 2}"
-                                                th:classappend="${i == users.number ? 'active' : ''}">
-                                                <a class="page-link" th:href="@{/admin/users(page=${i}, size=${users.size}, search=${param.search})}" th:text="${i + 1}">1</a>
-                                            </li>
-                                            <li class="page-item" th:classappend="${users.last ? 'disabled' : ''}">
-                                                <a class="page-link" th:href="@{/admin/users(page=${users.number + 1}, size=${users.size}, search=${param.search})}" aria-label="Следующая">
-                                                    <span aria-hidden="true">&raquo;</span>
-                                                </a>
-                                            </li>
-                                            <li class="page-item" th:classappend="${users.last ? 'disabled' : ''}">
-                                                <a class="page-link" th:href="@{/admin/users(page=${users.totalPages - 1}, size=${users.size}, search=${param.search})}" aria-label="Последняя">
-                                                    <span aria-hidden="true">&raquo;&raquo;</span>
-                                                </a>
-                                            </li>
-                                        </ul>
-                                    </nav>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Вкладка: Администраторы -->
-                    <div class="tab-pane fade" id="admins" role="tabpanel" aria-labelledby="admins-tab">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="card-title mb-0">Администраторы системы</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-striped table-hover align-middle">
-                                        <thead>
-                                            <tr>
-                                                <th scope="col">ID</th>
-                                                <th scope="col">ФИО</th>
-                                                <th scope="col">Логин</th>
-                                                <th scope="col">Контакты</th>
-                                                <th scope="col">Дата регистрации</th>
-                                                <th scope="col">Действия</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr th:each="user : ${users}" th:if="${user.role.name() == 'ADMIN'}">
-                                                <td th:text="${user.id}">1</td>
-                                                <td th:text="${user.fio}">Администратор</td>
-                                                <td th:text="${user.login}">admin</td>
-                                                <td th:text="${user.contacts}">admin@example.com</td>
-                                                <td th:text="${#dates.format(user.dateOfRegistration, 'dd.MM.yyyy')}">01.01.2023</td>
-                                                <td>
-                                                    <div class="btn-group">
-                                                        <a th:href="@{/admin/users/{id}/edit(id=${user.id})}" class="btn btn-sm btn-outline-primary">
-                                                            <i class="bi bi-pencil"></i>
-                                                        </a>
-                                                        <button class="btn btn-sm btn-outline-danger" 
-                                                                th:onclick="'confirmDelete(' + ${user.id} + ', \'' + ${user.fio} + '\')'">
-                                                            <i class="bi bi-trash"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            <tr th:if="${users.empty || !users.?[role.name() == 'ADMIN'].size()}">
-                                                <td colspan="6" class="text-center">Администраторы не найдены</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Вкладка: Подписчики -->
-                    <div class="tab-pane fade" id="subscribers" role="tabpanel" aria-labelledby="subscribers-tab">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="card-title mb-0">Пользователи с активной подпиской</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-striped table-hover align-middle">
-                                        <thead>
-                                            <tr>
-                                                <th scope="col">ID</th>
-                                                <th scope="col">ФИО</th>
-                                                <th scope="col">Логин</th>
-                                                <th scope="col">Контакты</th>
-                                                <th scope="col">Дата регистрации</th>
-                                                <th scope="col">Действия</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr th:each="user : ${users}" th:if="${user.hasSubscription}">
-                                                <td th:text="${user.id}">1</td>
-                                                <td th:text="${user.fio}">Подписчик</td>
-                                                <td th:text="${user.login}">subscriber</td>
-                                                <td th:text="${user.contacts}">subscriber@example.com</td>
-                                                <td th:text="${#dates.format(user.dateOfRegistration, 'dd.MM.yyyy')}">01.01.2023</td>
-                                                <td>
-                                                    <div class="btn-group">
-                                                        <a th:href="@{/admin/users/{id}/edit(id=${user.id})}" class="btn btn-sm btn-outline-primary">
-                                                            <i class="bi bi-pencil"></i>
-                                                        </a>
-                                                        <button class="btn btn-sm btn-outline-success" 
-                                                                th:onclick="'toggleSubscription(' + ${user.id} + ')'">
-                                                            <i class="bi bi-x-circle"></i>
-                                                        </button>
-                                                        <button class="btn btn-sm btn-outline-danger" 
-                                                                th:onclick="'confirmDelete(' + ${user.id} + ', \'' + ${user.fio} + '\')'">
-                                                            <i class="bi bi-trash"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            <tr th:if="${users.empty || !users.?[hasSubscription == true].size()}">
-                                                <td colspan="6" class="text-center">Подписчики не найдены</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Вкладка: Недавно зарегистрированные -->
-                    <div class="tab-pane fade" id="recent" role="tabpanel" aria-labelledby="recent-tab">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="card-title mb-0">Недавно зарегистрированные пользователи</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-striped table-hover align-middle">
-                                        <thead>
-                                            <tr>
-                                                <th scope="col">ID</th>
-                                                <th scope="col">ФИО</th>
-                                                <th scope="col">Логин</th>
-                                                <th scope="col">Контакты</th>
-                                                <th scope="col">Дата регистрации</th>
-                                                <th scope="col">Действия</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <!-- Показываем только пользователей, зарегистрированных за последние 30 дней -->
-                                            <tr th:each="user : ${recentUsers}" th:if="${recentUsers != null}">
-                                                <td th:text="${user.id}">1</td>
-                                                <td th:text="${user.fio}">Новый пользователь</td>
-                                                <td th:text="${user.login}">newuser</td>
-                                                <td th:text="${user.contacts}">newuser@example.com</td>
-                                                <td th:text="${#dates.format(user.dateOfRegistration, 'dd.MM.yyyy')}">01.01.2023</td>
-                                                <td>
-                                                    <div class="btn-group">
-                                                        <a th:href="@{/admin/users/{id}/edit(id=${user.id})}" class="btn btn-sm btn-outline-primary">
-                                                            <i class="bi bi-pencil"></i>
-                                                        </a>
-                                                        <button class="btn btn-sm btn-outline-success" 
-                                                                th:onclick="'toggleSubscription(' + ${user.id} + ')'">
-                                                            <i class="bi" th:classappend="${user.hasSubscription ? 'bi-x-circle' : 'bi-check-circle'}"></i>
-                                                        </button>
-                                                        <button class="btn btn-sm btn-outline-danger" 
-                                                                th:onclick="'confirmDelete(' + ${user.id} + ', \'' + ${user.fio} + '\')'">
-                                                            <i class="bi bi-trash"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            <tr th:if="${recentUsers == null || recentUsers.empty}">
-                                                <td colspan="6" class="text-center">Недавно зарегистрированных пользователей нет</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </main>
-        </div>
     </div>
+</div>
 
-    <!-- Модальное окно для добавления нового пользователя -->
-    <div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="addUserModalLabel">Добавление нового пользователя</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="addUserForm" method="post" th:action="@{/admin/users/add}">
-                        <div class="mb-3">
-                            <label for="fio" class="form-label">ФИО</label>
-                            <input type="text" class="form-control" id="fio" name="fio" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="login" class="form-label">Логин</label>
-                            <input type="text" class="form-control" id="login" name="login" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="password" class="form-label">Пароль</label>
-                            <input type="password" class="form-control" id="password" name="password" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="contacts" class="form-label">Контакты</label>
-                            <input type="text" class="form-control" id="contacts" name="contacts">
-                        </div>
-                        <div class="mb-3">
-                            <label for="role" class="form-label">Роль</label>
-                            <select class="form-select" id="role" name="role" required>
-                                <option value="USER">Пользователь</option>
-                                <option value="ADMIN">Администратор</option>
-                            </select>
-                        </div>
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" id="hasSubscription" name="hasSubscription">
-                            <label class="form-check-label" for="hasSubscription">Активировать подписку</label>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                    <button type="submit" form="addUserForm" class="btn btn-primary">Добавить</button>
-                </div>
+<!-- Модальное окно добавления -->
+<div class="modal fade" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Новый пользователь</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form th:action="@{/admin/users/add}" method="post" id="addUserForm">
+                    <div class="mb-3">
+                        <label for="fio" class="form-label">ФИО</label>
+                        <input type="text" class="form-control" id="fio" name="fio" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="login" class="form-label">Логин</label>
+                        <input type="text" class="form-control" id="login" name="login" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Пароль</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="contacts" class="form-label">Контактная информация</label>
+                        <input type="text" class="form-control" id="contacts" name="contacts" placeholder="Email или телефон">
+                    </div>
+                    <div class="mb-3">
+                        <label for="role" class="form-label">Роль</label>
+                        <select class="form-select" id="role" name="role" required>
+                            <option value="USER">Пользователь</option>
+                            <option value="ADMIN">Администратор</option>
+                        </select>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="hasSubscription" name="hasSubscription">
+                        <label class="form-check-label" for="hasSubscription">Активировать подписку</label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="submit" form="addUserForm" class="btn btn-primary">Добавить</button>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Модальное окно для подтверждения удаления -->
-    <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="deleteConfirmModalLabel">Подтверждение удаления</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p>Вы действительно хотите удалить пользователя <span id="userToDelete"></span>?</p>
-                    <p class="text-danger">Это действие невозможно отменить.</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                    <form id="deleteUserForm" method="post" th:action="@{/admin/users/delete}">
-                        <input type="hidden" id="userId" name="userId">
-                        <button type="submit" class="btn btn-danger">Удалить</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Bootstrap JS и зависимости -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    
-    <script>
-        // Инициализация всплывающих подсказок
-        document.addEventListener('DOMContentLoaded', function() {
-            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-                return new bootstrap.Tooltip(tooltipTriggerEl)
-            });
+<!-- Скрипты -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Адаптивное меню
+    document.addEventListener('DOMContentLoaded', () => {
+        const sidebar = document.getElementById('sidebarMenu');
+        document.querySelector('.navbar-toggler').addEventListener('click', () => {
+            sidebar.classList.toggle('show');
         });
-        
-        // Функция подтверждения удаления
-        function confirmDelete(userId, userName) {
-            document.getElementById('userId').value = userId;
-            document.getElementById('userToDelete').textContent = userName;
-            var modal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
-            modal.show();
-        }
-        
-        // Функция переключения подписки
-        function toggleSubscription(userId) {
-            fetch('/admin/users/' + userId + '/toggle-subscription', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="_csrf"]').getAttribute('content')
-                }
-            })
-            .then(response => {
-                if (response.ok) {
-                    return response.json();
-                }
-                throw new Error('Ошибка при изменении статуса подписки');
-            })
-            .then(data => {
-                window.location.reload();
-            })
-            .catch(error => {
-                console.error('Ошибка:', error);
-                alert('Произошла ошибка при изменении статуса подписки. Пожалуйста, попробуйте еще раз.');
+    });
+
+    // Модальное окно удаления
+    document.addEventListener('DOMContentLoaded', () => {
+        const deleteUserModal = document.getElementById('deleteUserModal');
+        if (deleteUserModal) {
+            deleteUserModal.addEventListener('show.bs.modal', (event) => {
+                const button = event.relatedTarget;
+                const userId = button.getAttribute('data-user-id');
+                const userName = button.getAttribute('data-user-name');
+                deleteUserModal.querySelector('#userName').textContent = userName;
+                deleteUserModal.querySelector('#userIdToDelete').value = userId;
             });
         }
-        
-        // Запоминаем активную вкладку
-        document.addEventListener('DOMContentLoaded', function() {
-            // Активация вкладки
-            var triggerTabList = [].slice.call(document.querySelectorAll('#userTabs button'))
-            triggerTabList.forEach(function (triggerEl) {
-                var tabTrigger = new bootstrap.Tab(triggerEl)
-                
-                triggerEl.addEventListener('click', function (event) {
-                    event.preventDefault()
-                    localStorage.setItem('activeUserTab', this.getAttribute('id'));
-                    tabTrigger.show()
-                });
-            });
-            
-            // Восстановление последней активной вкладки
-            var activeTab = localStorage.getItem('activeUserTab');
-            if (activeTab) {
-                var tab = document.getElementById(activeTab);
-                if (tab) {
-                    var tabInstance = new bootstrap.Tab(tab);
-                    tabInstance.show();
-                }
-            }
+    });
+
+    // Активация вкладок
+    document.addEventListener('DOMContentLoaded', () => {
+        const triggerTabList = [].slice.call(document.querySelectorAll('a[data-bs-toggle="tab"]'));
+        triggerTabList.forEach(function (triggerEl) {
+            new bootstrap.Tab(triggerEl);
         });
-    </script>
+    });
+</script>
 </body>
-</html> 
+</html>

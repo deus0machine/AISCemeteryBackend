@@ -45,6 +45,7 @@ public class AuthController {
             model.addAttribute("message", "Вы успешно вышли из системы");
         }
         
+        // Возвращаем view с явным указанием полного пути шаблона
         return "login";
     }
     

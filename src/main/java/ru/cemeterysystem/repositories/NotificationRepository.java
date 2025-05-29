@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import ru.cemeterysystem.models.Notification;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -32,6 +33,12 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     // Находит все уведомления, связанные с определенной сущностью
     List<Notification> findByRelatedEntityId(Long relatedEntityId);
     
+    // Находит уведомления для конкретного мемориала с определенным типом
+    List<Notification> findByRelatedEntityIdAndType(
+        Long relatedEntityId,
+        Notification.NotificationType type
+    );
+    
     // Находит уведомления пользователя для определенной сущности, с определенным типом и статусом
     List<Notification> findByUserIdAndRelatedEntityIdAndTypeAndStatus(
         Long userId,
@@ -39,4 +46,18 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
         Notification.NotificationType type, 
         Notification.NotificationStatus status
     );
+    
+    // Методы для админ-панели уведомлений
+    
+    // Находит все непрочитанные уведомления
+    List<Notification> findByReadFalse();
+    
+    // Подсчитывает количество срочных уведомлений
+    long countByUrgentTrue();
+    
+    // Подсчитывает количество прочитанных уведомлений
+    long countByReadTrue();
+    
+    // Подсчитывает количество уведомлений после указанной даты
+    long countByCreatedAtAfter(LocalDateTime date);
 } 

@@ -34,7 +34,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         "/api/memorials/public",
         "/error",
         "/swagger-ui",
-        "/v3/api-docs"
+        "/v3/api-docs",
+        "/login",
+        "/css",
+        "/js",
+        "/images",
+        "/access-denied"
     );
 
     @Override
@@ -83,8 +88,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     logger.debug("Successfully authenticated user: {}", userLogin);
                 } else {
                     logger.debug("Token is not valid for user: {}", userLogin);
-                    filterChain.doFilter(request, response);
-                    return;
                 }
             }
 

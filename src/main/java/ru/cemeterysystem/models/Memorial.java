@@ -95,6 +95,19 @@ public class Memorial {
     @Column(name = "is_public", nullable = false, columnDefinition = "boolean default false")
     @JsonProperty("is_public")
     private boolean isPublic;
+    
+    // Статус публикации мемориала
+    @Enumerated(EnumType.STRING)
+    @Column(name = "publication_status", nullable = false, columnDefinition = "VARCHAR(255) default 'DRAFT'")
+    private PublicationStatus publicationStatus = PublicationStatus.DRAFT;
+    
+    // Enum для статуса публикации
+    public enum PublicationStatus {
+        DRAFT,               // Черновик (не опубликован)
+        PENDING_MODERATION,  // На модерации
+        PUBLISHED,           // Опубликован
+        REJECTED             // Отклонен
+    }
 
     private Long treeId;
 
@@ -155,6 +168,10 @@ public class Memorial {
     // ID пользователя, который внес последние изменения
     @Column(name = "last_editor_id")
     private Long lastEditorId;
+
+    // Счетчик просмотров
+    @Column(name = "view_count")
+    private Integer viewCount = 0;
 
     @PrePersist
     protected void onCreate() {

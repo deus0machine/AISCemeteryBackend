@@ -368,348 +368,158 @@ public class MemorialService {
         return memorialMapper.toDTO(memorialRepository.save(memorial));
     }
 
+    /**
+     * Обновляет существующий мемориал
+     * @param id ID мемориала
+     * @param memorialDTO данные для обновления
+     * @param user пользователь, выполняющий обновление
+     * @return обновленный мемориал
+     */
     @Transactional
-    public MemorialDTO updateMemorial(Long id, MemorialDTO dto) {
+    public MemorialDTO updateMemorial(Long id, MemorialDTO memorialDTO, User user) {
         Memorial memorial = memorialRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Memorial not found"));
             
-        // Получаем текущего пользователя
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String login = authentication.getName();
-        User currentUser = userRepository.findByLogin(login)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        // Проверяем права доступа
+        if (!memorial.getCreatedBy().equals(user) && !memorial.isEditor(user)) {
+            throw new RuntimeException("Unauthorized access");
+        }
         
-        validateMemorialDates(LocalDate.parse(dto.getBirthDate()), 
-                            dto.getDeathDate() != null ? LocalDate.parse(dto.getDeathDate()) : null);
+        // Проверяем статус мемориала - строгая проверка на модерацию
+        if (memorial.getPublicationStatus() == Memorial.PublicationStatus.PENDING_MODERATION) {
+            log.error("Попытка обновить мемориал ID={} находящийся на модерации. Пользователь ID={}, логин={}",
+                    id, user.getId(), user.getLogin());
+            throw new RuntimeException("Cannot edit memorial that is under moderation");
+        }
         
-        // Проверяем, является ли пользователь редактором или владельцем
-        boolean isEditor = memorial.isEditor(currentUser);
-        boolean isOwner = memorial.getCreatedBy().equals(currentUser);
+        boolean isEditor = !memorial.getCreatedBy().equals(user) && memorial.isEditor(user);
+        log.info("Обновление мемориала ID={}, пользователь={} (ID={}), isEditor={}",
+                id, user.getLogin(), user.getId(), isEditor);
         
-        // Если пользователь - редактор (но не владелец)
-        if (isEditor && !isOwner) {
-            log.info("Изменение мемориала редактором. ID мемориала: {}, редактор: {}", 
-                    id, currentUser.getLogin());
-            
-            // Сохраняем текущее состояние мемориала (до изменений)
-                            try {
-                    ObjectMapper objectMapper = new ObjectMapper();
-                    objectMapper.configure(com.fasterxml.jackson.databind.SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
-                    objectMapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-                    // Регистрируем модуль для сериализации Java 8 date/time типов (LocalDateTime)
-                    objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
-                    objectMapper.disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-                
-                // Преобразуем мемориал в DTO
-                MemorialDTO currentDto = memorialMapper.toDTO(memorial);
-                log.info("Текущее состояние мемориала (DTO): {}", currentDto);
-                
-                // Сериализуем DTO в JSON
-                String previousState = objectMapper.writeValueAsString(currentDto);
-                log.info("Сериализовано предыдущее состояние, длина JSON: {} байт", previousState.length());
-                
-                // Сохраняем предыдущее состояние, но НЕ обновляем сам мемориал
-                memorial.setPreviousState(previousState);
-                
-                // Запоминаем, кто внес изменения
-                memorial.setLastEditorId(currentUser.getId());
-                
-                // Устанавливаем флаг ожидания подтверждения
-                memorial.setPendingChanges(true);
-                
-                // Сохраняем изменения в поля pending*
-                
-                // Сохраняем биографию
-                if (dto.getBiography() != null) {
-                    memorial.setPendingBiography(dto.getBiography());
-                    log.info("Сохранена ожидающая биография для мемориала ID={}: '{}'", id, dto.getBiography());
-                }
-                
-                // Сохраняем даты
+        // Обновляем поля мемориала
+        if (isEditor) {
+            // Если редактор - сохраняем как предложенные изменения
+            updateMemorialPendingFields(memorial, memorialDTO, user);
+        } else {
+            // Если владелец - применяем изменения сразу
+            updateMemorialFields(memorial, memorialDTO);
+        }
+        
+        Memorial updatedMemorial = memorialRepository.save(memorial);
+        return memorialMapper.toDTO(updatedMemorial);
+    }
+    
+    /**
+     * Обновляет поля мемориала из DTO для владельца (прямое обновление)
+     */
+    private void updateMemorialFields(Memorial memorial, MemorialDTO dto) {
+        if (dto.getFio() != null) {
+            memorial.setFio(dto.getFio());
+        }
+        
                 if (dto.getBirthDate() != null) {
-                    LocalDate pendingBirthDate = LocalDate.parse(dto.getBirthDate());
-                    memorial.setPendingBirthDate(pendingBirthDate);
-                    log.info("Сохранена ожидающая дата рождения для мемориала ID={}: {}", id, pendingBirthDate);
+            memorial.setBirthDate(LocalDate.parse(dto.getBirthDate()));
                 }
                 
                 if (dto.getDeathDate() != null) {
-                    LocalDate pendingDeathDate = LocalDate.parse(dto.getDeathDate());
-                    memorial.setPendingDeathDate(pendingDeathDate);
-                    log.info("Сохранена ожидающая дата смерти для мемориала ID={}: {}", id, pendingDeathDate);
+            memorial.setDeathDate(LocalDate.parse(dto.getDeathDate()));
                 } else {
-                    // Если дата смерти была удалена
-                    memorial.setPendingDeathDate(null);
-                    log.info("Ожидающая дата смерти установлена в null для мемориала ID={}", id);
+            memorial.setDeathDate(null);
                 }
                 
-                // Сохраняем местоположения
+        if (dto.getBiography() != null) {
+            memorial.setBiography(dto.getBiography());
+        }
+        
                 if (dto.getMainLocation() != null) {
-                    memorial.setPendingMainLocation(dto.getMainLocation());
-                    log.info("Сохранено ожидающее основное местоположение для мемориала ID={}: {}",
-                           id, dto.getMainLocation().getAddress());
+            memorial.setMainLocation(dto.getMainLocation());
                 }
                 
                 if (dto.getBurialLocation() != null) {
-                    memorial.setPendingBurialLocation(dto.getBurialLocation());
-                    log.info("Сохранено ожидающее место захоронения для мемориала ID={}: {}",
-                           id, dto.getBurialLocation().getAddress());
-                }
-                
-                // Формируем текст уведомления с детальным описанием изменений
-                StringBuilder changeDetails = new StringBuilder();
-                changeDetails.append("Редактор ").append(currentUser.getFio())
-                        .append(" внес изменения в мемориал \"").append(memorial.getFio())
-                        .append("\". Требуется ваше подтверждение.\n\n=== ИЗМЕНЕНИЯ ===\n");
-                
-                // Читаем DTO из JSON для сравнения с новыми данными
-                MemorialDTO oldDto = objectMapper.readValue(previousState, MemorialDTO.class);
-                log.info("Десериализовано предыдущее состояние для сравнения: {}", oldDto.getFio());
-                
-                // ФИО
-                if (!oldDto.getFio().equals(dto.getFio())) {
-                    changeDetails.append("- ФИО изменено:\n");
-                    changeDetails.append("  БЫЛО: ").append(oldDto.getFio()).append("\n");
-                    changeDetails.append("  СТАЛО: ").append(dto.getFio()).append("\n\n");
-                }
-                
-                // Даты
-                if (!Objects.equals(oldDto.getBirthDate(), dto.getBirthDate())) {
-                    changeDetails.append("- Дата рождения изменена:\n");
-                    changeDetails.append("  БЫЛО: ").append(oldDto.getBirthDate()).append("\n");
-                    changeDetails.append("  СТАЛО: ").append(dto.getBirthDate()).append("\n\n");
-                }
-                
-                if (!Objects.equals(oldDto.getDeathDate(), dto.getDeathDate())) {
-                    String oldDate = oldDto.getDeathDate() != null ? oldDto.getDeathDate() : "не указана";
-                    String newDate = dto.getDeathDate() != null ? dto.getDeathDate() : "не указана";
-                    changeDetails.append("- Дата смерти изменена:\n");
-                    changeDetails.append("  БЫЛО: ").append(oldDate).append("\n");
-                    changeDetails.append("  СТАЛО: ").append(newDate).append("\n\n");
-                }
-                
-                // Биография
-                if (!Objects.equals(oldDto.getBiography(), dto.getBiography())) {
-                    String oldBio = oldDto.getBiography() != null ? oldDto.getBiography() : "не указана";
-                    String newBio = dto.getBiography() != null ? dto.getBiography() : "не указана";
-                    
-                    changeDetails.append("- Биография изменена:\n");
-                    changeDetails.append("  БЫЛО: ").append(oldBio).append("\n\n");
-                    changeDetails.append("  СТАЛО: ").append(newBio).append("\n\n");
-                }
-                
-                // Местоположения
-                boolean mainLocationChanged = (oldDto.getMainLocation() == null && dto.getMainLocation() != null) ||
-                                           (oldDto.getMainLocation() != null && dto.getMainLocation() == null) ||
-                                           (oldDto.getMainLocation() != null && dto.getMainLocation() != null && 
-                                            !oldDto.getMainLocation().equals(dto.getMainLocation()));
-                
-                if (mainLocationChanged) {
-                    String oldLoc = oldDto.getMainLocation() != null ? 
-                            (oldDto.getMainLocation().getAddress() != null ? 
-                             oldDto.getMainLocation().getAddress() : "координаты указаны") : "не указано";
-                    String newLoc = dto.getMainLocation() != null ? 
-                            (dto.getMainLocation().getAddress() != null ? 
-                             dto.getMainLocation().getAddress() : "координаты указаны") : "не указано";
-                    
-                    changeDetails.append("- Основное местоположение изменено:\n");
-                    changeDetails.append("  БЫЛО: ").append(oldLoc).append("\n");
-                    changeDetails.append("  СТАЛО: ").append(newLoc).append("\n\n");
-                    
-                    // Добавляем координаты, если они есть
-                    if (oldDto.getMainLocation() != null && oldDto.getMainLocation().getLatitude() != null) {
-                        changeDetails.append("  Старые координаты: ").append(oldDto.getMainLocation().getLatitude())
-                                .append(", ").append(oldDto.getMainLocation().getLongitude()).append("\n");
-                    }
-                    if (dto.getMainLocation() != null && dto.getMainLocation().getLatitude() != null) {
-                        changeDetails.append("  Новые координаты: ").append(dto.getMainLocation().getLatitude())
-                                .append(", ").append(dto.getMainLocation().getLongitude()).append("\n\n");
-                    }
-                }
-                
-                boolean burialLocationChanged = (oldDto.getBurialLocation() == null && dto.getBurialLocation() != null) ||
-                                             (oldDto.getBurialLocation() != null && dto.getBurialLocation() == null) ||
-                                             (oldDto.getBurialLocation() != null && dto.getBurialLocation() != null && 
-                                              !oldDto.getBurialLocation().equals(dto.getBurialLocation()));
-                
-                if (burialLocationChanged) {
-                    String oldLoc = oldDto.getBurialLocation() != null ? 
-                            (oldDto.getBurialLocation().getAddress() != null ? 
-                             oldDto.getBurialLocation().getAddress() : "координаты указаны") : "не указано";
-                    String newLoc = dto.getBurialLocation() != null ? 
-                            (dto.getBurialLocation().getAddress() != null ? 
-                             dto.getBurialLocation().getAddress() : "координаты указаны") : "не указано";
-                    
-                    changeDetails.append("- Место захоронения изменено:\n");
-                    changeDetails.append("  БЫЛО: ").append(oldLoc).append("\n");
-                    changeDetails.append("  СТАЛО: ").append(newLoc).append("\n\n");
-                    
-                    // Добавляем координаты, если они есть
-                    if (oldDto.getBurialLocation() != null && oldDto.getBurialLocation().getLatitude() != null) {
-                        changeDetails.append("  Старые координаты: ").append(oldDto.getBurialLocation().getLatitude())
-                                .append(", ").append(oldDto.getBurialLocation().getLongitude()).append("\n");
-                    }
-                    if (dto.getBurialLocation() != null && dto.getBurialLocation().getLatitude() != null) {
-                        changeDetails.append("  Новые координаты: ").append(dto.getBurialLocation().getLatitude())
-                                .append(", ").append(dto.getBurialLocation().getLongitude()).append("\n\n");
-                    }
-                }
-                
-                // Публичность
-                if (oldDto.isPublic() != dto.isPublic()) {
-                    changeDetails.append("- Публичность изменена:\n");
-                    changeDetails.append("  БЫЛО: ").append(oldDto.isPublic() ? "публичный" : "непубличный").append("\n");
-                    changeDetails.append("  СТАЛО: ").append(dto.isPublic() ? "публичный" : "непубличный").append("\n\n");
-                }
-                
-                // Проверяем, есть ли уже уведомление о ожидающих изменениях для этого мемориала
-                List<Notification> existingNotifications = notificationRepository.findByRelatedEntityIdAndTypeAndStatus(
-                    memorial.getId(), 
-                    Notification.NotificationType.MEMORIAL_EDIT, 
-                    Notification.NotificationStatus.PENDING
-                );
-                
-                Notification notification;
-                
-                if (!existingNotifications.isEmpty()) {
-                    // Обновляем существующее уведомление
-                    notification = existingNotifications.get(0);
-                    
-                    // Обновляем сообщение, сохраняя существующие изменения
-                    String currentMessage = notification.getMessage();
-                    
-                    if (currentMessage.contains("=== ИЗМЕНЕНИЯ ===")) {
-                        // Находим позицию начала списка изменений и добавляем новую информацию о фото
-                        int changeStartPos = currentMessage.indexOf("=== ИЗМЕНЕНИЯ ===") + "=== ИЗМЕНЕНИЯ ===\n".length();
-                        
-                        // Сохраняем существующее содержимое и добавляем информацию о фото в начало
-                        String existingChanges = currentMessage.substring(changeStartPos);
-                        String newMessage = currentMessage.substring(0, changeStartPos) + 
-                                          changeDetails.toString() + 
-                                          existingChanges;
-                        
-                        notification.setMessage(newMessage);
-                    } else {
-                        // Если формат сообщения отличается, создаем новое сообщение целиком
-                        String newMessage = "Редактор " + currentUser.getFio() +
-                            " внес изменения в мемориал \"" + memorial.getFio() +
-                            "\". Требуется ваше подтверждение.\n\n=== ИЗМЕНЕНИЯ ===\n" + 
-                            changeDetails.toString();
-                        
-                        notification.setMessage(newMessage);
-                    }
-                    
-                    notification.setCreatedAt(LocalDateTime.now());
-                    notification.setRead(false);
-                    
-                    log.info("Обновлено существующее уведомление ID={} для мемориала ID={}", 
-                            notification.getId(), memorial.getId());
-                } else {
-                    // Создаем новое уведомление
-                    notification = new Notification();
-                    notification.setTitle("Изменения в мемориале");
-                    
-                    String message = "Редактор " + currentUser.getFio() +
-                        " внес изменения в мемориал \"" + memorial.getFio() +
-                        "\". Требуется ваше подтверждение.\n\n=== ИЗМЕНЕНИЯ ===\n" + 
-                        changeDetails.toString();
-                    
-                    notification.setMessage(message);
-                    notification.setUser(memorial.getCreatedBy());
-                    notification.setSender(currentUser);
-                    notification.setType(Notification.NotificationType.MEMORIAL_EDIT);
-                    notification.setStatus(Notification.NotificationStatus.PENDING);
-                    notification.setRelatedEntityId(memorial.getId());
-                    notification.setRelatedEntityName(memorial.getFio());
-                    notification.setCreatedAt(LocalDateTime.now());
-                    notification.setRead(false);
-                    
-                    log.info("Создано новое уведомление о изменении мемориала ID={} для владельца ID={}", 
-                            memorial.getId(), memorial.getCreatedBy().getId());
-                }
-                
-                // Сохраняем уведомление
-                notification = notificationRepository.save(notification);
-                log.info("Сохранено уведомление ID={} для мемориала ID={}", 
-                        notification.getId(), memorial.getId());
-                
-                // Создаем уведомление для редактора о том, что его изменения ожидают подтверждения
-                // Проверяем, есть ли уже уведомление для редактора
-                List<Notification> existingEditorNotifications = notificationRepository.findByUserIdAndRelatedEntityIdAndTypeAndStatus(
-                    currentUser.getId(),
-                    memorial.getId(),
-                    Notification.NotificationType.MEMORIAL_EDIT,
-                    Notification.NotificationStatus.INFO
-                );
-                
-                if (!existingEditorNotifications.isEmpty()) {
-                    // Если уже есть уведомление для редактора, не создаем новое
-                    log.info("Уведомление для редактора ID={} уже существует, не создаем новое", currentUser.getId());
-                } else {
-                    // Получаем системного пользователя
-                    User systemUser = userRepository.findByLogin("system")
-                            .orElseGet(() -> {
-                                User system = new User();
-                                system.setLogin("system");
-                                system.setFio("Система");
-                                system.setDateOfRegistration(new Date());
-                                system.setPassword("system_password");
-                                system.setRole(User.Role.USER);
-                                system.setHasSubscription(false);
-                                return userRepository.save(system);
-                            });
-                    
-                    // Создаем информационное уведомление для редактора
-                    Notification editorNotification = new Notification();
-                    editorNotification.setTitle("Ваши изменения ожидают подтверждения");
-                    editorNotification.setMessage("Вы внесли изменения в мемориал \"" + memorial.getFio() + 
-                            "\". Изменения будут видны после подтверждения владельцем.");
-                    
-                    // Получатель - редактор (текущий пользователь)
-                    editorNotification.setUser(currentUser);
-                    
-                    // Отправитель - система
-                    editorNotification.setSender(systemUser);
-                    
-                    editorNotification.setType(Notification.NotificationType.MEMORIAL_EDIT);
-                    editorNotification.setStatus(Notification.NotificationStatus.INFO); // Информационное уведомление
-                    editorNotification.setRelatedEntityId(memorial.getId());
-                    editorNotification.setRelatedEntityName(memorial.getFio());
-                    editorNotification.setCreatedAt(LocalDateTime.now());
-                    editorNotification.setRead(false);
-                    
-                    // Сохраняем уведомление для редактора
-                    Notification savedEditorNotification = notificationRepository.save(editorNotification);
-                    log.info("Создано информационное уведомление ID={} для редактора ID={} о изменениях", 
-                            savedEditorNotification.getId(), currentUser.getId());
-                }
-                
-                memorialRepository.save(memorial);
-                
-                log.info("Сохранен мемориал ID={} с ожидающими изменениями", memorial.getId());
-                
-                // Возвращаем DTO мемориала с флагом pendingChanges=true
-                MemorialDTO resultDto = memorialMapper.toDTO(memorial);
-                resultDto.setPendingChanges(true);
-                return resultDto;
-                
-            } catch (Exception e) {
-                log.error("Ошибка при обработке изменений от редактора: {}", e.getMessage(), e);
-                
-                // В случае ошибки всё равно возвращаем DTO
-                MemorialDTO resultDto = memorialMapper.toDTO(memorial);
-                resultDto.setPendingChanges(true);
-                return resultDto;
+            memorial.setBurialLocation(dto.getBurialLocation());
+        }
+        
+        memorial.setPublic(dto.isPublic());
+        
+        // Если было изменение через редактора, сбрасываем ожидающие изменения
+        memorial.setPendingChanges(false);
+        memorial.setPendingBiography(null);
+        memorial.setPendingBirthDate(null);
+        memorial.setPendingDeathDate(null);
+        memorial.setPendingMainLocation(null);
+        memorial.setPendingBurialLocation(null);
+        memorial.setPendingPhotoUrl(null);
+        memorial.setLastEditorId(null);
+    }
+    
+    /**
+     * Обновляет поля мемориала из DTO для редактора (в ожидающие изменения)
+     */
+    private void updateMemorialPendingFields(Memorial memorial, MemorialDTO dto, User editor) {
+        boolean hasChanges = false;
+        
+        if (dto.getFio() != null && !dto.getFio().equals(memorial.getFio())) {
+            // ФИО не может быть изменено редактором, только владельцем
+            log.warn("Редактор пытается изменить ФИО мемориала, это разрешено только владельцу");
+        }
+        
+        if (dto.getBirthDate() != null) {
+            LocalDate birthDate = LocalDate.parse(dto.getBirthDate());
+            if (!birthDate.equals(memorial.getBirthDate())) {
+                memorial.setPendingBirthDate(birthDate);
+                hasChanges = true;
             }
-        } else {
-            // Если владелец - применяем изменения сразу
-            updateMemorialFromDTO(memorial, dto);
-            memorial.setPendingChanges(false);
-            memorial.setPreviousState(null);
-            memorial.setProposedChanges(null);
+        }
+        
+        if (dto.getDeathDate() != null) {
+            LocalDate deathDate = LocalDate.parse(dto.getDeathDate());
+            if (memorial.getDeathDate() == null || !deathDate.equals(memorial.getDeathDate())) {
+                memorial.setPendingDeathDate(deathDate);
+                hasChanges = true;
+            }
+        } else if (memorial.getDeathDate() != null) {
+            memorial.setPendingDeathDate(null);
+            hasChanges = true;
+        }
+        
+        if (dto.getBiography() != null && !dto.getBiography().equals(memorial.getBiography())) {
+            memorial.setPendingBiography(dto.getBiography());
+            hasChanges = true;
+        }
+        
+        if (dto.getMainLocation() != null && !dto.getMainLocation().equals(memorial.getMainLocation())) {
+            memorial.setPendingMainLocation(dto.getMainLocation());
+            hasChanges = true;
+        }
+        
+        if (dto.getBurialLocation() != null && !dto.getBurialLocation().equals(memorial.getBurialLocation())) {
+            memorial.setPendingBurialLocation(dto.getBurialLocation());
+            hasChanges = true;
+        }
+        
+        // Публичность может быть изменена только владельцем
+        
+        if (hasChanges) {
+            memorial.setPendingChanges(true);
+            memorial.setLastEditorId(editor.getId());
             
-            memorialRepository.save(memorial);
-            MemorialDTO resultDto = memorialMapper.toDTO(memorial);
-            return resultDto;
+            // Сохраняем предыдущее состояние, если еще не сохранено
+            if (memorial.getPreviousState() == null) {
+                try {
+                    ObjectMapper objectMapper = new ObjectMapper();
+                    objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
+                    objectMapper.disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+                    objectMapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+                    
+                    MemorialDTO currentDto = memorialMapper.toDTO(memorial);
+                    memorial.setPreviousState(objectMapper.writeValueAsString(currentDto));
+            } catch (Exception e) {
+                    log.error("Ошибка при сохранении предыдущего состояния мемориала: {}", e.getMessage(), e);
+                }
+            }
+            
+            // Создаем уведомление для владельца
+            createPendingChangesNotification(memorial, editor);
         }
     }
 
@@ -1375,5 +1185,192 @@ public class MemorialService {
         memorialRepository.save(memorial);
         
         log.info("Обновлена приватность мемориала ID={}, isPublic={}", id, isPublic);
+    }
+
+    /**
+     * Отправляет мемориал на модерацию
+     * @param id ID мемориала
+     * @param user текущий пользователь
+     * @return обновленный мемориал
+     */
+    @Transactional
+    public MemorialDTO sendForModeration(Long id, User user) {
+        Memorial memorial = memorialRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Memorial not found"));
+        
+        // Проверяем, что пользователь является владельцем или редактором
+        if (!memorial.getCreatedBy().equals(user) && !memorial.isEditor(user)) {
+            throw new RuntimeException("Unauthorized access");
+        }
+        
+        // Устанавливаем статус "На модерации"
+        memorial.setPublicationStatus(Memorial.PublicationStatus.PENDING_MODERATION);
+        
+        Memorial savedMemorial = memorialRepository.save(memorial);
+        
+        // Создаем уведомление для администраторов
+        createModerationNotification(savedMemorial, user);
+        
+        log.info("Мемориал ID={} отправлен на модерацию пользователем ID={}", id, user.getId());
+        
+        return memorialMapper.toDTO(savedMemorial);
+    }
+    
+    /**
+     * Создает уведомление о запросе на модерацию мемориала
+     */
+    private void createModerationNotification(Memorial memorial, User sender) {
+        // Находим всех администраторов
+        List<User> admins = userRepository.findByRole(User.Role.ADMIN);
+        
+        for (User admin : admins) {
+            Notification notification = new Notification();
+            notification.setUser(admin);
+            notification.setSender(sender);
+            notification.setTitle("Запрос на публикацию мемориала");
+            notification.setMessage("Пользователь '" + sender.getFio() + "' запрашивает публикацию мемориала '" + memorial.getFio() + "'");
+            notification.setType(Notification.NotificationType.MODERATION);
+            notification.setStatus(Notification.NotificationStatus.PENDING);
+            notification.setRead(false);
+            notification.setUrgent(false);
+            notification.setCreatedAt(LocalDateTime.now());
+            notification.setRelatedEntityId(memorial.getId());
+            notification.setRelatedEntityName(memorial.getFio());
+            
+            notificationRepository.save(notification);
+            log.info("Создано уведомление о модерации для администратора {}", admin.getFio());
+        }
+
+        // ВАЖНО: Это отдельное информационное уведомление для пользователя
+        // Оно имеет тип SYSTEM, чтобы не отображаться в списке модерации у администраторов
+        Notification senderNotification = new Notification();
+        senderNotification.setUser(sender);
+        senderNotification.setSender(sender); // Самому себе
+        senderNotification.setTitle("Мемориал отправлен на модерацию");
+        senderNotification.setMessage("Ваш мемориал '" + memorial.getFio() + "' отправлен на модерацию и будет опубликован после одобрения администратором.");
+        senderNotification.setType(Notification.NotificationType.SYSTEM); // Меняем тип на SYSTEM для отделения от уведомлений модерации
+        senderNotification.setStatus(Notification.NotificationStatus.INFO); // Информационное - не требует действий
+        senderNotification.setRead(false);
+        senderNotification.setUrgent(false);
+        senderNotification.setCreatedAt(LocalDateTime.now());
+        senderNotification.setRelatedEntityId(memorial.getId());
+        senderNotification.setRelatedEntityName(memorial.getFio());
+        
+        notificationRepository.save(senderNotification);
+        log.info("Создано информационное уведомление для отправителя {} о начале модерации", sender.getFio());
+    }
+    
+    /**
+     * Обрабатывает решение администратора по публикации мемориала
+     * @param id ID мемориала
+     * @param approved одобрено или отклонено
+     * @param admin администратор, принявший решение
+     * @return обновленный мемориал
+     */
+    @Transactional
+    public MemorialDTO moderateMemorial(Long id, boolean approved, User admin) {
+        // Проверяем, что пользователь является администратором
+        if (admin.getRole() != User.Role.ADMIN) {
+            throw new RuntimeException("Unauthorized access");
+        }
+        
+        Memorial memorial = memorialRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Memorial not found"));
+        
+        if (approved) {
+            // Публикуем мемориал
+            memorial.setPublicationStatus(Memorial.PublicationStatus.PUBLISHED);
+            memorial.setPublic(true);
+        } else {
+            // Отклоняем публикацию
+            memorial.setPublicationStatus(Memorial.PublicationStatus.REJECTED);
+            memorial.setPublic(false);
+        }
+        
+        Memorial savedMemorial = memorialRepository.save(memorial);
+        
+        // Создаем уведомление для владельца мемориала
+        createModerationResponseNotification(savedMemorial, admin, approved);
+        
+        log.info("Модерация мемориала ID={}: {}", id, approved ? "одобрен" : "отклонен");
+        
+        return memorialMapper.toDTO(savedMemorial);
+    }
+    
+    /**
+     * Создает уведомление о решении по модерации мемориала
+     */
+    private void createModerationResponseNotification(Memorial memorial, User admin, boolean approved) {
+        User owner = memorial.getCreatedBy();
+        
+        Notification notification = new Notification();
+        notification.setUser(owner);
+        notification.setSender(admin);
+        
+        if (approved) {
+            notification.setTitle("Мемориал опубликован");
+            notification.setMessage("Ваш мемориал '" + memorial.getFio() + "' был одобрен и опубликован на сайте.");
+            notification.setStatus(Notification.NotificationStatus.ACCEPTED);
+        } else {
+            notification.setTitle("Мемориал не опубликован");
+            notification.setMessage("Ваш мемориал '" + memorial.getFio() + "' не был одобрен администратором и не будет опубликован на сайте.");
+            notification.setStatus(Notification.NotificationStatus.REJECTED);
+        }
+        
+        notification.setType(Notification.NotificationType.MODERATION);
+        notification.setRead(false);
+        notification.setUrgent(true); // Делаем уведомление срочным для привлечения внимания
+        notification.setCreatedAt(LocalDateTime.now());
+        notification.setRelatedEntityId(memorial.getId());
+        notification.setRelatedEntityName(memorial.getFio());
+        
+        Notification savedNotification = notificationRepository.save(notification);
+        log.info("Создано уведомление ID={} о результате модерации для владельца {} ({})", 
+                savedNotification.getId(), owner.getFio(), owner.getId());
+    }
+
+    /**
+     * Создает уведомление о предложенных изменениях от редактора
+     */
+    private void createPendingChangesNotification(Memorial memorial, User editor) {
+        User owner = memorial.getCreatedBy();
+        
+        // Создаем уведомление для владельца о предложенных изменениях
+        Notification notification = new Notification();
+        notification.setUser(owner);
+        notification.setSender(editor);
+        notification.setTitle("Предложены изменения в мемориале");
+        notification.setMessage("Редактор " + editor.getFio() + " предложил изменения в мемориале '" 
+                + memorial.getFio() + "'. Требуется ваше подтверждение.");
+        notification.setType(Notification.NotificationType.MEMORIAL_EDIT);
+        notification.setStatus(Notification.NotificationStatus.PENDING);
+        notification.setRead(false);
+        notification.setUrgent(false);
+        notification.setCreatedAt(LocalDateTime.now());
+        notification.setRelatedEntityId(memorial.getId());
+        notification.setRelatedEntityName(memorial.getFio());
+        
+        Notification savedNotification = notificationRepository.save(notification);
+        log.info("Создано уведомление ID={} о предложенных изменениях для владельца {} ({})", 
+                savedNotification.getId(), owner.getFio(), owner.getId());
+        
+        // Создаем информационное уведомление для редактора
+        Notification editorNotification = new Notification();
+        editorNotification.setUser(editor);
+        editorNotification.setSender(editor); // Самому себе
+        editorNotification.setTitle("Изменения предложены");
+        editorNotification.setMessage("Ваши изменения в мемориале '" + memorial.getFio() 
+                + "' предложены владельцу и будут применены после его подтверждения.");
+        editorNotification.setType(Notification.NotificationType.MEMORIAL_EDIT);
+        editorNotification.setStatus(Notification.NotificationStatus.INFO); // Для исходящих - INFO
+        editorNotification.setRead(false);
+        editorNotification.setUrgent(false);
+        editorNotification.setCreatedAt(LocalDateTime.now());
+        editorNotification.setRelatedEntityId(memorial.getId());
+        editorNotification.setRelatedEntityName(memorial.getFio());
+        
+        Notification savedEditorNotification = notificationRepository.save(editorNotification);
+        log.info("Создано уведомление ID={} для редактора {} о предложенных изменениях", 
+                savedEditorNotification.getId(), editor.getFio());
     }
 }

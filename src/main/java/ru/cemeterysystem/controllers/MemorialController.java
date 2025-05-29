@@ -3,9 +3,12 @@ package ru.cemeterysystem.controllers;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import ru.cemeterysystem.dto.EditorRequestDTO;
@@ -13,10 +16,13 @@ import ru.cemeterysystem.dto.MemorialDTO;
 import ru.cemeterysystem.dto.UserDTO;
 import ru.cemeterysystem.models.User;
 import ru.cemeterysystem.models.Memorial;
+import ru.cemeterysystem.repositories.MemorialRepository;
+import ru.cemeterysystem.repositories.UserRepository;
 import ru.cemeterysystem.services.MemorialService;
 import ru.cemeterysystem.services.UserService;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * REST контроллер для управления памятниками.
@@ -31,6 +37,8 @@ public class MemorialController {
     
     private final MemorialService memorialService;
     private final UserService userService;
+    private final MemorialRepository memorialRepository;
+    private final UserRepository userRepository;
 
     /**
      * Получает текущего аутентифицированного пользователя.
@@ -119,29 +127,42 @@ public class MemorialController {
      * @return обновленный памятник
      */
     @PutMapping("/{id}")
-    public MemorialDTO updateMemorial(@PathVariable Long id,
-                                      @RequestBody MemorialDTO dto) {
-        User user = getCurrentUser();
-        
-        // Получаем информацию о правах пользователя на мемориал
-        MemorialDTO existingMemorial = memorialService.getMemorialByIdForUser(id, user);
-        
-        // Получаем флаги из DTO
-        boolean isEditor = existingMemorial.isEditor();
-        boolean isOwner = existingMemorial.getCreatedBy() != null && 
-                          existingMemorial.getCreatedBy().getId().equals(user.getId());
-        
-        log.info("Обновление мемориала ID={}: пользователь={}, isEditor={}, isOwner={}, hasSubscription={}", 
-                id, user.getLogin(), isEditor, isOwner, user.getHasSubscription());
-        
-        // Проверяем наличие подписки, если указаны местоположения и пользователь не является редактором
-        if ((dto.getMainLocation() != null || dto.getBurialLocation() != null) && 
-            user.getHasSubscription() != Boolean.TRUE && !isEditor && !isOwner) {
-            log.warn("Отказано в обновлении местоположения: пользователь не имеет подписки и не является редактором");
-            throw new IllegalStateException("Для указания местоположения требуется подписка");
+    public ResponseEntity<MemorialDTO> updateMemorial(@PathVariable Long id, @RequestBody MemorialDTO memorialDTO) {
+        try {
+            // Получаем текущего пользователя
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String login = authentication.getName();
+            User user = userRepository.findByLogin(login)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            // Проверяем существование мемориала
+            Memorial memorial = memorialRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Memorial not found"));
+            
+            // Проверяем, что пользователь имеет права на редактирование мемориала
+            if (!memorial.getUser().equals(user) && !memorial.isEditor(user)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(null);
+            }
+            
+            // Проверяем, находится ли мемориал на модерации - добавлена более подробная проверка
+            if (memorial.getPublicationStatus() == Memorial.PublicationStatus.PENDING_MODERATION) {
+                log.error("Попытка обновить мемориал ID={} в статусе модерации пользователем ID={}", 
+                        id, user.getId());
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .header("X-Error-Type", "MEMORIAL_UNDER_MODERATION")
+                    .header("X-Error-Message", "Невозможно обновить мемориал, находящийся на модерации")
+                    .body(null);
+            }
+            
+            MemorialDTO updatedMemorial = memorialService.updateMemorial(id, memorialDTO, user);
+            return ResponseEntity.ok(updatedMemorial);
+        } catch (Exception e) {
+            log.error("Ошибка при обновлении мемориала ID={}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .header("X-Error-Message", e.getMessage())
+                .body(null);
         }
-        
-        return memorialService.updateMemorial(id, dto);
     }
 
     /**
@@ -158,11 +179,13 @@ public class MemorialController {
 
     /**
      * Обновляет приватность памятника (публичный/непубличный).
-     *
+     * 
+     * @deprecated Используйте вместо этого метод sendForModeration для публикации
      * @param id ID памятника
      * @param isPublic новый статус приватности
      * @return успешный ответ (HTTP 200)
      */
+    @Deprecated
     @PutMapping("/{id}/privacy")
     public ResponseEntity<Void> updateMemorialPrivacy(@PathVariable Long id,
                                                       @RequestBody boolean isPublic) {
@@ -176,6 +199,25 @@ public class MemorialController {
         
         memorialService.updateMemorialPrivacy(id, isPublic);
         return ResponseEntity.ok().build();
+    }
+    
+    /**
+     * Отправляет мемориал на модерацию для публикации.
+     *
+     * @param id ID памятника
+     * @return обновленный мемориал
+     */
+    @PostMapping("/{id}/send-for-moderation")
+    public MemorialDTO sendForModeration(@PathVariable Long id) {
+        User user = getCurrentUser();
+        
+        // Проверяем наличие подписки
+        if (user.getHasSubscription() != Boolean.TRUE) {
+            throw new IllegalStateException("Для публикации мемориала требуется подписка");
+        }
+        
+        log.info("Отправка мемориала ID={} на модерацию пользователем {}", id, user.getLogin());
+        return memorialService.sendForModeration(id, user);
     }
 
     /**

@@ -2,240 +2,495 @@
 <html lang="ru" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="UTF-8">
-    <title>Редактирование пользователя</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактирование пользователя | Система управления кладбищем</title>
+
+    <!-- Подключение ресурсов -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #198754;
+            --danger-color: #dc3545;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f8f9fa;
+        }
+
+        /* Сайдбар */
+        .sidebar {
+            background: var(--primary-color);
+            min-height: 100vh;
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.7);
+            border-left: 3px solid transparent;
+        }
+
+        .sidebar .nav-link.active {
+            background: rgba(255,255,255,0.1);
+            border-left-color: var(--secondary-color);
+            color: white;
+        }
+
+        /* Основной контент */
+        .main-content {
+            background: #f8f9fa;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* Карточки */
+        .card-modern {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            background-color: #fff;
+            border-bottom: 1px solid #eaeaea;
+            padding: 15px 20px;
+        }
+
+        .card-title {
+            margin-bottom: 0;
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        /* Кнопки действий */
+        .btn-action {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+        }
+
+        /* Адаптивность */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                z-index: 1000;
+                transform: translateX(-100%);
+            }
+
+            .sidebar.active {
+                transform: translateX(0);
+            }
+        }
+    </style>
 </head>
 <body>
-<div th:fragment="content">
-    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="h2">
-            <i class="bi bi-person-gear me-2"></i>
-            Редактирование пользователя
-        </h1>
-        <div class="btn-toolbar mb-2 mb-md-0">
-            <a href="/admin/users" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-arrow-left me-1"></i> Назад к списку
+<!-- Шапка -->
+<header class="navbar navbar-dark bg-primary shadow-sm">
+    <div class="container-fluid">
+        <button class="navbar-toggler d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <a class="navbar-brand" href="/admin">
+            <i class="bi bi-building-gear me-2"></i>Администрирование
+        </a>
+        <div class="dropdown">
+            <a href="#" class="text-white text-decoration-none dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="bi bi-person-circle me-2"></i>
+                <span sec:authentication="name"></span>
             </a>
-        </div>
-    </div>
-
-    <div class="alert alert-success alert-dismissible fade show" role="alert" th:if="${successMessage}">
-        <i class="bi bi-check-circle-fill me-2"></i> <span th:text="${successMessage}"></span>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-    <div class="alert alert-danger alert-dismissible fade show" role="alert" th:if="${errorMessage}">
-        <i class="bi bi-exclamation-triangle-fill me-2"></i> <span th:text="${errorMessage}"></span>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-
-    <div class="row">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Данные пользователя</h5>
-                </div>
-                <div class="card-body">
-                    <form th:action="@{/admin/users/{id}/edit(id=${user.id})}" method="post">
-                        <div class="row mb-3">
-                            <label for="id" class="col-sm-3 col-form-label">ID пользователя</label>
-                            <div class="col-sm-9">
-                                <input type="text" class="form-control" id="id" th:value="${user.id}" disabled>
-                            </div>
-                        </div>
-                        <div class="row mb-3">
-                            <label for="fio" class="col-sm-3 col-form-label">ФИО</label>
-                            <div class="col-sm-9">
-                                <input type="text" class="form-control" id="fio" name="fio" th:value="${user.fio}" required>
-                            </div>
-                        </div>
-                        <div class="row mb-3">
-                            <label for="login" class="col-sm-3 col-form-label">Логин</label>
-                            <div class="col-sm-9">
-                                <input type="text" class="form-control" id="login" name="login" th:value="${user.login}" required>
-                            </div>
-                        </div>
-                        <div class="row mb-3">
-                            <label for="newPassword" class="col-sm-3 col-form-label">Новый пароль</label>
-                            <div class="col-sm-9">
-                                <input type="password" class="form-control" id="newPassword" name="newPassword" placeholder="Оставьте пустым, чтобы сохранить текущий пароль">
-                                <div class="form-text">Введите новый пароль, только если хотите его изменить.</div>
-                            </div>
-                        </div>
-                        <div class="row mb-3">
-                            <label for="contacts" class="col-sm-3 col-form-label">Контакты</label>
-                            <div class="col-sm-9">
-                                <input type="text" class="form-control" id="contacts" name="contacts" th:value="${user.contacts}">
-                            </div>
-                        </div>
-                        <div class="row mb-3">
-                            <label for="role" class="col-sm-3 col-form-label">Роль</label>
-                            <div class="col-sm-9">
-                                <select class="form-select" id="role" name="role" required>
-                                    <option value="USER" th:selected="${user.role.name() == 'USER'}">Пользователь</option>
-                                    <option value="ADMIN" th:selected="${user.role.name() == 'ADMIN'}">Администратор</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="row mb-3">
-                            <label for="dateOfRegistration" class="col-sm-3 col-form-label">Дата регистрации</label>
-                            <div class="col-sm-9">
-                                <input type="text" class="form-control" id="dateOfRegistration" 
-                                       th:value="${#dates.format(user.dateOfRegistration, 'dd.MM.yyyy')}" disabled>
-                            </div>
-                        </div>
-                        <div class="row mb-3">
-                            <div class="col-sm-3 col-form-label">Подписка</div>
-                            <div class="col-sm-9">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" id="hasSubscription" 
-                                           name="hasSubscription" th:checked="${user.hasSubscription}">
-                                    <label class="form-check-label" for="hasSubscription">
-                                        <span th:text="${user.hasSubscription ? 'Активна' : 'Не активна'}">Статус подписки</span>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <a th:href="@{/admin/users}" class="btn btn-secondary me-md-2">Отмена</a>
-                            <button type="submit" class="btn btn-primary">Сохранить изменения</button>
-                        </div>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="#"><i class="bi bi-gear me-2"></i>Настройки</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <form th:action="@{/logout}" method="post">
+                        <button class="dropdown-item" type="submit">
+                            <i class="bi bi-box-arrow-right me-2"></i>Выйти
+                        </button>
                     </form>
-                </div>
-            </div>
+                </li>
+            </ul>
         </div>
-        
-        <div class="col-md-4">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Информация</h5>
+    </div>
+</header>
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- Боковое меню -->
+        <nav class="col-md-3 col-lg-2 sidebar collapse d-md-block" id="sidebarMenu">
+            <div class="position-sticky pt-3">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin">
+                            <i class="bi bi-speedometer2 me-2"></i>Панель управления
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/admin/users">
+                            <i class="bi bi-people-fill me-2"></i>Пользователи
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/memorials">
+                            <i class="bi bi-bookmark-heart me-2"></i>Мемориалы
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/family-trees">
+                            <i class="bi bi-diagram-3 me-2"></i>Семейные древа
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/notifications">
+                            <i class="bi bi-bell me-2"></i>Уведомления
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/reports">
+                            <i class="bi bi-bar-chart me-2"></i>Отчеты
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/settings">
+                            <i class="bi bi-gear me-2"></i>Настройки
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <!-- Основной контент -->
+        <main class="col-md-9 ms-sm-auto col-lg-10 main-content">
+            <!-- Хлебные крошки -->
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/admin">Главная</a></li>
+                    <li class="breadcrumb-item"><a href="/admin/users">Пользователи</a></li>
+                    <li class="breadcrumb-item active">Редактирование</li>
+                </ol>
+            </nav>
+
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h4 mb-0">
+                    <i class="bi bi-person-gear me-2"></i>Редактирование пользователя
+                </h1>
+                <a href="/admin/users" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i>Назад
+                </a>
+            </div>
+
+            <div class="alert alert-success alert-dismissible fade show" role="alert" th:if="${successMessage}">
+                <i class="bi bi-check-circle-fill me-2"></i> <span th:text="${successMessage}"></span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            <div class="alert alert-danger alert-dismissible fade show" role="alert" th:if="${errorMessage}">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i> <span th:text="${errorMessage}"></span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card-modern">
+                        <div class="card-header">
+                            <h5 class="card-title">Данные пользователя</h5>
+                        </div>
+                        <div class="card-body">
+                            <form th:action="@{/admin/users/{id}/edit(id=${user.id})}" method="post">
+                                <div class="row mb-3">
+                                    <label for="id" class="col-sm-3 col-form-label">ID пользователя</label>
+                                    <div class="col-sm-9">
+                                        <input type="text" class="form-control" id="id" th:value="${user.id}" disabled>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <label for="fio" class="col-sm-3 col-form-label">ФИО</label>
+                                    <div class="col-sm-9">
+                                        <input type="text" class="form-control" id="fio" name="fio" th:value="${user.fio}" required>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <label for="login" class="col-sm-3 col-form-label">Логин</label>
+                                    <div class="col-sm-9">
+                                        <input type="text" class="form-control" id="login" name="login" th:value="${user.login}" required>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <label for="newPassword" class="col-sm-3 col-form-label">Новый пароль</label>
+                                    <div class="col-sm-9">
+                                        <input type="password" class="form-control" id="newPassword" name="newPassword" placeholder="Оставьте пустым, чтобы сохранить текущий пароль">
+                                        <div class="form-text">Введите новый пароль, только если хотите его изменить.</div>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <label for="contacts" class="col-sm-3 col-form-label">Контакты</label>
+                                    <div class="col-sm-9">
+                                        <input type="text" class="form-control" id="contacts" name="contacts" th:value="${user.contacts}">
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <label for="role" class="col-sm-3 col-form-label">Роль</label>
+                                    <div class="col-sm-9">
+                                        <select class="form-select" id="role" name="role" required>
+                                            <option value="USER" th:selected="${user.role.name() == 'USER'}">Пользователь</option>
+                                            <option value="ADMIN" th:selected="${user.role.name() == 'ADMIN'}">Администратор</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <label for="dateOfRegistration" class="col-sm-3 col-form-label">Дата регистрации</label>
+                                    <div class="col-sm-9">
+                                        <input type="text" class="form-control" id="dateOfRegistration" 
+                                               th:value="${#dates.format(user.dateOfRegistration, 'dd.MM.yyyy')}" disabled>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-sm-3 col-form-label">Подписка</div>
+                                    <div class="col-sm-9">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="hasSubscription" 
+                                                   name="hasSubscription" th:checked="${user.hasSubscription}">
+                                            <label class="form-check-label" for="hasSubscription">
+                                                <span th:text="${user.hasSubscription ? 'Активна' : 'Не активна'}">Статус подписки</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <a th:href="@{/admin/users}" class="btn btn-secondary me-md-2">Отмена</a>
+                                    <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Статус
-                            <span class="badge rounded-pill" 
-                                  th:classappend="${user.hasSubscription ? 'bg-success' : 'bg-secondary'}" 
-                                  th:text="${user.hasSubscription ? 'Активен' : 'Не активен'}">Статус</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Роль
-                            <span class="badge rounded-pill" 
-                                  th:classappend="${user.role.name() == 'ADMIN' ? 'bg-danger' : 'bg-primary'}" 
-                                  th:text="${user.role.name()}">Роль</span>
-                        </li>
-                    </ul>
+                
+                <div class="col-md-4">
+                    <div class="card-modern mb-4">
+                        <div class="card-header">
+                            <h5 class="card-title">Информация</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    Статус
+                                    <span class="badge rounded-pill" 
+                                          th:classappend="${user.hasSubscription ? 'bg-success' : 'bg-secondary'}" 
+                                          th:text="${user.hasSubscription ? 'Активен' : 'Не активен'}">Статус</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    Роль
+                                    <span class="badge rounded-pill" 
+                                          th:classappend="${user.role.name() == 'ADMIN' ? 'bg-danger' : 'bg-primary'}" 
+                                          th:text="${user.role.name()}">Роль</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="card-modern">
+                        <div class="card-header">
+                            <h5 class="card-title">Действия</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-warning" type="button" data-bs-toggle="modal" data-bs-target="#resetPasswordModal">
+                                    <i class="bi bi-key me-1"></i> Сбросить пароль
+                                </button>
+                                <button class="btn btn-danger" type="button" onclick="confirmDelete()">
+                                    <i class="bi bi-trash me-1"></i> Удалить пользователя
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Действия</h5>
-                </div>
-                <div class="card-body">
-                    <div class="d-grid gap-2">
-                        <button class="btn btn-warning" type="button" data-bs-toggle="modal" data-bs-target="#resetPasswordModal">
-                            <i class="bi bi-key me-1"></i> Сбросить пароль
-                        </button>
-                        <button class="btn btn-danger" type="button" onclick="confirmDelete()">
-                            <i class="bi bi-trash me-1"></i> Удалить пользователя
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Модальное окно для подтверждения удаления -->
-    <div class="modal fade" id="deleteConfirmationModal" tabindex="-1" aria-labelledby="deleteConfirmationModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="deleteConfirmationModalLabel">Подтверждение удаления</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p>Вы уверены, что хотите удалить пользователя <strong th:text="${user.fio}"></strong>?</p>
-                    <p class="text-danger">Это действие невозможно отменить!</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                    <form th:action="@{/admin/users/delete}" method="post">
-                        <input type="hidden" name="userId" th:value="${user.id}">
-                        <button type="submit" class="btn btn-danger">Удалить</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Модальное окно для сброса пароля -->
-    <div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="resetPasswordModalLabel">Сброс пароля</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form th:action="@{/admin/users/{id}/reset-password(id=${user.id})}" method="post">
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="resetPassword" class="form-label">Новый пароль</label>
-                            <input type="password" class="form-control" id="resetPassword" name="newPassword" required>
+            <!-- Секция с мемориалами пользователя -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card-modern">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="card-title">
+                                <i class="bi bi-bookmark-heart me-2"></i>Мемориалы пользователя
+                            </h5>
+                            <span class="badge bg-primary rounded-pill" th:text="${user.memorials != null ? user.memorials.size() : 0}">0</span>
                         </div>
-                        <div class="mb-3">
-                            <label for="confirmResetPassword" class="form-label">Подтвердите пароль</label>
-                            <input type="password" class="form-control" id="confirmResetPassword" name="confirmPassword" required>
-                            <div class="invalid-feedback" id="passwordMismatch" style="display: none;">
-                                Пароли не совпадают
+                        <div class="card-body">
+                            <div th:if="${user.memorials == null || user.memorials.isEmpty()}" class="text-center py-4">
+                                <i class="bi bi-info-circle text-muted fs-1"></i>
+                                <p class="text-muted mt-2">У пользователя нет мемориалов</p>
+                            </div>
+                            <div th:if="${user.memorials != null && !user.memorials.isEmpty()}" class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Фото</th>
+                                            <th>Имя</th>
+                                            <th>Даты</th>
+                                            <th>Статус</th>
+                                            <th>Действия</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr th:each="memorial : ${user.memorials}">
+                                            <td th:text="${memorial.id}">1</td>
+                                            <td>
+                                                <div class="memorial-photo rounded" style="width: 50px; height: 50px; background-size: cover; background-position: center;"
+                                                     th:style="${memorial.photoUrl != null ? 'background-image: url(' + memorial.photoUrl + '); width: 50px; height: 50px; background-size: cover; background-position: center;' : 'background-color: #e9ecef; width: 50px; height: 50px;'}">
+                                                    <span th:if="${memorial.photoUrl == null}" class="d-flex align-items-center justify-content-center h-100 text-muted">
+                                                        <i class="bi bi-person"></i>
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="fw-medium" th:text="${memorial.fio}">Иванов Иван Иванович</div>
+                                                <small class="text-muted" th:if="${memorial.biography != null && !memorial.biography.isEmpty()}" th:text="${#strings.abbreviate(memorial.biography, 30)}">Эпитафия</small>
+                                            </td>
+                                            <td>
+                                                <div th:if="${memorial.birthDate != null}" th:text="${#temporals.format(memorial.birthDate, 'dd.MM.yyyy')}">01.01.1950</div>
+                                                <div th:if="${memorial.deathDate != null}" th:text="${#temporals.format(memorial.deathDate, 'dd.MM.yyyy')}">01.01.2020</div>
+                                            </td>
+                                            <td>
+                                                <span class="badge rounded-pill bg-success" th:if="${memorial.isPublic}">Опубликован</span>
+                                                <span class="badge rounded-pill bg-secondary" th:unless="${memorial.isPublic}">Не опубликован</span>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex gap-2">
+                                                    <a th:href="@{/admin/memorials/{id}/edit(id=${memorial.id})}" class="btn btn-action btn-outline-primary" title="Редактировать">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </a>
+                                                    <a th:href="@{/memorials/{id}(id=${memorial.id})}" target="_blank" class="btn btn-action btn-outline-secondary" title="Просмотреть">
+                                                        <i class="bi bi-eye"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                        <button type="submit" class="btn btn-primary" id="resetPasswordButton">Сбросить пароль</button>
-                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- Модальное окно для подтверждения удаления -->
+<div class="modal fade" id="deleteConfirmationModal" tabindex="-1" aria-labelledby="deleteConfirmationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteConfirmationModalLabel">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Подтверждение удаления
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы уверены, что хотите удалить пользователя <strong th:text="${user.fio}"></strong>?</p>
+                <p class="text-danger">Это действие невозможно отменить!</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <form th:action="@{/admin/users/delete}" method="post">
+                    <input type="hidden" name="userId" th:value="${user.id}">
+                    <button type="submit" class="btn btn-danger">Удалить</button>
                 </form>
             </div>
         </div>
     </div>
+</div>
 
-    <script>
-        function confirmDelete() {
-            new bootstrap.Modal(document.getElementById('deleteConfirmationModal')).show();
+<!-- Модальное окно для сброса пароля -->
+<div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="resetPasswordModalLabel">
+                    <i class="bi bi-key me-2"></i>Сброс пароля
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form th:action="@{/admin/users/{id}/reset-password(id=${user.id})}" method="post">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="resetPassword" class="form-label">Новый пароль</label>
+                        <input type="password" class="form-control" id="resetPassword" name="newPassword" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirmResetPassword" class="form-label">Подтвердите пароль</label>
+                        <input type="password" class="form-control" id="confirmResetPassword" name="confirmPassword" required>
+                        <div class="invalid-feedback" id="passwordMismatch" style="display: none;">
+                            Пароли не совпадают
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary" id="resetPasswordButton">Сбросить пароль</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Скрипты -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Адаптивное меню
+    document.addEventListener('DOMContentLoaded', () => {
+        const sidebar = document.getElementById('sidebarMenu');
+        document.querySelector('.navbar-toggler').addEventListener('click', () => {
+            sidebar.classList.toggle('show');
+        });
+    });
+
+    function confirmDelete() {
+        new bootstrap.Modal(document.getElementById('deleteConfirmationModal')).show();
+    }
+    
+    // Проверка совпадения паролей при сбросе
+    document.addEventListener('DOMContentLoaded', function() {
+        const resetPassword = document.getElementById('resetPassword');
+        const confirmResetPassword = document.getElementById('confirmResetPassword');
+        const passwordMismatch = document.getElementById('passwordMismatch');
+        const resetPasswordButton = document.getElementById('resetPasswordButton');
+        
+        function checkPasswordMatch() {
+            if (resetPassword.value !== confirmResetPassword.value) {
+                passwordMismatch.style.display = 'block';
+                resetPasswordButton.disabled = true;
+                confirmResetPassword.classList.add('is-invalid');
+            } else {
+                passwordMismatch.style.display = 'none';
+                resetPasswordButton.disabled = false;
+                confirmResetPassword.classList.remove('is-invalid');
+            }
         }
         
-        // Проверка совпадения паролей при сбросе
-        document.addEventListener('DOMContentLoaded', function() {
-            const resetPassword = document.getElementById('resetPassword');
-            const confirmResetPassword = document.getElementById('confirmResetPassword');
-            const passwordMismatch = document.getElementById('passwordMismatch');
-            const resetPasswordButton = document.getElementById('resetPasswordButton');
-            
-            function checkPasswordMatch() {
-                if (resetPassword.value !== confirmResetPassword.value) {
-                    passwordMismatch.style.display = 'block';
-                    resetPasswordButton.disabled = true;
-                    confirmResetPassword.classList.add('is-invalid');
-                } else {
-                    passwordMismatch.style.display = 'none';
-                    resetPasswordButton.disabled = false;
-                    confirmResetPassword.classList.remove('is-invalid');
-                }
-            }
-            
-            resetPassword.addEventListener('keyup', checkPasswordMatch);
-            confirmResetPassword.addEventListener('keyup', checkPasswordMatch);
-        });
+        resetPassword.addEventListener('keyup', checkPasswordMatch);
+        confirmResetPassword.addEventListener('keyup', checkPasswordMatch);
+    });
+    
+    // Обновление текста для переключателя подписки
+    document.addEventListener('DOMContentLoaded', function() {
+        const hasSubscriptionCheckbox = document.getElementById('hasSubscription');
+        const hasSubscriptionLabel = hasSubscriptionCheckbox.nextElementSibling.querySelector('span');
         
-        // Обновление текста для переключателя подписки
-        document.addEventListener('DOMContentLoaded', function() {
-            const hasSubscriptionCheckbox = document.getElementById('hasSubscription');
-            const hasSubscriptionLabel = hasSubscriptionCheckbox.nextElementSibling.querySelector('span');
-            
-            hasSubscriptionCheckbox.addEventListener('change', function() {
-                hasSubscriptionLabel.textContent = this.checked ? 'Активна' : 'Не активна';
-            });
+        hasSubscriptionCheckbox.addEventListener('change', function() {
+            hasSubscriptionLabel.textContent = this.checked ? 'Активна' : 'Не активна';
         });
-    </script>
-</div>
+    });
+</script>
 </body>
 </html> 

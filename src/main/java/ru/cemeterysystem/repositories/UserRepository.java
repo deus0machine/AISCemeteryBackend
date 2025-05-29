@@ -16,4 +16,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Page<User> findByFioContainingIgnoreCase(String fio, Pageable pageable);
     List<User> findByDateOfRegistrationAfter(Date date);
     long countByHasSubscriptionTrue();
+    
+    // Поиск пользователей по роли
+    List<User> findByRole(User.Role role);
 }
