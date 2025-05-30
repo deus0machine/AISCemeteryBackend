@@ -1,6 +1,8 @@
 package ru.cemeterysystem.controllers.admin;
 
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -18,7 +20,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/admin/notifications")
 @RequiredArgsConstructor
 public class AdminNotificationController {
-
+    private static final Logger log = LoggerFactory.getLogger(AdminNotificationController.class);
     private final NotificationRepository notificationRepository;
     private final NotificationService notificationService;
 
@@ -181,18 +183,38 @@ public class AdminNotificationController {
             @RequestParam("title") String title,
             @RequestParam("content") String content,
             @RequestParam(value = "urgent", defaultValue = "false") boolean urgent,
+            @RequestParam("recipientType") String recipientType,
+            @RequestParam(value = "sendEmail", defaultValue = "false") boolean sendEmail,
             @RequestParam(value = "recipientIds", required = false) Long[] recipientIds) {
         
-        Notification notification = notificationService.createNotification(
-                type, title, content, urgent, recipientIds);
-        
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", notification != null);
-        if (notification != null) {
-            response.put("notificationId", notification.getId());
+        try {
+            Notification notification = notificationService.createNotification(
+                    type, title, content, urgent, recipientType, recipientIds);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", notification != null);
+            if (notification != null) {
+                response.put("notificationId", notification.getId());
+                response.put("message", "Уведомление успешно создано и отправлено");
+            } else {
+                response.put("message", "Ошибка создания уведомления");
+            }
+            
+            // TODO: Реализовать отправку email-уведомлений если sendEmail = true
+            if (sendEmail) {
+                // Здесь можно добавить логику отправки email
+                log.info("Запрос на отправку email-уведомления (функция не реализована)");
+            }
+            
+            return response;
+        } catch (Exception e) {
+            log.error("Ошибка при создании уведомления: {}", e.getMessage(), e);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return response;
         }
-        
-        return response;
     }
     
     @PostMapping("/settings")
@@ -214,7 +236,6 @@ public class AdminNotificationController {
     @PostMapping("/cleanup")
     @ResponseBody
     public Map<String, Object> cleanupNotifications() {
-        // Сохраняем только уведомления созданные в DataLoader (первое уведомление)
         long deletedCount = notificationService.cleanupExcessNotifications();
         
         Map<String, Object> response = new HashMap<>();
@@ -222,5 +243,33 @@ public class AdminNotificationController {
         response.put("deletedCount", deletedCount);
         
         return response;
+    }
+    
+    /**
+     * Ответ на техническое уведомление
+     */
+    @PostMapping("/technical-response")
+    @ResponseBody
+    public Map<String, Object> respondToTechnical(
+            @RequestParam("notificationId") Long notificationId,
+            @RequestParam("response") String response) {
+        
+        try {
+            boolean success = notificationService.respondToTechnicalSupport(notificationId, response);
+            
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("success", success);
+            
+            if (!success) {
+                responseData.put("message", "Не удалось отправить ответ");
+            }
+            
+            return responseData;
+        } catch (Exception e) {
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("success", false);
+            responseData.put("message", e.getMessage());
+            return responseData;
+        }
     }
 } 

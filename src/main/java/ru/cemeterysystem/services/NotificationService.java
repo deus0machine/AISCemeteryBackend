@@ -3,6 +3,8 @@ package ru.cemeterysystem.services;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.cemeterysystem.models.Memorial;
@@ -14,6 +16,7 @@ import ru.cemeterysystem.repositories.UserRepository;
 import ru.cemeterysystem.dto.NotificationDTO;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -67,6 +70,40 @@ public class NotificationService {
         
         Notification saved = notificationRepository.save(notification);
         return convertToDTO(saved);
+    }
+    
+    // Создать техническое уведомление для администраторов
+    public NotificationDTO createTechnicalSupport(Long senderId, String message) {
+        User sender = userRepository.findById(senderId)
+                .orElseThrow(() -> new RuntimeException("Отправитель не найден"));
+        
+        // Найти всех администраторов
+        List<User> admins = userRepository.findByRole(User.Role.ADMIN);
+        if (admins.isEmpty()) {
+            throw new RuntimeException("Не найдено ни одного администратора");
+        }
+        
+        // Создаем уведомление для каждого администратора
+        Notification firstNotification = null;
+        for (User admin : admins) {
+            Notification notification = new Notification();
+            notification.setTitle("Технические вопросы");
+            notification.setMessage(message);
+            notification.setUser(admin);
+            notification.setSender(sender);
+            notification.setType(Notification.NotificationType.TECHNICAL);
+            notification.setStatus(Notification.NotificationStatus.INFO);
+            notification.setCreatedAt(LocalDateTime.now());
+            notification.setRead(false);
+            notification.setUrgent(false);
+            
+            Notification saved = notificationRepository.save(notification);
+            if (firstNotification == null) {
+                firstNotification = saved;
+            }
+        }
+        
+        return convertToDTO(firstNotification);
     }
     
     // Ответить на запрос уведомления
@@ -283,17 +320,22 @@ public class NotificationService {
     
     // Создать административное уведомление
     @Transactional
-    public Notification createNotification(String type, String title, String content, boolean urgent, Long[] recipientIds) {
-        Notification notification = new Notification();
-        notification.setTitle(title);
-        notification.setMessage(content);
-        notification.setCreatedAt(LocalDateTime.now());
-        notification.setRead(false);
-        notification.setUrgent(urgent);
-        
+    public Notification createNotification(String type, String title, String content, boolean urgent, String recipientType, Long[] recipientIds) {
         // Определяем тип уведомления
         Notification.NotificationType notificationType;
         switch (type) {
+            case "admin_info":
+                notificationType = Notification.NotificationType.INFO;
+                break;
+            case "mass_announcement":
+                notificationType = Notification.NotificationType.MASS_ANNOUNCEMENT;
+                break;
+            case "admin_system":
+                notificationType = Notification.NotificationType.ADMIN_SYSTEM;
+                break;
+            case "admin_warning":
+                notificationType = Notification.NotificationType.ADMIN_WARNING;
+                break;
             case "moderation":
                 notificationType = Notification.NotificationType.MODERATION;
                 break;
@@ -308,43 +350,72 @@ public class NotificationService {
                 notificationType = Notification.NotificationType.SYSTEM;
                 break;
         }
-        notification.setType(notificationType);
-        notification.setStatus(Notification.NotificationStatus.INFO);
         
-        // Если указаны конкретные получатели
-        if (recipientIds != null && recipientIds.length > 0) {
-            List<User> recipients = userRepository.findAllById(Arrays.asList(recipientIds));
-            
-            // Создаем отдельные уведомления для каждого получателя
-            for (User recipient : recipients) {
-                Notification userNotification = new Notification();
-                userNotification.setTitle(title);
-                userNotification.setMessage(content);
-                userNotification.setCreatedAt(LocalDateTime.now());
-                userNotification.setRead(false);
-                userNotification.setUrgent(urgent);
-                userNotification.setType(notificationType);
-                userNotification.setStatus(Notification.NotificationStatus.INFO);
-                userNotification.setUser(recipient);
-                
-                notificationRepository.save(userNotification);
-            }
-            
-            return notification; // Возвращаем оригинальное уведомление как шаблон
-        } else {
-            // Для уведомлений, которые не привязаны к конкретным пользователям
-            // Например, системные уведомления, которые видны только в админке
-            
-            // Получаем администратора системы как владельца уведомления
-            Optional<User> adminUser = userRepository.findByRole(User.Role.ADMIN).stream().findFirst();
-            if (adminUser.isPresent()) {
-                notification.setUser(adminUser.get());
-                return notificationRepository.save(notification);
+        List<User> recipients = new ArrayList<>();
+        
+        // Определяем получателей в зависимости от типа
+        if ("all_users".equals(recipientType)) {
+            // Всем пользователям
+            recipients = userRepository.findAll();
+            log.info("Отправка уведомления всем пользователям: {} получателей", recipients.size());
+        } else if ("all_admins".equals(recipientType)) {
+            // Всем администраторам
+            recipients = userRepository.findByRole(User.Role.ADMIN);
+            log.info("Отправка уведомления всем администраторам: {} получателей", recipients.size());
+        } else if ("specific_user".equals(recipientType) || "multiple_users".equals(recipientType)) {
+            // Конкретным пользователям
+            if (recipientIds != null && recipientIds.length > 0) {
+                recipients = userRepository.findAllById(Arrays.asList(recipientIds));
+                log.info("Отправка уведомления выбранным пользователям: {} получателей", recipients.size());
             } else {
-                log.error("Не найден администратор для системного уведомления");
-                return null;
+                log.warn("Не указаны ID получателей для типа {}", recipientType);
+                throw new RuntimeException("Не указаны получатели уведомления");
             }
+        } else {
+            log.warn("Неизвестный тип получателей: {}", recipientType);
+            throw new RuntimeException("Неизвестный тип получателей: " + recipientType);
         }
+        
+        if (recipients.isEmpty()) {
+            log.warn("Не найдено получателей для отправки уведомления");
+            throw new RuntimeException("Не найдено получателей для отправки уведомления");
+        }
+        
+        // Получаем текущего администратора как отправителя
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        User admin = null;
+        if (auth != null && auth.isAuthenticated()) {
+            String username = auth.getName();
+            admin = userRepository.findByLogin(username).orElse(null);
+        }
+        
+        Notification firstNotification = null;
+        
+        // Создаем отдельные уведомления для каждого получателя
+        for (User recipient : recipients) {
+            Notification notification = new Notification();
+            notification.setTitle(title);
+            notification.setMessage(content);
+            notification.setCreatedAt(LocalDateTime.now());
+            notification.setRead(false);
+            notification.setUrgent(urgent);
+            notification.setType(notificationType);
+            notification.setStatus(Notification.NotificationStatus.INFO);
+            notification.setUser(recipient);
+            notification.setSender(admin); // Устанавливаем отправителя
+            
+            Notification saved = notificationRepository.save(notification);
+            if (firstNotification == null) {
+                firstNotification = saved;
+            }
+            
+            log.debug("Создано уведомление ID={} для пользователя ID={}", saved.getId(), recipient.getId());
+        }
+        
+        log.info("Успешно создано {} уведомлений типа {} с заголовком '{}'", 
+                recipients.size(), notificationType, title);
+        
+        return firstNotification; // Возвращаем первое созданное уведомление
     }
 
     @Transactional
@@ -401,6 +472,61 @@ public class NotificationService {
         } catch (Exception e) {
             log.error("Ошибка при очистке уведомлений: {}", e.getMessage(), e);
             return 0;
+        }
+    }
+    
+    /**
+     * Ответить на техническое уведомление
+     */
+    @Transactional
+    public boolean respondToTechnicalSupport(Long notificationId, String responseMessage) {
+        try {
+            log.info("Ответ на техническое уведомление ID={}", notificationId);
+            
+            Notification originalNotification = notificationRepository.findById(notificationId)
+                    .orElseThrow(() -> new RuntimeException("Уведомление не найдено"));
+            
+            // Проверяем, что это техническое уведомление
+            if (originalNotification.getType() != Notification.NotificationType.TECHNICAL) {
+                throw new RuntimeException("Можно отвечать только на технические уведомления");
+            }
+            
+            // Получаем отправителя оригинального уведомления
+            User originalSender = originalNotification.getSender();
+            if (originalSender == null) {
+                throw new RuntimeException("Не найден отправитель оригинального уведомления");
+            }
+            
+            // Получаем текущего администратора (получателя оригинального уведомления)
+            User admin = originalNotification.getUser();
+            
+            // Создаем ответное уведомление
+            Notification responseNotification = new Notification();
+            responseNotification.setTitle("Ответ на техническое обращение");
+            responseNotification.setMessage(responseMessage);
+            responseNotification.setUser(originalSender); // Отправляем пользователю
+            responseNotification.setSender(admin); // От администратора
+            responseNotification.setType(Notification.NotificationType.SYSTEM);
+            responseNotification.setStatus(Notification.NotificationStatus.INFO);
+            responseNotification.setCreatedAt(LocalDateTime.now());
+            responseNotification.setRead(false);
+            responseNotification.setUrgent(false);
+            
+            // Связываем с оригинальным уведомлением через relatedEntityId, но не указываем relatedEntityName
+            responseNotification.setRelatedEntityId(originalNotification.getId());
+            
+            notificationRepository.save(responseNotification);
+            
+            // Отмечаем оригинальное уведомление как обработанное
+            originalNotification.setStatus(Notification.NotificationStatus.PROCESSED);
+            originalNotification.setRead(true);
+            notificationRepository.save(originalNotification);
+            
+            log.info("Создан ответ на техническое уведомление для пользователя ID={}", originalSender.getId());
+            return true;
+        } catch (Exception e) {
+            log.error("Ошибка при ответе на техническое уведомление: {}", e.getMessage(), e);
+            return false;
         }
     }
 } 

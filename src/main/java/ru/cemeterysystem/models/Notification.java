@@ -68,13 +68,18 @@ public class Notification {
         MEMORIAL_MODERATION,      // Новый мемориал на модерации
         CHANGES_MODERATION,       // Изменения мемориала на модерации
         MEMORIAL_APPROVED,        // Мемориал одобрен администратором
-        MEMORIAL_REJECTED         // Мемориал отклонен администратором
+        MEMORIAL_REJECTED,        // Мемориал отклонен администратором
+        ADMIN_INFO,               // Информация от администратора
+        MASS_ANNOUNCEMENT,        // Массовое оповещение о важном
+        ADMIN_SYSTEM,             // Административное системное уведомление 
+        ADMIN_WARNING             // Предупреждение от администратора
     }
     
     public enum NotificationStatus {
         PENDING,    // Ожидает ответа
         ACCEPTED,   // Принято
         REJECTED,   // Отклонено
-        INFO        // Информационное (не требует ответа)
+        INFO,       // Информационное (не требует ответа)
+        PROCESSED   // Обработано (для технических уведомлений)
     }
 } 

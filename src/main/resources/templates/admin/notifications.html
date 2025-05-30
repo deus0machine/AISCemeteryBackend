@@ -512,6 +512,20 @@
                                                 <i class="bi bi-x-lg me-1"></i>Отклонить
                                             </button>
                                         </div>
+                                        
+                                        <!-- Кнопка ответа для технических уведомлений -->
+                                        <div th:if="${notification.type.name() == 'TECHNICAL' && notification.status.name() != 'PROCESSED'}">
+                                            <button class="btn btn-sm btn-primary respond-technical" 
+                                                    th:data-id="${notification.id}"
+                                                    th:data-sender-name="${notification.sender != null ? notification.sender.fio : 'Пользователь'}">
+                                                <i class="bi bi-reply me-1"></i>Ответить
+                                            </button>
+                                        </div>
+                                        
+                                        <!-- Статус для обработанных технических уведомлений -->
+                                        <div th:if="${notification.type.name() == 'TECHNICAL' && notification.status.name() == 'PROCESSED'}">
+                                            <span class="badge bg-success">Отвечено</span>
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -613,12 +627,73 @@
                 });
             });
         }
+        
+        // Обработчик для кнопок ответа на технические уведомления
+        const respondTechnicalButtons = document.querySelectorAll('.respond-technical');
+        respondTechnicalButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const notificationId = this.getAttribute('data-id');
+                const senderName = this.getAttribute('data-sender-name');
+                
+                // Заполняем модальное окно
+                document.getElementById('responseSenderName').textContent = senderName;
+                document.getElementById('responseMessage').value = '';
+                
+                // Сохраняем ID уведомления для отправки ответа
+                document.getElementById('sendResponseBtn').setAttribute('data-notification-id', notificationId);
+                
+                // Показываем модальное окно
+                new bootstrap.Modal(document.getElementById('technicalResponseModal')).show();
+            });
+        });
+        
+        // Обработчик для отправки ответа на техническое уведомление
+        const sendResponseBtn = document.getElementById('sendResponseBtn');
+        if (sendResponseBtn) {
+            sendResponseBtn.addEventListener('click', function() {
+                const notificationId = this.getAttribute('data-notification-id');
+                const responseMessage = document.getElementById('responseMessage').value.trim();
+                
+                if (!responseMessage) {
+                    alert('Введите текст ответа');
+                    return;
+                }
+                
+                // Отправляем ответ
+                const formData = new FormData();
+                formData.append('notificationId', notificationId);
+                formData.append('response', responseMessage);
+                
+                fetch('/admin/notifications/technical-response', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Ответ успешно отправлен пользователю');
+                        
+                        // Закрываем модальное окно
+                        bootstrap.Modal.getInstance(document.getElementById('technicalResponseModal')).hide();
+                        
+                        // Перезагружаем страницу для обновления статуса
+                        window.location.reload();
+                    } else {
+                        alert('Ошибка при отправке ответа: ' + (data.message || 'Неизвестная ошибка'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                    alert('Произошла ошибка при отправке ответа');
+                });
+            });
+        }
     });
 </script>
 
 <!-- Модальное окно для создания уведомления -->
 <div class="modal fade" id="createNotificationModal" tabindex="-1" aria-labelledby="createNotificationModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="createNotificationModalLabel">
@@ -628,46 +703,103 @@
             </div>
             <div class="modal-body">
                 <form id="createNotificationForm">
+                    <!-- Тип уведомления -->
                     <div class="mb-3">
                         <label for="notificationType" class="form-label">Тип уведомления</label>
                         <select class="form-select" id="notificationType" required>
                             <option value="">Выберите тип</option>
-                            <option value="system">Системное</option>
-                            <option value="user">Всем пользователям</option>
-                            <option value="admin">Только администраторам</option>
+                            <optgroup label="Информационные">
+                                <option value="admin_info">📄 Информация от администратора</option>
+                                <option value="admin_system">⚙️ Административное системное уведомление</option>
+                            </optgroup>
+                            <optgroup label="Важные">
+                                <option value="mass_announcement">📢 Массовое оповещение (важное)</option>
+                                <option value="admin_warning">⚠️ Предупреждение</option>
+                            </optgroup>
+                            <optgroup label="Устаревшие (для совместимости)">
+                                <option value="system">Обычное системное</option>
+                                <option value="technical">Техническое</option>
+                                <option value="user">Пользовательское</option>
+                            </optgroup>
+                        </select>
+                        <div class="form-text">Выберите подходящий тип для правильного отображения на клиенте</div>
+                    </div>
+                    
+                    <!-- Получатели -->
+                    <div class="mb-3">
+                        <label for="recipientType" class="form-label">Получатели</label>
+                        <select class="form-select" id="recipientType" required>
+                            <option value="">Выберите получателей</option>
+                            <option value="all_users">👥 Всем пользователям</option>
+                            <option value="all_admins">👑 Всем администраторам</option>
+                            <option value="specific_user">👤 Конкретному пользователю</option>
+                            <option value="multiple_users">👥 Нескольким пользователям</option>
                         </select>
                     </div>
-                    <div class="mb-3">
-                        <label for="notificationTitle" class="form-label">Заголовок</label>
-                        <input type="text" class="form-control" id="notificationTitle" required>
+                    
+                    <!-- Выбор конкретного пользователя -->
+                    <div class="mb-3" id="specificUserBlock" style="display: none;">
+                        <label for="specificUser" class="form-label">Выберите пользователя</label>
+                        <select class="form-select" id="specificUser">
+                            <option value="">Загрузка...</option>
+                        </select>
                     </div>
-                    <div class="mb-3">
-                        <label for="notificationContent" class="form-label">Содержание</label>
-                        <textarea class="form-control" id="notificationContent" rows="4" required></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="notificationUrgent">
-                            <label class="form-check-label" for="notificationUrgent">
-                                Пометить как срочное
-                            </label>
-                        </div>
-                    </div>
-                    <div class="mb-3" id="selectUsersBlock" style="display: none;">
-                        <label for="selectUsers" class="form-label">Выберите пользователей</label>
-                        <select class="form-select" id="selectUsers" multiple>
-                            <option value="1">Иванов Иван</option>
-                            <option value="2">Петров Петр</option>
-                            <option value="3">Сидорова Елена</option>
-                            <option value="4">Смирнов Алексей</option>
+                    
+                    <!-- Выбор нескольких пользователей -->
+                    <div class="mb-3" id="multipleUsersBlock" style="display: none;">
+                        <label for="multipleUsers" class="form-label">Выберите пользователей</label>
+                        <select class="form-select" id="multipleUsers" multiple size="8">
+                            <option value="">Загрузка...</option>
                         </select>
                         <div class="form-text">Удерживайте Ctrl (Cmd) для выбора нескольких пользователей</div>
+                    </div>
+                    
+                    <!-- Заголовок -->
+                    <div class="mb-3">
+                        <label for="notificationTitle" class="form-label">Заголовок</label>
+                        <input type="text" class="form-control" id="notificationTitle" required 
+                               placeholder="Введите заголовок уведомления">
+                        <div class="form-text">Краткое описание сути уведомления</div>
+                    </div>
+                    
+                    <!-- Содержание -->
+                    <div class="mb-3">
+                        <label for="notificationContent" class="form-label">Содержание</label>
+                        <textarea class="form-control" id="notificationContent" rows="5" required
+                                  placeholder="Введите подробное содержание уведомления..."></textarea>
+                        <div class="form-text">Детальное описание уведомления</div>
+                    </div>
+                    
+                    <!-- Дополнительные опции -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="notificationUrgent">
+                                <label class="form-check-label" for="notificationUrgent">
+                                    <i class="bi bi-exclamation-triangle text-warning me-1"></i>
+                                    Пометить как срочное
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="sendEmail">
+                                <label class="form-check-label" for="sendEmail">
+                                    <i class="bi bi-envelope text-primary me-1"></i>
+                                    Отправить email-уведомление
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                <button type="button" class="btn btn-primary" id="sendNotificationBtn">Отправить</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i>Отмена
+                </button>
+                <button type="button" class="btn btn-primary" id="sendNotificationBtn">
+                    <i class="bi bi-send me-1"></i>Отправить уведомление
+                </button>
             </div>
         </div>
     </div>
@@ -689,21 +821,21 @@
                         <label class="form-label">Автоматическое удаление</label>
                         <select class="form-select" id="autoDeletion">
                             <option value="never">Никогда</option>
-                            <option value="1month">После 1 месяца</option>
-                            <option value="3months" selected>После 3 месяцев</option>
-                            <option value="6months">После 6 месяцев</option>
-                            <option value="1year">После 1 года</option>
+                            <option value="week">Через неделю</option>
+                            <option value="month" selected>Через месяц</option>
+                            <option value="quarter">Через 3 месяца</option>
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Настройки Email-уведомлений</label>
-                        <div class="form-check form-switch mb-2">
+                        <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="emailNotification" checked>
                             <label class="form-check-label" for="emailNotification">
-                                Получать уведомления по email
+                                Email-уведомления
                             </label>
                         </div>
-                        <div class="form-check form-switch mb-2">
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="emailUrgentOnly">
                             <label class="form-check-label" for="emailUrgentOnly">
                                 Только срочные уведомления
@@ -711,12 +843,11 @@
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Периодичность сводки</label>
+                        <label class="form-label">Дайджест уведомлений</label>
                         <select class="form-select" id="digestFrequency">
-                            <option value="never">Не отправлять</option>
-                            <option value="daily">Ежедневно</option>
-                            <option value="weekly" selected>Еженедельно</option>
-                            <option value="monthly">Ежемесячно</option>
+                            <option value="never">Отключен</option>
+                            <option value="daily" selected>Ежедневно</option>
+                            <option value="weekly">Еженедельно</option>
                         </select>
                     </div>
                 </form>
@@ -724,6 +855,36 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
                 <button type="button" class="btn btn-primary" id="saveSettingsBtn">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для ответа на техническое уведомление -->
+<div class="modal fade" id="technicalResponseModal" tabindex="-1" aria-labelledby="technicalResponseModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="technicalResponseModalLabel">
+                    <i class="bi bi-reply me-2"></i>Ответ на техническое обращение
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Пользователь:</label>
+                    <span id="responseSenderName" class="fw-bold"></span>
+                </div>
+                <div class="mb-3">
+                    <label for="responseMessage" class="form-label">Ваш ответ</label>
+                    <textarea class="form-control" id="responseMessage" rows="6" 
+                              placeholder="Введите ответ пользователю..." required></textarea>
+                    <div class="form-text">Ответ будет отправлен как уведомление пользователю</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="sendResponseBtn">Отправить ответ</button>
             </div>
         </div>
     </div>
@@ -739,118 +900,159 @@
         
         // Обработка формы создания уведомления
         const notificationType = document.getElementById('notificationType');
-        const selectUsersBlock = document.getElementById('selectUsersBlock');
+        const recipientType = document.getElementById('recipientType');
+        const specificUserBlock = document.getElementById('specificUserBlock');
+        const multipleUsersBlock = document.getElementById('multipleUsersBlock');
+        const specificUser = document.getElementById('specificUser');
+        const multipleUsers = document.getElementById('multipleUsers');
         
-        notificationType.addEventListener('change', function() {
-            if (this.value === 'user') {
-                selectUsersBlock.style.display = 'block';
-            } else {
-                selectUsersBlock.style.display = 'none';
+        // Загружаем список пользователей при открытии модального окна
+        document.getElementById('createNotificationModal').addEventListener('show.bs.modal', function() {
+            loadUsers();
+        });
+        
+        // Функция загрузки пользователей
+        function loadUsers() {
+            fetch('/admin/users/api/all')
+                .then(response => response.json())
+                .then(users => {
+                    // Очищаем существующие опции
+                    specificUser.innerHTML = '<option value="">Выберите пользователя</option>';
+                    multipleUsers.innerHTML = '';
+                    
+                    // Добавляем пользователей
+                    users.forEach(user => {
+                        const option1 = new Option(`${user.fio || user.login} (${user.email})`, user.id);
+                        const option2 = new Option(`${user.fio || user.login} (${user.email})`, user.id);
+                        
+                        specificUser.appendChild(option1);
+                        multipleUsers.appendChild(option2);
+                    });
+                })
+                .catch(error => {
+                    console.error('Ошибка загрузки пользователей:', error);
+                    specificUser.innerHTML = '<option value="">Ошибка загрузки</option>';
+                    multipleUsers.innerHTML = '<option value="">Ошибка загрузки</option>';
+                });
+        }
+        
+        // Обработка изменения типа получателей
+        recipientType.addEventListener('change', function() {
+            const value = this.value;
+            
+            // Скрываем все блоки выбора пользователей
+            specificUserBlock.style.display = 'none';
+            multipleUsersBlock.style.display = 'none';
+            
+            // Показываем нужный блок
+            if (value === 'specific_user') {
+                specificUserBlock.style.display = 'block';
+            } else if (value === 'multiple_users') {
+                multipleUsersBlock.style.display = 'block';
             }
         });
         
         // Обработка кнопки отправки уведомления
         document.getElementById('sendNotificationBtn').addEventListener('click', function() {
-            const title = document.getElementById('notificationTitle').value;
-            const content = document.getElementById('notificationContent').value;
+            const title = document.getElementById('notificationTitle').value.trim();
+            const content = document.getElementById('notificationContent').value.trim();
             const type = document.getElementById('notificationType').value;
+            const recipientTypeValue = recipientType.value;
+            const urgent = document.getElementById('notificationUrgent').checked;
+            const sendEmail = document.getElementById('sendEmail').checked;
             
-            if (!title || !content || !type) {
+            // Валидация
+            if (!title || !content || !type || !recipientTypeValue) {
                 alert('Пожалуйста, заполните все обязательные поля');
                 return;
             }
             
-            // В реальном приложении здесь был бы AJAX-запрос
-            alert('Уведомление успешно отправлено!');
+            // Определяем получателей
+            let recipientIds = [];
+            let recipientInfo = '';
             
-            // Закрыть модальное окно
-            bootstrap.Modal.getInstance(document.getElementById('createNotificationModal')).hide();
-        });
-        
-        // Обработка кнопки сохранения настроек
-        document.getElementById('saveSettingsBtn').addEventListener('click', function() {
-            // В реальном приложении здесь был бы AJAX-запрос
-            alert('Настройки успешно сохранены!');
+            switch (recipientTypeValue) {
+                case 'all_users':
+                    recipientInfo = 'всем пользователям';
+                    break;
+                case 'all_admins':
+                    recipientInfo = 'всем администраторам';
+                    break;
+                case 'specific_user':
+                    const selectedUser = specificUser.value;
+                    if (!selectedUser) {
+                        alert('Выберите пользователя');
+                        return;
+                    }
+                    recipientIds = [selectedUser];
+                    recipientInfo = 'выбранному пользователю';
+                    break;
+                case 'multiple_users':
+                    const selectedUsers = Array.from(multipleUsers.selectedOptions).map(option => option.value);
+                    if (selectedUsers.length === 0) {
+                        alert('Выберите хотя бы одного пользователя');
+                        return;
+                    }
+                    recipientIds = selectedUsers;
+                    recipientInfo = `${selectedUsers.length} пользователям`;
+                    break;
+            }
             
-            // Закрыть модальное окно
-            bootstrap.Modal.getInstance(document.getElementById('settingsModal')).hide();
-        });
-        
-        // Отметить все как прочитанные
-        document.getElementById('markAllRead').addEventListener('click', function() {
-            // В реальном приложении здесь был бы AJAX-запрос
-            alert('Все уведомления отмечены как прочитанные');
+            // Подтверждение отправки
+            const confirmMessage = `Отправить уведомление "${title}" ${recipientInfo}?${urgent ? ' (СРОЧНОЕ)' : ''}`;
+            if (!confirm(confirmMessage)) {
+                return;
+            }
             
-            // Визуально обновить страницу
-            document.querySelectorAll('.notification-item.unread').forEach(item => {
-                item.classList.remove('unread');
-            });
-        });
-        
-        // Обработка кнопок "Отметить как прочитанное"
-        document.querySelectorAll('.mark-read').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const notificationId = this.getAttribute('data-id');
-                const notificationItem = this.closest('.notification-item');
-                
-                fetch(`/admin/notifications/mark-read/${notificationId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        notificationItem.classList.remove('unread');
-                        this.innerHTML = '<i class="bi bi-check"></i>';
-                        this.disabled = true;
-                        this.title = 'Прочитано';
-                    }
-                })
-                .catch(error => {
-                    console.error('Ошибка:', error);
-                });
-            });
-        });
-        
-        // Обработка кнопок принятия/отклонения запросов
-        document.querySelectorAll('.mark-accept, .mark-reject').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const notificationId = this.getAttribute('data-id');
-                const isAccepted = this.classList.contains('mark-accept');
-                const actionButtons = this.parentElement;
-                
-                // Вызываем API для принятия/отклонения запроса
-                fetch(`/api/notifications/${notificationId}/respond`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        accept: isAccepted
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        actionButtons.innerHTML = `<span class="badge ${isAccepted ? 'bg-success' : 'bg-danger'}">${isAccepted ? 'Принят' : 'Отклонен'}</span>`;
-                        
-                        // Если это уведомление о модерации, предложить перезагрузить страницу
-                        const notificationItem = actionButtons.closest('.notification-item');
-                        if (notificationItem.querySelector('.notification-type i.bi-shield-check')) {
-                            if (confirm('Статус мемориала обновлен. Хотите перезагрузить страницу, чтобы увидеть изменения?')) {
-                                window.location.reload();
-                            }
-                        }
-                    } else {
-                        alert('Ошибка при обработке запроса: ' + (data.message || 'Неизвестная ошибка'));
-                    }
-                })
-                .catch(error => {
-                    console.error('Ошибка:', error);
-                    alert('Произошла ошибка при выполнении запроса');
-                });
+            // Формируем данные для отправки
+            const formData = new FormData();
+            formData.append('type', type);
+            formData.append('title', title);
+            formData.append('content', content);
+            formData.append('urgent', urgent);
+            formData.append('sendEmail', sendEmail);
+            formData.append('recipientType', recipientTypeValue);
+            
+            // Добавляем ID получателей, если они есть
+            if (recipientIds.length > 0) {
+                recipientIds.forEach(id => formData.append('recipientIds', id));
+            }
+            
+            // Отправляем запрос
+            this.disabled = true;
+            this.innerHTML = '<i class="bi bi-hourglass me-1"></i>Отправка...';
+            
+            fetch('/admin/notifications/create', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`Уведомление успешно отправлено ${recipientInfo}!`);
+                    
+                    // Закрываем модальное окно
+                    bootstrap.Modal.getInstance(document.getElementById('createNotificationModal')).hide();
+                    
+                    // Очищаем форму
+                    document.getElementById('createNotificationForm').reset();
+                    specificUserBlock.style.display = 'none';
+                    multipleUsersBlock.style.display = 'none';
+                    
+                    // Перезагружаем страницу для отображения нового уведомления
+                    window.location.reload();
+                } else {
+                    alert('Ошибка при отправке уведомления: ' + (data.message || 'Неизвестная ошибка'));
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка:', error);
+                alert('Произошла ошибка при отправке уведомления');
+            })
+            .finally(() => {
+                // Восстанавливаем кнопку
+                this.disabled = false;
+                this.innerHTML = '<i class="bi bi-send me-1"></i>Отправить уведомление';
             });
         });
     });

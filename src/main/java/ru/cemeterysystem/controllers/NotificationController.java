@@ -138,4 +138,34 @@ public class NotificationController {
         notificationService.deleteNotification(id);
         return ResponseEntity.ok().build();
     }
+
+    /**
+     * Создает техническое уведомление для администраторов
+     */
+    @PostMapping("/technical-support")
+    public ResponseEntity<Map<String, Object>> createTechnicalSupport(@RequestBody Map<String, String> request) {
+        try {
+            User currentUser = getCurrentUser();
+            String message = request.get("message");
+            
+            if (message == null || message.trim().isEmpty()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("status", "error");
+                response.put("message", "Сообщение не может быть пустым");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            NotificationDTO notification = notificationService.createTechnicalSupport(currentUser.getId(), message);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("data", notification);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
 } 

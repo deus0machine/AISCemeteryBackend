@@ -19,7 +19,8 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.stream.Collectors;
 
 @Controller
@@ -27,7 +28,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AdminController {
 
-    private static final Logger logger = Logger.getLogger(AdminController.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(AdminController.class.getName());
     
     private final UserService userService;
     private final UserRepository userRepository;
