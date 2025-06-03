@@ -188,13 +188,13 @@ public class AdminNotificationController {
             @RequestParam(value = "recipientIds", required = false) Long[] recipientIds) {
         
         try {
-            Notification notification = notificationService.createNotification(
+        Notification notification = notificationService.createNotification(
                     type, title, content, urgent, recipientType, recipientIds);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", notification != null);
-            if (notification != null) {
-                response.put("notificationId", notification.getId());
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", notification != null);
+        if (notification != null) {
+            response.put("notificationId", notification.getId());
                 response.put("message", "Уведомление успешно создано и отправлено");
             } else {
                 response.put("message", "Ошибка создания уведомления");
@@ -204,9 +204,9 @@ public class AdminNotificationController {
             if (sendEmail) {
                 // Здесь можно добавить логику отправки email
                 log.info("Запрос на отправку email-уведомления (функция не реализована)");
-            }
-            
-            return response;
+        }
+        
+        return response;
         } catch (Exception e) {
             log.error("Ошибка при создании уведомления: {}", e.getMessage(), e);
             

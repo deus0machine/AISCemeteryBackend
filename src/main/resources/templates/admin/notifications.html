@@ -773,14 +773,14 @@
                     <!-- Дополнительные опции -->
                     <div class="row">
                         <div class="col-md-6">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="notificationUrgent">
-                                <label class="form-check-label" for="notificationUrgent">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="notificationUrgent">
+                            <label class="form-check-label" for="notificationUrgent">
                                     <i class="bi bi-exclamation-triangle text-warning me-1"></i>
-                                    Пометить как срочное
-                                </label>
-                            </div>
+                                Пометить как срочное
+                            </label>
                         </div>
+                    </div>
                         <div class="col-md-6">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="sendEmail">
@@ -1012,7 +1012,7 @@
             formData.append('urgent', urgent);
             formData.append('sendEmail', sendEmail);
             formData.append('recipientType', recipientTypeValue);
-            
+        
             // Добавляем ID получателей, если они есть
             if (recipientIds.length > 0) {
                 recipientIds.forEach(id => formData.append('recipientIds', id));
@@ -1021,32 +1021,32 @@
             // Отправляем запрос
             this.disabled = true;
             this.innerHTML = '<i class="bi bi-hourglass me-1"></i>Отправка...';
-            
+                
             fetch('/admin/notifications/create', {
-                method: 'POST',
+                    method: 'POST',
                 body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
                     alert(`Уведомление успешно отправлено ${recipientInfo}!`);
-                    
+        
                     // Закрываем модальное окно
                     bootstrap.Modal.getInstance(document.getElementById('createNotificationModal')).hide();
-                    
+                
                     // Очищаем форму
                     document.getElementById('createNotificationForm').reset();
                     specificUserBlock.style.display = 'none';
                     multipleUsersBlock.style.display = 'none';
-                    
+                        
                     // Перезагружаем страницу для отображения нового уведомления
-                    window.location.reload();
-                } else {
+                                window.location.reload();
+                    } else {
                     alert('Ошибка при отправке уведомления: ' + (data.message || 'Неизвестная ошибка'));
-                }
-            })
-            .catch(error => {
-                console.error('Ошибка:', error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
                 alert('Произошла ошибка при отправке уведомления');
             })
             .finally(() => {

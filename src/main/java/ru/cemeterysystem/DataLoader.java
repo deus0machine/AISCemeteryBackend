@@ -111,8 +111,10 @@ public class DataLoader implements CommandLineRunner {
             burial7.setCreatedBy(admin);
             burial7.setPublic(true);
             burial7.setPublicationStatus(Memorial.PublicationStatus.PUBLISHED);
+            
             Memorial burial8 = new Memorial(admin, "Сергеева Ольга Николаевна", LocalDate.of(1998, 6, 14), LocalDate.of(1928, 12, 15));
             burial8.setCreatedBy(admin);
+            
             logger.info("Saving memorials to database...");
             memorialRepository.saveAll(List.of(burial1, burial2, burial3, burial4, burial5, burial6, burial7, burial8));
 
@@ -129,24 +131,25 @@ public class DataLoader implements CommandLineRunner {
             // Создаем связи между захоронениями
             List<MemorialRelation> relations = new ArrayList<>();
 
-// Базовые связи из оригинала
-            relations.add(createRelation(familyTree, burial1, burial2, MemorialRelation.RelationType.SPOUSE));
-            relations.add(createRelation(familyTree, burial1, burial3, MemorialRelation.RelationType.PARENT));
-            relations.add(createRelation(familyTree, burial4, burial1, MemorialRelation.RelationType.CHILD));
+            // СУПРУЖЕСКИЕ СВЯЗИ
+            relations.add(createRelation(familyTree, burial1, burial2, MemorialRelation.RelationType.SPOUSE)); // Иван + Анна
+            relations.add(createRelation(familyTree, burial7, burial8, MemorialRelation.RelationType.SPOUSE)); // Иван_Андр + Ольга (прародители)
 
-// Новые связи
-// Родители Ивана (burial1)
-            relations.add(createRelation(familyTree, burial1, burial5, MemorialRelation.RelationType.PARENT));  // Мать
-            relations.add(createRelation(familyTree, burial3, burial5, MemorialRelation.RelationType.SPOUSE)); // Супруги
-
-// Дети Ивана и Анны
-            relations.add(createRelation(familyTree, burial6, burial1, MemorialRelation.RelationType.CHILD));
-            relations.add(createRelation(familyTree, burial6, burial2, MemorialRelation.RelationType.PARENT));
-
-// Родители Андрея (burial3) - прадеды
-            relations.add(createRelation(familyTree, burial3, burial7, MemorialRelation.RelationType.PARENT)); // Отец
-            relations.add(createRelation(familyTree, burial3, burial8, MemorialRelation.RelationType.PARENT)); // Мать
-            relations.add(createRelation(familyTree, burial7, burial8, MemorialRelation.RelationType.SPOUSE)); // Супруги
+            // РОДИТЕЛЬСКИЕ СВЯЗИ (ПРАВИЛЬНОЕ НАПРАВЛЕНИЕ: РОДИТЕЛЬ → РЕБЕНОК)
+            
+            // Прародители → их дети (Андрей, Мария, Иван - НЕ Анна!)
+            relations.add(createRelation(familyTree, burial7, burial3, MemorialRelation.RelationType.PARENT)); // Иван_Андр → Андрей
+            relations.add(createRelation(familyTree, burial8, burial3, MemorialRelation.RelationType.PARENT)); // Ольга → Андрей
+            relations.add(createRelation(familyTree, burial7, burial5, MemorialRelation.RelationType.PARENT)); // Иван_Андр → Мария
+            relations.add(createRelation(familyTree, burial8, burial5, MemorialRelation.RelationType.PARENT)); // Ольга → Мария
+            relations.add(createRelation(familyTree, burial7, burial1, MemorialRelation.RelationType.PARENT)); // Иван_Андр → Иван
+            relations.add(createRelation(familyTree, burial8, burial1, MemorialRelation.RelationType.PARENT)); // Ольга → Иван
+            
+            // Иван и Анна → их дети (Владимир и Елена) - Анна теперь внешняя невестка!
+            relations.add(createRelation(familyTree, burial1, burial4, MemorialRelation.RelationType.PARENT)); // Иван → Владимир
+            relations.add(createRelation(familyTree, burial2, burial4, MemorialRelation.RelationType.PARENT)); // Анна → Владимир
+            relations.add(createRelation(familyTree, burial1, burial6, MemorialRelation.RelationType.PARENT)); // Иван → Елена
+            relations.add(createRelation(familyTree, burial2, burial6, MemorialRelation.RelationType.PARENT)); // Анна → Елена
 
             memorialRelationRepository.saveAll(relations);
             

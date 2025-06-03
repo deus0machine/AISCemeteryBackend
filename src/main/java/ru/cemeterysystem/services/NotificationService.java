@@ -364,7 +364,7 @@ public class NotificationService {
             log.info("Отправка уведомления всем администраторам: {} получателей", recipients.size());
         } else if ("specific_user".equals(recipientType) || "multiple_users".equals(recipientType)) {
             // Конкретным пользователям
-            if (recipientIds != null && recipientIds.length > 0) {
+        if (recipientIds != null && recipientIds.length > 0) {
                 recipients = userRepository.findAllById(Arrays.asList(recipientIds));
                 log.info("Отправка уведомления выбранным пользователям: {} получателей", recipients.size());
             } else {
@@ -390,9 +390,9 @@ public class NotificationService {
         }
         
         Notification firstNotification = null;
-        
-        // Создаем отдельные уведомления для каждого получателя
-        for (User recipient : recipients) {
+            
+            // Создаем отдельные уведомления для каждого получателя
+            for (User recipient : recipients) {
             Notification notification = new Notification();
             notification.setTitle(title);
             notification.setMessage(content);
