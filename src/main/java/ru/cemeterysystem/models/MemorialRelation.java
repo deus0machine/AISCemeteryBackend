@@ -42,6 +42,7 @@ public class MemorialRelation {
         GRANDPARENT, // Дедушка/бабушка
         GRANDCHILD,  // Внук/внучка
         UNCLE_AUNT,  // Дядя/тетя
-        NEPHEW_NIECE // Племянник/племянница
+        NEPHEW_NIECE, // Племянник/племянница
+        PLACEHOLDER  // Временная связь для мемориала без семейных связей
     }
 } 

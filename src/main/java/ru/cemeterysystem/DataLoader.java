@@ -60,7 +60,7 @@ public class DataLoader implements CommandLineRunner {
             admin.setDateOfRegistration(new Date());
             admin.setHasSubscription(true);
             admin.setContacts("admin@example.com");
-            
+
             // Создаем пользователя
             User user = new User();
             user.setFio("Севостьянов Сергей Вячеславович");

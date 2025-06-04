@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import ru.cemeterysystem.dto.FamilyTreeDTO;
 import ru.cemeterysystem.dto.FamilyTreeUpdateDTO;
 import ru.cemeterysystem.dto.MemorialRelationDTO;
+import ru.cemeterysystem.dto.TreeMemorialDTO;
 import ru.cemeterysystem.models.FamilyTree;
 import ru.cemeterysystem.models.MemorialRelation;
 import ru.cemeterysystem.models.User;
@@ -124,12 +125,30 @@ public class FamilyTreeController {
     public ResponseEntity<?> addRelation(
             @PathVariable Long id,
             @RequestBody MemorialRelationDTO relationDTO) {
+        logger.info("=== START addRelation ===");
+        logger.info("Family Tree ID: {}", id);
+        logger.info("Incoming MemorialRelationDTO: {}", relationDTO);
+        logger.info("RelationDTO.sourceMemorial: {}", relationDTO.getSourceMemorial());
+        logger.info("RelationDTO.targetMemorial: {}", relationDTO.getTargetMemorial());
+        logger.info("RelationDTO.relationType: {}", relationDTO.getRelationType());
+        
         try {
             User user = getCurrentUser();
+            logger.info("Current user: {}", user.getLogin());
+            
+            logger.info("Calling familyTreeService.addRelation...");
             MemorialRelation relation = familyTreeService.addRelation(id, relationDTO, user);
+            logger.info("Successfully created relation with ID: {}", relation.getId());
+            
+            logger.info("Returning response with relation: {}", relation);
+            logger.info("=== END addRelation SUCCESS ===");
             return ResponseEntity.ok(relation);
         } catch (Exception e) {
-            logger.error("Error adding relation: {}", e.getMessage(), e);
+            logger.error("=== ERROR in addRelation ===");
+            logger.error("Exception type: {}", e.getClass().getSimpleName());
+            logger.error("Exception message: {}", e.getMessage());
+            logger.error("Full stack trace:", e);
+            logger.error("=== END addRelation ERROR ===");
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed to add relation: " + e.getMessage());
         }
@@ -156,6 +175,48 @@ public class FamilyTreeController {
             logger.error("Error getting relations: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed to get relations: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/{id}/memorials/{memorialId}")
+    public ResponseEntity<?> addMemorialToTree(
+            @PathVariable Long id, 
+            @PathVariable Long memorialId) {
+        try {
+            User user = getCurrentUser();
+            familyTreeService.addMemorialToTree(id, memorialId, user);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            logger.error("Error adding memorial {} to tree {}: {}", memorialId, id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to add memorial to tree: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/{id}/memorials")
+    public ResponseEntity<?> getTreeMemorials(@PathVariable Long id) {
+        try {
+            List<TreeMemorialDTO> memorials = familyTreeService.getTreeMemorials(id);
+            return ResponseEntity.ok(memorials);
+        } catch (Exception e) {
+            logger.error("Error getting memorials for tree {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to get tree memorials: " + e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/{id}/memorials/{memorialId}")
+    public ResponseEntity<?> removeMemorialFromTree(
+            @PathVariable Long id, 
+            @PathVariable Long memorialId) {
+        try {
+            User user = getCurrentUser();
+            familyTreeService.removeMemorialFromTree(id, memorialId, user);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            logger.error("Error removing memorial {} from tree {}: {}", memorialId, id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to remove memorial from tree: " + e.getMessage());
         }
     }
 } 
