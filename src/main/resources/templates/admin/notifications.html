@@ -423,12 +423,14 @@
                                                (${notification.type.name() == 'MODERATION'} ? 'bg-primary bg-opacity-10 text-primary' : 
                                                (${notification.type.name() == 'TECHNICAL'} ? 'bg-danger bg-opacity-10 text-danger' :
                                                (${notification.type.name() == 'USER_REQUEST'} ? 'bg-success bg-opacity-10 text-success' :
-                                               'bg-warning bg-opacity-10 text-warning')))">
+                                               (${notification.type.name() == 'MEMORIAL_REPORT'} ? 'bg-danger bg-opacity-10 text-danger' :
+                                               'bg-warning bg-opacity-10 text-warning'))))">
                                         <i th:class="'bi ' + 
                                                   (${notification.type.name() == 'MODERATION'} ? 'bi-shield-check' : 
                                                   (${notification.type.name() == 'TECHNICAL'} ? 'bi-exclamation-triangle' :
                                                   (${notification.type.name() == 'USER_REQUEST'} ? 'bi-person-lines-fill' :
-                                                  'bi-gear')))"></i>
+                                                  (${notification.type.name() == 'MEMORIAL_REPORT'} ? 'bi-flag' :
+                                                  'bi-gear'))))"></i>
                                     </div>
                                 </div>
                                 
@@ -489,6 +491,14 @@
                                             <i class="bi bi-eye me-1"></i>Просмотреть мемориал на модерации
                                         </a>
                                         
+                                        <!-- Кнопка просмотра для жалоб на мемориалы -->
+                                        <a th:if="${notification.relatedEntityId != null && notification.type.name() == 'MEMORIAL_REPORT'}" 
+                                           th:href="@{/admin/memorials/{id}(id=${notification.relatedEntityId})}" 
+                                           target="_blank"
+                                           class="btn btn-sm btn-primary">
+                                            <i class="bi bi-eye me-1"></i>Просмотреть мемориал
+                                        </a>
+                                        
                                         <!-- Кнопки принятия/отклонения для запросов модерации -->
                                         <div th:if="${notification.status.name() == 'PENDING' && notification.type.name() == 'MODERATION'}">
                                             <a th:href="@{/admin/memorials/{id}/approve(id=${notification.relatedEntityId})}" 
@@ -525,6 +535,29 @@
                                         <!-- Статус для обработанных технических уведомлений -->
                                         <div th:if="${notification.type.name() == 'TECHNICAL' && notification.status.name() == 'PROCESSED'}">
                                             <span class="badge bg-success">Отвечено</span>
+                                        </div>
+                                        
+                                        <!-- Кнопки для жалоб на мемориалы -->
+                                        <div th:if="${notification.type.name() == 'MEMORIAL_REPORT'}">
+                                            <!-- Показываем кнопки только если жалоба еще не обработана -->
+                                            <div th:if="${notification.status.name() != 'PROCESSED'}">
+                                                <button class="btn btn-sm btn-danger block-memorial" 
+                                                        th:data-memorial-id="${notification.relatedEntityId}"
+                                                        th:data-notification-id="${notification.id}">
+                                                    <i class="bi bi-ban me-1"></i>Заблокировать мемориал
+                                                </button>
+                                                <button class="btn btn-sm btn-secondary dismiss-report" 
+                                                        th:data-memorial-id="${notification.relatedEntityId}"
+                                                        th:data-notification-id="${notification.id}">
+                                                    <i class="bi bi-x-circle me-1"></i>Отклонить жалобу
+                                                </button>
+                                            </div>
+                                            <!-- Показываем статус для обработанных жалоб -->
+                                            <div th:if="${notification.status.name() == 'PROCESSED'}">
+                                                <span class="badge bg-success">
+                                                    <i class="bi bi-check-circle me-1"></i>Жалоба рассмотрена
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -688,6 +721,75 @@
                 });
             });
         }
+        
+        // Обработчик для кнопок блокировки мемориала
+        const blockMemorialButtons = document.querySelectorAll('.block-memorial');
+        blockMemorialButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const memorialId = this.getAttribute('data-memorial-id');
+                const notificationId = this.getAttribute('data-notification-id');
+                
+                const reason = prompt('Укажите причину блокировки мемориала:');
+                if (!reason || reason.trim() === '') {
+                    return;
+                }
+                
+                if (!confirm('Вы уверены, что хотите заблокировать этот мемориал?')) {
+                    return;
+                }
+                
+                // Отправляем запрос на блокировку
+                const formData = new FormData();
+                formData.append('reason', reason.trim());
+                
+                fetch(`/admin/memorials/${memorialId}/block`, {
+                    method: 'POST',
+                    body: formData
+                })
+                                 .then(response => {
+                     if (response.ok) {
+                         alert('Мемориал заблокирован. Владелец и автор жалобы получили уведомления.');
+                         window.location.reload();
+                    } else {
+                        alert('Ошибка при блокировке мемориала');
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                    alert('Произошла ошибка при блокировке мемориала');
+                });
+            });
+        });
+        
+        // Обработчик для кнопок отклонения жалобы
+        const dismissReportButtons = document.querySelectorAll('.dismiss-report');
+        dismissReportButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const memorialId = this.getAttribute('data-memorial-id');
+                const notificationId = this.getAttribute('data-notification-id');
+                
+                if (!confirm('Отклонить жалобу? Мемориал останется без изменений, а пользователь получит уведомление об отклонении.')) {
+                    return;
+                }
+                
+                // Отклоняем жалобу через специальный endpoint
+                fetch(`/admin/memorials/${memorialId}/dismiss-report`, {
+                    method: 'POST'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        alert('Жалоба отклонена. Пользователь получил уведомление.');
+                        window.location.reload();
+                    } else {
+                        alert('Ошибка при отклонении жалобы');
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                    alert('Произошла ошибка при отклонении жалобы');
+                });
+            });
+        });
     });
 </script>
 

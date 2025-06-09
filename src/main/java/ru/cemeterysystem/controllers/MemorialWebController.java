@@ -35,8 +35,9 @@ public class MemorialWebController {
             @RequestParam(value = "errorMessage", required = false) String errorMessage,
             Model model) {
         
-        // Получаем публичные мемориалы
-        List<Memorial> publicMemorials = memorialRepository.findByIsPublicTrue();
+        // Получаем публичные опубликованные незаблокированные мемориалы
+        List<Memorial> publicMemorials = memorialRepository.findByIsPublicTrueAndPublicationStatusAndIsBlockedFalse(
+                Memorial.PublicationStatus.PUBLISHED);
         model.addAttribute("memorials", publicMemorials);
         
         // Если есть сообщение об ошибке, добавляем его в модель

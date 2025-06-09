@@ -72,7 +72,8 @@ public class Notification {
         ADMIN_INFO,               // Информация от администратора
         MASS_ANNOUNCEMENT,        // Массовое оповещение о важном
         ADMIN_SYSTEM,             // Административное системное уведомление 
-        ADMIN_WARNING             // Предупреждение от администратора
+        ADMIN_WARNING,            // Предупреждение от администратора
+        MEMORIAL_REPORT           // Жалоба на мемориал
     }
     
     public enum NotificationStatus {

@@ -79,6 +79,9 @@ public class AdminNotificationController {
                 case "user":
                     notificationType = Notification.NotificationType.USER_REQUEST;
                     break;
+                case "reports":
+                    notificationType = Notification.NotificationType.MEMORIAL_REPORT;
+                    break;
                 case "system":
                     notificationType = Notification.NotificationType.SYSTEM;
                     break;
@@ -119,6 +122,7 @@ public class AdminNotificationController {
         typeCountMap.put("Модерация контента", 0);
         typeCountMap.put("Технические вопросы", 0);
         typeCountMap.put("Запросы пользователей", 0);
+        typeCountMap.put("Жалобы на мемориалы", 0);
         typeCountMap.put("Системные", 0);
         
         for (Notification notification : notificationList) {
@@ -132,6 +136,9 @@ public class AdminNotificationController {
                         break;
                     case USER_REQUEST:
                         typeCountMap.put("Запросы пользователей", typeCountMap.get("Запросы пользователей") + 1);
+                        break;
+                    case MEMORIAL_REPORT:
+                        typeCountMap.put("Жалобы на мемориалы", typeCountMap.get("Жалобы на мемориалы") + 1);
                         break;
                     case SYSTEM:
                     case MEMORIAL_EDIT:

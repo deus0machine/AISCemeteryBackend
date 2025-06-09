@@ -166,7 +166,14 @@ public class AdminMemorialController {
         Memorial memorial = optionalMemorial.get();
         
         // Обновление данных мемориала
-        memorial.setFio(memorialUpdates.getFio());
+        // Убираем прямое редактирование fio - только через отдельные поля
+        // memorial.setFio(memorialUpdates.getFio());
+        
+        // Обновляем отдельные поля ФИО
+        memorial.setFirstName(memorialUpdates.getFirstName());
+        memorial.setLastName(memorialUpdates.getLastName());
+        memorial.setMiddleName(memorialUpdates.getMiddleName());
+        
         memorial.setBirthDate(memorialUpdates.getBirthDate());
         memorial.setDeathDate(memorialUpdates.getDeathDate());
         memorial.setBiography(memorialUpdates.getBiography());
@@ -570,5 +577,255 @@ public class AdminMemorialController {
         }
         
         return "redirect:/admin/memorials/" + id;
+    }
+
+    @PostMapping("/{id}/block")
+    public String blockMemorial(@PathVariable Long id, 
+                               @RequestParam(name = "reason", required = false) String reason,
+                               RedirectAttributes redirectAttributes) {
+        try {
+            // Получаем текущего пользователя
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String login = authentication.getName();
+            User currentUser = userRepository.findByLogin(login)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            // Проверяем, что пользователь - администратор
+            if (currentUser.getRole() != User.Role.ADMIN) {
+                redirectAttributes.addFlashAttribute("errorMessage", "Только администратор может блокировать мемориалы");
+                return "redirect:/admin/memorials/" + id;
+            }
+            
+            // Получаем мемориал
+            Memorial memorial = memorialRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Мемориал не найден"));
+            
+            // Проверяем, что мемориал еще не заблокирован
+            if (memorial.isBlocked()) {
+                redirectAttributes.addFlashAttribute("errorMessage", "Мемориал уже заблокирован");
+                return "redirect:/admin/memorials/" + id;
+            }
+            
+            // Блокируем мемориал
+            memorial.setBlocked(true);
+            memorial.setBlockReason(reason != null ? reason : "Нарушение правил сообщества");
+            memorial.setBlockedAt(java.time.LocalDateTime.now());
+            memorial.setBlockedBy(currentUser);
+            
+            // Если мемориал был публичным, делаем его приватным
+            if (memorial.isPublic()) {
+                memorial.setPublic(false);
+            }
+            
+            // Если мемориал был опубликован, меняем статус на REJECTED
+            if (memorial.getPublicationStatus() == Memorial.PublicationStatus.PUBLISHED) {
+                memorial.setPublicationStatus(Memorial.PublicationStatus.REJECTED);
+            }
+            
+            memorialRepository.save(memorial);
+            
+            // Создаем уведомление для владельца мемориала
+            createBlockNotificationForOwner(memorial, currentUser, reason);
+            
+            // Отправляем уведомление пользователю, подавшему жалобу (если есть)
+            notifyReporterAboutAction(memorial, currentUser, true, reason);
+            
+            log.info("Мемориал ID={} заблокирован администратором {}: {}", 
+                    id, currentUser.getLogin(), reason);
+                    
+            redirectAttributes.addFlashAttribute("successMessage", "Мемориал заблокирован");
+        } catch (Exception e) {
+            log.error("Ошибка при блокировке мемориала ID={}: {}", id, e.getMessage(), e);
+            redirectAttributes.addFlashAttribute("errorMessage", "Ошибка при блокировке мемориала: " + e.getMessage());
+        }
+        
+        return "redirect:/admin/memorials/" + id;
+    }
+
+    @PostMapping("/{id}/unblock")
+    public String unblockMemorial(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        try {
+            // Получаем текущего пользователя
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String login = authentication.getName();
+            User currentUser = userRepository.findByLogin(login)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            // Проверяем, что пользователь - администратор
+            if (currentUser.getRole() != User.Role.ADMIN) {
+                redirectAttributes.addFlashAttribute("errorMessage", "Только администратор может разблокировать мемориалы");
+                return "redirect:/admin/memorials/" + id;
+            }
+            
+            // Получаем мемориал
+            Memorial memorial = memorialRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Мемориал не найден"));
+            
+            // Проверяем, что мемориал заблокирован
+            if (!memorial.isBlocked()) {
+                redirectAttributes.addFlashAttribute("errorMessage", "Мемориал не заблокирован");
+                return "redirect:/admin/memorials/" + id;
+            }
+            
+            // Разблокируем мемориал
+            memorial.setBlocked(false);
+            memorial.setBlockReason(null);
+            memorial.setBlockedAt(null);
+            memorial.setBlockedBy(null);
+            
+            // Восстанавливаем статус публикации на DRAFT (владелец сам решит публиковать или нет)
+            if (memorial.getPublicationStatus() == Memorial.PublicationStatus.REJECTED) {
+                memorial.setPublicationStatus(Memorial.PublicationStatus.DRAFT);
+            }
+            
+            memorialRepository.save(memorial);
+            
+            // Создаем уведомление для владельца мемориала
+            createUnblockNotificationForOwner(memorial, currentUser);
+            
+            log.info("Мемориал ID={} разблокирован администратором {}", 
+                    id, currentUser.getLogin());
+                    
+            redirectAttributes.addFlashAttribute("successMessage", "Мемориал разблокирован");
+        } catch (Exception e) {
+            log.error("Ошибка при разблокировке мемориала ID={}: {}", id, e.getMessage(), e);
+            redirectAttributes.addFlashAttribute("errorMessage", "Ошибка при разблокировке мемориала: " + e.getMessage());
+        }
+        
+        return "redirect:/admin/memorials/" + id;
+    }
+
+    /**
+     * Создает уведомление для владельца о блокировке мемориала
+     */
+    private void createBlockNotificationForOwner(Memorial memorial, User admin, String reason) {
+        Notification notification = new Notification();
+        notification.setTitle("Мемориал заблокирован");
+        notification.setMessage(String.format(
+            "Ваш мемориал \"%s\" был заблокирован администратором.\n\nПричина блокировки:\n%s\n\nДля получения дополнительной информации обратитесь в службу поддержки.",
+            memorial.getFio(),
+            reason != null ? reason : "Нарушение правил сообщества"
+        ));
+        notification.setUser(memorial.getCreatedBy());
+        notification.setSender(admin);
+        notification.setType(Notification.NotificationType.ADMIN_WARNING);
+        notification.setStatus(Notification.NotificationStatus.INFO);
+        notification.setRelatedEntityId(memorial.getId());
+        notification.setRelatedEntityName(memorial.getFio());
+        notification.setCreatedAt(java.time.LocalDateTime.now());
+        notification.setRead(false);
+        notification.setUrgent(true);
+        
+        notificationRepository.save(notification);
+    }
+
+    /**
+     * Создает уведомление для владельца о разблокировке мемориала
+     */
+    private void createUnblockNotificationForOwner(Memorial memorial, User admin) {
+        Notification notification = new Notification();
+        notification.setTitle("Мемориал разблокирован");
+        notification.setMessage(String.format(
+            "Ваш мемориал \"%s\" был разблокирован администратором.\n\nТеперь вы можете снова редактировать мемориал и при желании сделать его публичным.",
+            memorial.getFio()
+        ));
+        notification.setUser(memorial.getCreatedBy());
+        notification.setSender(admin);
+        notification.setType(Notification.NotificationType.ADMIN_INFO);
+        notification.setStatus(Notification.NotificationStatus.INFO);
+        notification.setRelatedEntityId(memorial.getId());
+        notification.setRelatedEntityName(memorial.getFio());
+        notification.setCreatedAt(java.time.LocalDateTime.now());
+        notification.setRead(false);
+        notification.setUrgent(false);
+        
+        notificationRepository.save(notification);
+    }
+
+    /**
+     * Уведомляет пользователя, подавшего жалобу, о результате рассмотрения
+     */
+    private void notifyReporterAboutAction(Memorial memorial, User admin, boolean memorialBlocked, String blockReason) {
+        // Находим уведомления о жалобах на этот мемориал
+        List<Notification> reportNotifications = notificationRepository
+                .findByRelatedEntityIdAndTypeAndStatus(
+                        memorial.getId(),
+                        Notification.NotificationType.MEMORIAL_REPORT, 
+                        Notification.NotificationStatus.INFO
+                );
+        
+        for (Notification reportNotification : reportNotifications) {
+            if (reportNotification.getSender() != null) {
+                User reporter = reportNotification.getSender();
+                
+                Notification responseNotification = new Notification();
+                
+                if (memorialBlocked) {
+                    responseNotification.setTitle("Жалоба рассмотрена - приняты меры");
+                    responseNotification.setMessage(String.format(
+                        "По вашей жалобе на мемориал \"%s\" приняты меры. Мемориал был заблокирован администратором.\n\nСпасибо за вашу бдительность!",
+                        memorial.getFio()
+                    ));
+                    responseNotification.setType(Notification.NotificationType.ADMIN_INFO);
+                } else {
+                    responseNotification.setTitle("Жалоба рассмотрена - отклонена");
+                    responseNotification.setMessage(String.format(
+                        "Ваша жалоба на мемориал \"%s\" была рассмотрена и отклонена администратором.\n\nМемориал не нарушает правила сообщества.",
+                        memorial.getFio()
+                    ));
+                    responseNotification.setType(Notification.NotificationType.ADMIN_INFO);
+                }
+                
+                responseNotification.setUser(reporter);
+                responseNotification.setSender(admin);
+                responseNotification.setStatus(Notification.NotificationStatus.INFO);
+                responseNotification.setRelatedEntityId(memorial.getId());
+                responseNotification.setRelatedEntityName(memorial.getFio());
+                responseNotification.setCreatedAt(java.time.LocalDateTime.now());
+                responseNotification.setRead(false);
+                responseNotification.setUrgent(false);
+                
+                notificationRepository.save(responseNotification);
+                
+                // Помечаем исходное уведомление о жалобе как обработанное
+                reportNotification.setStatus(Notification.NotificationStatus.PROCESSED);
+                reportNotification.setRead(true);
+                notificationRepository.save(reportNotification);
+            }
+        }
+    }
+
+    @PostMapping("/{id}/dismiss-report")
+    public String dismissMemorialReport(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        try {
+            // Получаем текущего пользователя
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String login = authentication.getName();
+            User currentUser = userRepository.findByLogin(login)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            // Проверяем, что пользователь - администратор
+            if (currentUser.getRole() != User.Role.ADMIN) {
+                redirectAttributes.addFlashAttribute("errorMessage", "Только администратор может отклонять жалобы");
+                return "redirect:/admin/memorials/" + id;
+            }
+            
+            // Получаем мемориал
+            Memorial memorial = memorialRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Мемориал не найден"));
+            
+            // Отправляем уведомление пользователю об отклонении жалобы
+            notifyReporterAboutAction(memorial, currentUser, false, null);
+            
+            log.info("Жалоба на мемориал ID={} отклонена администратором {}", 
+                    id, currentUser.getLogin());
+                    
+            redirectAttributes.addFlashAttribute("successMessage", "Жалоба отклонена");
+        } catch (Exception e) {
+            log.error("Ошибка при отклонении жалобы на мемориал ID={}: {}", id, e.getMessage(), e);
+            redirectAttributes.addFlashAttribute("errorMessage", "Ошибка при отклонении жалобы: " + e.getMessage());
+        }
+        
+        return "redirect:/admin/notifications";
     }
 } 

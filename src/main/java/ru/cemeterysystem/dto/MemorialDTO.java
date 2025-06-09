@@ -11,6 +11,12 @@ import java.util.List;
 public class MemorialDTO {
     private Long id;
     private String fio;
+    
+    // Новые поля для разделенного ФИО
+    private String firstName;
+    private String lastName;
+    private String middleName;
+    
     private String birthDate;
     private String deathDate;
     private String biography;
@@ -51,4 +57,38 @@ public class MemorialDTO {
     private Boolean pendingIsPublic;
     private Location pendingMainLocation;
     private Location pendingBurialLocation;
+    
+    // Pending поля для отдельных компонентов ФИО
+    private String pendingFirstName;
+    private String pendingLastName;
+    private String pendingMiddleName;
+    
+    // Поля блокировки
+    private boolean isBlocked = false;
+    private String blockReason;
+    private LocalDateTime blockedAt;
+    private UserDTO blockedBy;
+    
+    // Утилитные методы для работы с ФИО
+    public String getFullName() {
+        if (firstName != null && lastName != null && 
+            !firstName.trim().isEmpty() && !lastName.trim().isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            sb.append(lastName.trim());
+            if (firstName != null && !firstName.trim().isEmpty()) {
+                sb.append(" ").append(firstName.trim());
+            }
+            if (middleName != null && !middleName.trim().isEmpty()) {
+                sb.append(" ").append(middleName.trim());
+            }
+            return sb.toString();
+        } else {
+            return fio != null ? fio : "";
+        }
+    }
+    
+    public boolean hasSeparateNameFields() {
+        return firstName != null && lastName != null && 
+               !firstName.trim().isEmpty() && !lastName.trim().isEmpty();
+    }
 } 

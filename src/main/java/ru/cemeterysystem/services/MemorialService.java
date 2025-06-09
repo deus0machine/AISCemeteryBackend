@@ -4,6 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -11,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import ru.cemeterysystem.dto.EditorRequestDTO;
 import ru.cemeterysystem.dto.MemorialDTO;
+import ru.cemeterysystem.dto.PagedResponse;
 import ru.cemeterysystem.dto.UserDTO;
 import ru.cemeterysystem.mappers.MemorialMapper;
 import ru.cemeterysystem.mappers.UserMapper;
@@ -50,216 +55,157 @@ public class MemorialService {
             .collect(Collectors.toList());
     }
 
-    public List<MemorialDTO> getMyMemorials(Long userId) {
+    // Новые методы с пагинацией
+    
+    /**
+     * Получает список всех мемориалов с пагинацией
+     */
+    public PagedResponse<MemorialDTO> getAllMemorials(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Memorial> memorialPage = memorialRepository.findAll(pageable);
+        
+        List<MemorialDTO> memorialDTOs = memorialPage.getContent().stream()
+            .map(memorialMapper::toDTO)
+            .collect(Collectors.toList());
+            
+        return PagedResponse.of(memorialDTOs, page, size, memorialPage.getTotalElements());
+    }
+    
+    /**
+     * Получает список мемориалов пользователя с пагинацией
+     */
+    public PagedResponse<MemorialDTO> getMyMemorials(Long userId, int page, int size) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("User not found"));
         
-        log.info("Получение мемориалов для пользователя: id={}, login={}", user.getId(), user.getLogin());
+        log.info("Получение мемориалов с пагинацией для пользователя: id={}, login={}, страница={}, размер={}", 
+                user.getId(), user.getLogin(), page, size);
         
-        // Получаем мемориалы, где пользователь является создателем
+        // Получаем все мемориалы пользователя (без пагинации для фильтрации)
         List<Memorial> ownedMemorials = memorialRepository.findByCreatedBy(user);
-        log.info("Найдено мемориалов, где пользователь является создателем: {}", ownedMemorials.size());
-        
-        // Получаем мемориалы, где пользователь является редактором - метод 1
         List<Memorial> editedMemorials = memorialRepository.findByEditorsContaining(user);
-        log.info("Найдено мемориалов, где пользователь является редактором (метод 1): {}", editedMemorials.size());
-        
-        // Получаем мемориалы, где пользователь является редактором - метод 2 через JPQL
         List<Memorial> editedMemorials2 = memorialRepository.findMemorialsWhereUserIsEditor(user.getId());
-        log.info("Найдено мемориалов, где пользователь является редактором (метод 2): {}", editedMemorials2.size());
         
-        // Логируем данные о всех мемориалах в системе, чтобы понять структуру связей
-        log.info("Проверка всех мемориалов в системе на наличие редакторов...");
-        List<Memorial> allMemorialsInSystem = memorialRepository.findAll();
-        log.info("Всего мемориалов в системе: {}", allMemorialsInSystem.size());
-        
-        for (Memorial m : allMemorialsInSystem) {
-            // Проверяем все мемориалы и их редакторов
-            if (m.getEditors() != null && !m.getEditors().isEmpty()) {
-                log.info("Мемориал ID: {}, '{}', Владелец: {}, Количество редакторов: {}", 
-                        m.getId(), m.getFio(), m.getCreatedBy().getLogin(), m.getEditors().size());
-                
-                for (User editor : m.getEditors()) {
-                    log.info("  - Редактор: id={}, login={}", editor.getId(), editor.getLogin());
-                    
-                    // Если это редактор текущего пользователя - отмечаем особо
-                    if (editor.getId().equals(user.getId())) {
-                        log.info("  >>> НАЙДЕН ПОЛЬЗОВАТЕЛЬ {} КАК РЕДАКТОР МЕМОРИАЛА {}!", 
-                                user.getLogin(), m.getId());
-                        
-                        // Проверяем, почему этот мемориал мог не попасть в результаты поиска
-                        if (!editedMemorials.contains(m)) {
-                            log.warn("  !!! Этот мемориал НЕ был найден методом findByEditorsContaining!");
-                        }
-                        if (!editedMemorials2.contains(m)) {
-                            log.warn("  !!! Этот мемориал НЕ был найден методом findMemorialsWhereUserIsEditor!");
-                        }
-                        
-                        // Если мемориал не найден ни одним методом, добавляем его вручную
-                        if (!editedMemorials.contains(m) && !editedMemorials2.contains(m)) {
-                            log.info("  +++ Добавляем мемориал вручную в список редактируемых");
-                            editedMemorials.add(m);
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Объединяем результаты обоих методов
-        for (Memorial memorial : editedMemorials2) {
-            if (!editedMemorials.contains(memorial)) {
-                editedMemorials.add(memorial);
-                log.info("Добавлен мемориал в список редакторов (из метода 2): {}", memorial.getId());
-            }
-        }
-        
-        // Объединяем списки и удаляем дубликаты
+        // Объединяем результаты
         List<Memorial> allMemorials = new ArrayList<>(ownedMemorials);
         for (Memorial memorial : editedMemorials) {
             if (!allMemorials.contains(memorial)) {
                 allMemorials.add(memorial);
-                log.info("Добавлен мемориал ID: {} в итоговый список (пользователь - редактор)", memorial.getId());
+            }
+        }
+        for (Memorial memorial : editedMemorials2) {
+            if (!allMemorials.contains(memorial)) {
+                allMemorials.add(memorial);
             }
         }
         
-        log.info("Общее количество мемориалов для отображения: {}", allMemorials.size());
+        // Сортируем по дате создания (новые первыми)
+        allMemorials.sort((m1, m2) -> {
+            if (m1.getCreatedAt() == null && m2.getCreatedAt() == null) return 0;
+            if (m1.getCreatedAt() == null) return 1;
+            if (m2.getCreatedAt() == null) return -1;
+            return m2.getCreatedAt().compareTo(m1.getCreatedAt());
+        });
         
-        List<MemorialDTO> result = allMemorials.stream()
+        // Применяем пагинацию вручную
+        long totalElements = allMemorials.size();
+        int startIndex = page * size;
+        int endIndex = Math.min(startIndex + size, allMemorials.size());
+        
+        List<Memorial> pageMemorials = startIndex < allMemorials.size() ? 
+            allMemorials.subList(startIndex, endIndex) : new ArrayList<>();
+        
+        List<MemorialDTO> result = pageMemorials.stream()
             .map(memorial -> {
                 MemorialDTO dto = memorialMapper.toDTO(memorial);
                 
-                // Установим флаг isEditor для каждого мемориала
                 boolean isOwner = memorial.getCreatedBy().equals(user);
                 boolean isEditor = memorial.isEditor(user);
                 
-                if (isOwner) {
-                    // Пользователь является основным владельцем
-                    dto.setEditor(false);
-                    log.info("Мемориал ID: {} - пользователь является владельцем", memorial.getId());
-                } else if (isEditor) {
-                    // Пользователь является редактором
-                    dto.setEditor(true);
-                    log.info("Мемориал ID: {} - пользователь является редактором", memorial.getId());
-                } else {
-                    log.warn("!!! Странная ситуация: мемориал ID: {} - пользователь не владелец и не редактор!", 
-                           memorial.getId());
-                }
+                dto.setEditor(!isOwner && isEditor);
                 
                 return dto;
             })
             .collect(Collectors.toList());
         
-        log.info("Возвращаем {} мемориалов для пользователя {}", result.size(), user.getLogin());
-        return result;
+        log.info("Возвращаем {} мемориалов на странице {} из {} для пользователя {}", 
+                result.size(), page + 1, (int) Math.ceil((double) totalElements / size), user.getLogin());
+        
+        return PagedResponse.of(result, page, size, totalElements);
     }
-
-    public List<MemorialDTO> getPublicMemorials() {
+    
+    /**
+     * Получает список публичных мемориалов с пагинацией
+     */
+    public PagedResponse<MemorialDTO> getPublicMemorials(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Memorial> memorialPage = memorialRepository.findByIsPublicTrueAndPublicationStatusAndIsBlockedFalse(
+                Memorial.PublicationStatus.PUBLISHED, pageable);
+        
         // Получаем текущего пользователя (если авторизован)
-        User userResult = null;
+        User currentUser = null;
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication != null && authentication.isAuthenticated() && 
                 !authentication.getPrincipal().equals("anonymousUser")) {
                 String login = authentication.getName();
-                userResult = userRepository.findByLogin(login).orElse(null);
-                
-                if (userResult != null) {
-                    log.info("getPublicMemorials: Текущий пользователь: ID={}, login={}", 
-                            userResult.getId(), userResult.getLogin());
-                } else {
-                    log.warn("getPublicMemorials: Не удалось найти пользователя по логину: {}", login);
-                }
-            } else {
-                log.info("getPublicMemorials: Пользователь не аутентифицирован");
+                currentUser = userRepository.findByLogin(login).orElse(null);
             }
         } catch (Exception e) {
             log.warn("getPublicMemorials: Не удалось получить текущего пользователя: {}", e.getMessage());
         }
         
-        // Создаем final переменную для использования в лямбда-выражении
-        final User currentUser = userResult;
+        final User finalCurrentUser = currentUser;
         
-        List<Memorial> publicMemorials = memorialRepository.findByIsPublicTrue();
-        log.info("getPublicMemorials: Найдено {} публичных мемориалов", publicMemorials.size());
-        
-        return publicMemorials.stream()
+        List<MemorialDTO> memorialDTOs = memorialPage.getContent().stream()
             .map(memorial -> {
                 // Проверяем, является ли пользователь владельцем или редактором
-                boolean isOwner = currentUser != null && memorial.getCreatedBy().equals(currentUser);
+                boolean isOwner = finalCurrentUser != null && memorial.getCreatedBy().equals(finalCurrentUser);
                 boolean isEditor = false;
                 
-                // Проверяем, есть ли текущий пользователь в списке редакторов
-                if (currentUser != null && memorial.getEditors() != null) {
-                    // Выводим список редакторов для отладки
-                    List<Long> editorIds = memorial.getEditors().stream()
-                        .map(User::getId)
-                        .collect(Collectors.toList());
-                    
-                    log.info("getPublicMemorials: Мемориал ID={} имеет {} редакторов: {}", 
-                           memorial.getId(), editorIds.size(), editorIds);
-                           
-                    // Проверяем каждого редактора и сравниваем ID
+                if (finalCurrentUser != null && memorial.getEditors() != null) {
                     for (User editor : memorial.getEditors()) {
-                        log.info("getPublicMemorials: Проверка редактора ID={} для мемориала ID={}, текущий пользователь ID={}", 
-                                editor.getId(), memorial.getId(), currentUser.getId());
-                        
-                        if (editor.getId().equals(currentUser.getId())) {
+                        if (editor.getId().equals(finalCurrentUser.getId())) {
                             isEditor = true;
-                            log.info("getPublicMemorials: НАЙДЕНО СОВПАДЕНИЕ! Пользователь ID={} является редактором мемориала ID={}", 
-                                    currentUser.getId(), memorial.getId());
                             break;
                         }
                     }
-                    
-                    log.info("getPublicMemorials: Результат проверки: мемориал ID={}, пользователь={}, is_editor={}", 
-                           memorial.getId(), currentUser.getLogin(), isEditor);
                 }
                 
                 // Если мемориал имеет ожидающие изменения и пользователь не владелец/редактор
                 if (memorial.isPendingChanges() && !isOwner && !isEditor) {
-                                    try {
-                    if (memorial.getPreviousState() != null && !memorial.getPreviousState().isEmpty()) {
-                        ObjectMapper objectMapper = new ObjectMapper();
-                        objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
-                        objectMapper.disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-                        objectMapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-                        MemorialDTO previousDto = objectMapper.readValue(memorial.getPreviousState(), MemorialDTO.class);
+                    try {
+                        if (memorial.getPreviousState() != null && !memorial.getPreviousState().isEmpty()) {
+                            ObjectMapper objectMapper = new ObjectMapper();
+                            objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
+                            objectMapper.disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+                            objectMapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+                            MemorialDTO previousDto = objectMapper.readValue(memorial.getPreviousState(), MemorialDTO.class);
                             
-                            // Обновляем ID и редакторов, которые не хранятся в previousState
                             previousDto.setId(memorial.getId());
                             previousDto.setEditorIds(memorial.getEditors().stream()
                                 .map(User::getId)
                                 .collect(Collectors.toList()));
-                            
-                            // Устанавливаем флаг редактора на основе нашей проверки
                             previousDto.setEditor(isEditor);
-                            
-                            // Устанавливаем флаг pendingChanges в false для внешних пользователей
                             previousDto.setPendingChanges(false);
                             
                             return previousDto;
                         }
                     } catch (Exception e) {
-                        log.error("Ошибка при восстановлении предыдущего состояния мемориала: {}", e.getMessage());
+                        log.error("Ошибка при получении предыдущего состояния мемориала {}: {}", memorial.getId(), e.getMessage());
                     }
                 }
                 
-                // В обычном случае возвращаем текущее состояние
                 MemorialDTO dto = memorialMapper.toDTO(memorial);
-                
-                // Устанавливаем флаг редактора на основе нашей проверки
                 dto.setEditor(isEditor);
-                
-                // Показываем флаг pendingChanges только владельцу и редакторам
-                if (!isOwner && !isEditor) {
-                    dto.setPendingChanges(false);
-                }
-                
-                log.info("getPublicMemorials: Для мемориала ID={} установлен флаг is_editor={}", memorial.getId(), isEditor);
-                
                 return dto;
             })
             .collect(Collectors.toList());
+            
+        log.info("getPublicMemorials: Возвращаем {} публичных мемориалов на странице {} из {}", 
+                memorialDTOs.size(), page + 1, memorialPage.getTotalPages());
+        
+        return PagedResponse.of(memorialDTOs, page, size, memorialPage.getTotalElements());
     }
 
     public MemorialDTO getMemorialById(Long id) {
@@ -441,8 +387,22 @@ public class MemorialService {
      * Обновляет поля мемориала из DTO для владельца (прямое обновление)
      */
     private void updateMemorialFields(Memorial memorial, MemorialDTO dto) {
-        if (dto.getFio() != null) {
-            memorial.setFio(dto.getFio());
+        // Убираем возможность редактирования fio напрямую - только через отдельные поля
+        // if (dto.getFio() != null) {
+        //     memorial.setFio(dto.getFio());
+        // }
+        
+        // Обновление отдельных полей ФИО
+        if (dto.getFirstName() != null) {
+            memorial.setFirstName(dto.getFirstName());
+        }
+        
+        if (dto.getLastName() != null) {
+            memorial.setLastName(dto.getLastName());
+        }
+        
+        if (dto.getMiddleName() != null) {
+            memorial.setMiddleName(dto.getMiddleName());
         }
         
                 if (dto.getBirthDate() != null) {
@@ -472,6 +432,9 @@ public class MemorialService {
         // Если было изменение через редактора, сбрасываем ожидающие изменения
         memorial.setPendingChanges(false);
         memorial.setPendingFio(null);
+        memorial.setPendingFirstName(null);
+        memorial.setPendingLastName(null);
+        memorial.setPendingMiddleName(null);
         memorial.setPendingBiography(null);
         memorial.setPendingBirthDate(null);
         memorial.setPendingDeathDate(null);
@@ -488,15 +451,23 @@ public class MemorialService {
         boolean hasChanges = false;
         boolean isOwner = memorial.getCreatedBy().equals(editor);
         
-        // ФИО может быть изменено владельцем даже в pending режиме
-        if (dto.getFio() != null && !dto.getFio().equals(memorial.getFio())) {
-            if (isOwner) {
-                memorial.setPendingFio(dto.getFio());
-                hasChanges = true;
-            } else {
-            // ФИО не может быть изменено редактором, только владельцем
-            log.warn("Редактор пытается изменить ФИО мемориала, это разрешено только владельцу");
-            }
+        // Убираем возможность изменения ФИО напрямую - только через отдельные поля
+        // ФИО формируется автоматически из отдельных полей
+        
+        // Обновление отдельных полей ФИО в pending режиме
+        if (dto.getFirstName() != null && !dto.getFirstName().equals(memorial.getFirstName())) {
+            memorial.setPendingFirstName(dto.getFirstName());
+            hasChanges = true;
+        }
+        
+        if (dto.getLastName() != null && !dto.getLastName().equals(memorial.getLastName())) {
+            memorial.setPendingLastName(dto.getLastName());
+            hasChanges = true;
+        }
+        
+        if (dto.getMiddleName() != null && !dto.getMiddleName().equals(memorial.getMiddleName())) {
+            memorial.setPendingMiddleName(dto.getMiddleName());
+            hasChanges = true;
         }
         
         if (dto.getBirthDate() != null) {
@@ -570,9 +541,31 @@ public class MemorialService {
 
     public List<MemorialDTO> searchMemorials(String query, String location, String startDate,
                                         String endDate, Boolean isPublic) {
-        return memorialRepository.search(query, location, startDate, endDate, isPublic).stream()
+        // Вызываем новый метод с пагинацией для обратной совместимости
+        PagedResponse<MemorialDTO> pagedResponse = searchMemorials(query, location, startDate, endDate, isPublic, 0, 1000);
+        return pagedResponse.getContent();
+    }
+    
+    /**
+     * Ищет мемориалы по различным параметрам с пагинацией
+     */
+    public PagedResponse<MemorialDTO> searchMemorials(String query, String location, String startDate,
+                                        String endDate, Boolean isPublic, int page, int size) {
+        List<Memorial> allResults = memorialRepository.search(query, location, startDate, endDate, isPublic);
+        
+        // Применяем пагинацию вручную
+        long totalElements = allResults.size();
+        int startIndex = page * size;
+        int endIndex = Math.min(startIndex + size, allResults.size());
+        
+        List<Memorial> pageResults = startIndex < allResults.size() ? 
+            allResults.subList(startIndex, endIndex) : new ArrayList<>();
+        
+        List<MemorialDTO> memorialDTOs = pageResults.stream()
             .map(memorialMapper::toDTO)
             .collect(Collectors.toList());
+            
+        return PagedResponse.of(memorialDTOs, page, size, totalElements);
     }
 
     public List<MemorialDTO> findByFio(String fio) {
@@ -588,7 +581,14 @@ public class MemorialService {
     }
 
     private void updateMemorialFromDTO(Memorial memorial, MemorialDTO dto) {
-        memorial.setFio(dto.getFio());
+        // Убираем возможность установки fio напрямую - только через отдельные поля
+        // memorial.setFio(dto.getFio());
+        
+        // Обновление отдельных полей ФИО
+        memorial.setFirstName(dto.getFirstName());
+        memorial.setLastName(dto.getLastName());
+        memorial.setMiddleName(dto.getMiddleName());
+        
         memorial.setBirthDate(LocalDate.parse(dto.getBirthDate()));
         if (dto.getDeathDate() != null) {
             memorial.setDeathDate(LocalDate.parse(dto.getDeathDate()));
@@ -812,14 +812,33 @@ public class MemorialService {
             try {
                 // Применяем ожидающие изменения
                 
-                    // 1. Обрабатываем ФИО
-                    if (memorial.getPendingFio() != null) {
-                        log.info("Применяем ожидающее ФИО для мемориала ID={}", memorialId);
-                        memorial.setFio(memorial.getPendingFio());
-                        memorial.setPendingFio(null);
-                    }
-                    
-                    // 2. Обрабатываем фото
+                // 1. Обрабатываем отдельные поля ФИО
+                if (memorial.getPendingFirstName() != null) {
+                    log.info("Применяем ожидающее имя для мемориала ID={}", memorialId);
+                    memorial.setFirstName(memorial.getPendingFirstName());
+                    memorial.setPendingFirstName(null);
+                }
+                
+                if (memorial.getPendingLastName() != null) {
+                    log.info("Применяем ожидающую фамилию для мемориала ID={}", memorialId);
+                    memorial.setLastName(memorial.getPendingLastName());
+                    memorial.setPendingLastName(null);
+                }
+                
+                if (memorial.getPendingMiddleName() != null) {
+                    log.info("Применяем ожидающее отчество для мемориала ID={}", memorialId);
+                    memorial.setMiddleName(memorial.getPendingMiddleName());
+                    memorial.setPendingMiddleName(null);
+                }
+                
+                // 2. Обрабатываем ФИО (для совместимости)
+                if (memorial.getPendingFio() != null) {
+                    log.info("Применяем ожидающее ФИО для мемориала ID={}", memorialId);
+                    memorial.setFio(memorial.getPendingFio());
+                    memorial.setPendingFio(null);
+                }
+                
+                // 3. Обрабатываем фото
                 if (memorial.getPendingPhotoUrl() != null && !memorial.getPendingPhotoUrl().isEmpty()) {
                     log.info("Применяем ожидающее фото для мемориала ID={}", memorialId);
                     
@@ -833,14 +852,14 @@ public class MemorialService {
                     memorial.setPendingPhotoUrl(null);
                 }
                 
-                    // 3. Обрабатываем биографию
+                    // 4. Обрабатываем биографию
                 if (memorial.getPendingBiography() != null) {
                     log.info("Применяем ожидающую биографию для мемориала ID={}", memorialId);
                     memorial.setBiography(memorial.getPendingBiography());
                     memorial.setPendingBiography(null);
                 }
                 
-                    // 4. Обрабатываем даты
+                    // 5. Обрабатываем даты
                 if (memorial.getPendingBirthDate() != null) {
                     log.info("Применяем ожидающую дату рождения для мемориала ID={}", memorialId);
                     memorial.setBirthDate(memorial.getPendingBirthDate());
@@ -853,14 +872,14 @@ public class MemorialService {
                     memorial.setPendingDeathDate(null);
                 }
                 
-                    // 5. Обрабатываем публичность
+                    // 6. Обрабатываем публичность
                     if (memorial.getPendingIsPublic() != null) {
                         log.info("Применяем ожидающую публичность для мемориала ID={}", memorialId);
                         memorial.setPublic(memorial.getPendingIsPublic());
                         memorial.setPendingIsPublic(null);
                     }
                     
-                    // 6. Обрабатываем местоположения
+                    // 7. Обрабатываем местоположения
                 if (memorial.getPendingMainLocation() != null) {
                     log.info("Применяем ожидающее основное местоположение для мемориала ID={}", memorialId);
                     memorial.setMainLocation(memorial.getPendingMainLocation());
@@ -1528,14 +1547,33 @@ public class MemorialService {
             
             // Применяем ожидающие изменения
             
-            // 1. Обрабатываем ФИО
+            // 1. Обрабатываем отдельные поля ФИО
+            if (memorial.getPendingFirstName() != null) {
+                log.info("Применяем ожидающее имя для мемориала ID={}", memorialId);
+                memorial.setFirstName(memorial.getPendingFirstName());
+                memorial.setPendingFirstName(null);
+            }
+            
+            if (memorial.getPendingLastName() != null) {
+                log.info("Применяем ожидающую фамилию для мемориала ID={}", memorialId);
+                memorial.setLastName(memorial.getPendingLastName());
+                memorial.setPendingLastName(null);
+            }
+            
+            if (memorial.getPendingMiddleName() != null) {
+                log.info("Применяем ожидающее отчество для мемориала ID={}", memorialId);
+                memorial.setMiddleName(memorial.getPendingMiddleName());
+                memorial.setPendingMiddleName(null);
+            }
+            
+            // 2. Обрабатываем ФИО (для совместимости)
             if (memorial.getPendingFio() != null) {
-                log.info("Применяем pending ФИО для мемориала ID={}", memorialId);
+                log.info("Применяем ожидающее ФИО для мемориала ID={}", memorialId);
                 memorial.setFio(memorial.getPendingFio());
                 memorial.setPendingFio(null);
             }
             
-            // 2. Обрабатываем фото
+            // 3. Обрабатываем фото
             if (memorial.getPendingPhotoUrl() != null && !memorial.getPendingPhotoUrl().isEmpty()) {
                 log.info("Применяем pending фото для мемориала ID={}", memorialId);
                 
@@ -1549,14 +1587,14 @@ public class MemorialService {
                 memorial.setPendingPhotoUrl(null);
             }
             
-            // 3. Обрабатываем биографию
+            // 4. Обрабатываем биографию
             if (memorial.getPendingBiography() != null) {
                 log.info("Применяем pending биографию для мемориала ID={}", memorialId);
                 memorial.setBiography(memorial.getPendingBiography());
                 memorial.setPendingBiography(null);
             }
             
-            // 4. Обрабатываем даты
+            // 5. Обрабатываем даты
             if (memorial.getPendingBirthDate() != null) {
                 log.info("Применяем pending дату рождения для мемориала ID={}", memorialId);
                 memorial.setBirthDate(memorial.getPendingBirthDate());
@@ -1569,14 +1607,14 @@ public class MemorialService {
                 memorial.setPendingDeathDate(null);
             }
             
-            // 5. Обрабатываем публичность
+            // 6. Обрабатываем публичность
             if (memorial.getPendingIsPublic() != null) {
                 log.info("Применяем pending публичность для мемориала ID={}", memorialId);
                 memorial.setPublic(memorial.getPendingIsPublic());
                 memorial.setPendingIsPublic(null);
             }
             
-            // 6. Обрабатываем местоположения
+            // 7. Обрабатываем местоположения
             if (memorial.getPendingMainLocation() != null) {
                 log.info("Применяем pending основное местоположение для мемориала ID={}", memorialId);
                 memorial.setMainLocation(memorial.getPendingMainLocation());
@@ -1655,5 +1693,19 @@ public class MemorialService {
                 memorial.getId(), memorial.isPendingChanges(), memorial.isChangesUnderModeration());
         
         return memorialMapper.toDTO(memorial);
+    }
+
+    // Старые методы для обратной совместимости
+    
+    public List<MemorialDTO> getMyMemorials(Long userId) {
+        // Вызываем новый метод с пагинацией и возвращаем первую страницу большого размера
+        PagedResponse<MemorialDTO> pagedResponse = getMyMemorials(userId, 0, 1000);
+        return pagedResponse.getContent();
+    }
+
+    public List<MemorialDTO> getPublicMemorials() {
+        // Вызываем новый метод с пагинацией и возвращаем первую страницу большого размера
+        PagedResponse<MemorialDTO> pagedResponse = getPublicMemorials(0, 1000);
+        return pagedResponse.getContent();
     }
 }

@@ -82,38 +82,86 @@ public class DataLoader implements CommandLineRunner {
             logger.info("Saving users to database...");
             userRepository.saveAll(List.of(admin, user, user2));
 
-            // Создаем захоронения
-            Memorial burial1 = new Memorial(user, "Иванов Иван Иванович", LocalDate.of(2023, 1, 15), LocalDate.of(1980, 5, 20));
-            burial1.setPublic(false);
+            // Создаем захоронения с отдельными полями ФИО
+            Memorial burial1 = new Memorial();
+            burial1.setUser(user);
             burial1.setCreatedBy(user);
+            burial1.setFirstName("Иван");
+            burial1.setLastName("Иванов");
+            burial1.setMiddleName("Иванович");
+            burial1.setDeathDate(LocalDate.of(2023, 1, 15));
+            burial1.setBirthDate(LocalDate.of(1980, 5, 20));
+            burial1.setPublic(false);
 
-            Memorial burial2 = new Memorial(user, "Иванова Анна Сергеевна", LocalDate.of(2023, 2, 10), LocalDate.of(1990, 7, 30));
-            burial2.setPublic(false);
+            Memorial burial2 = new Memorial();
+            burial2.setUser(user);
             burial2.setCreatedBy(user);
+            burial2.setFirstName("Анна");
+            burial2.setLastName("Иванова");
+            burial2.setMiddleName("Сергеевна");
+            burial2.setDeathDate(LocalDate.of(2023, 2, 10));
+            burial2.setBirthDate(LocalDate.of(1990, 7, 30));
+            burial2.setPublic(false);
 
-            Memorial burial3 = new Memorial(admin, "Сергеев Андрей Иванович", LocalDate.of(1980, 5, 15), LocalDate.of(1950, 10, 10));
+            Memorial burial3 = new Memorial();
+            burial3.setUser(admin);
             burial3.setCreatedBy(admin);
+            burial3.setFirstName("Андрей");
+            burial3.setLastName("Сергеев");
+            burial3.setMiddleName("Иванович");
+            burial3.setDeathDate(LocalDate.of(1980, 5, 15));
+            burial3.setBirthDate(LocalDate.of(1950, 10, 10));
 
-            Memorial burial4 = new Memorial(user, "Иванов Владимир Викторович", LocalDate.of(2024, 12, 18), LocalDate.of(2003, 9, 19));
-            burial4.setPublic(false);
+            Memorial burial4 = new Memorial();
+            burial4.setUser(user);
             burial4.setCreatedBy(user);
+            burial4.setFirstName("Владимир");
+            burial4.setLastName("Иванов");
+            burial4.setMiddleName("Викторович");
+            burial4.setDeathDate(LocalDate.of(2024, 12, 18));
+            burial4.setBirthDate(LocalDate.of(2003, 9, 19));
+            burial4.setPublic(false);
 
 // Новые члены семьи
-            Memorial burial5 = new Memorial(user, "Сергеева Мария Петровна", LocalDate.of(2022, 3, 5), LocalDate.of(1955, 8, 12));
-            burial5.setPublic(false);
+            Memorial burial5 = new Memorial();
+            burial5.setUser(user);
             burial5.setCreatedBy(user);
+            burial5.setFirstName("Мария");
+            burial5.setLastName("Сергеева");
+            burial5.setMiddleName("Петровна");
+            burial5.setDeathDate(LocalDate.of(2022, 3, 5));
+            burial5.setBirthDate(LocalDate.of(1955, 8, 12));
+            burial5.setPublic(false);
 
-            Memorial burial6 = new Memorial(user, "Иванова Елена Ивановна", LocalDate.of(2025, 4, 22), LocalDate.of(2005, 11, 3));
-            burial6.setPublic(false);
+            Memorial burial6 = new Memorial();
+            burial6.setUser(user);
             burial6.setCreatedBy(user);
+            burial6.setFirstName("Елена");
+            burial6.setLastName("Иванова");
+            burial6.setMiddleName("Ивановна");
+            burial6.setDeathDate(LocalDate.of(2025, 4, 22));
+            burial6.setBirthDate(LocalDate.of(2005, 11, 3));
+            burial6.setPublic(false);
 
-            Memorial burial7 = new Memorial(admin, "Сергеев Иван Андреевич", LocalDate.of(1995, 9, 1), LocalDate.of(1925, 4, 7));
+            Memorial burial7 = new Memorial();
+            burial7.setUser(admin);
             burial7.setCreatedBy(admin);
+            burial7.setFirstName("Иван");
+            burial7.setLastName("Сергеев");
+            burial7.setMiddleName("Андреевич");
+            burial7.setDeathDate(LocalDate.of(1995, 9, 1));
+            burial7.setBirthDate(LocalDate.of(1925, 4, 7));
             burial7.setPublic(true);
             burial7.setPublicationStatus(Memorial.PublicationStatus.PUBLISHED);
             
-            Memorial burial8 = new Memorial(admin, "Сергеева Ольга Николаевна", LocalDate.of(1998, 6, 14), LocalDate.of(1928, 12, 15));
+            Memorial burial8 = new Memorial();
+            burial8.setUser(admin);
             burial8.setCreatedBy(admin);
+            burial8.setFirstName("Ольга");
+            burial8.setLastName("Сергеева");
+            burial8.setMiddleName("Николаевна");
+            burial8.setDeathDate(LocalDate.of(1998, 6, 14));
+            burial8.setBirthDate(LocalDate.of(1928, 12, 15));
             
             logger.info("Saving memorials to database...");
             memorialRepository.saveAll(List.of(burial1, burial2, burial3, burial4, burial5, burial6, burial7, burial8));

@@ -234,9 +234,23 @@
                                     </div>
                                 </div>
                                 <div class="row mb-3">
-                                    <label for="fio" class="col-sm-3 col-form-label">ФИО</label>
+                                    <label class="col-sm-3 col-form-label">ФИО (отдельные поля)</label>
                                     <div class="col-sm-9">
-                                        <input type="text" class="form-control" id="fio" name="fio" th:value="${memorial.fio}" required>
+                                        <div class="row">
+                                            <div class="col-md-4 mb-2">
+                                                <input type="text" class="form-control" name="lastName" 
+                                                       placeholder="Фамилия*" th:value="${memorial.lastName}" required>
+                                            </div>
+                                            <div class="col-md-4 mb-2">
+                                                <input type="text" class="form-control" name="firstName" 
+                                                       placeholder="Имя*" th:value="${memorial.firstName}" required>
+                                            </div>
+                                            <div class="col-md-4 mb-2">
+                                                <input type="text" class="form-control" name="middleName" 
+                                                       placeholder="Отчество" th:value="${memorial.middleName}">
+                                            </div>
+                                        </div>
+                                        <small class="form-text text-muted">* - обязательные поля. ФИО формируется автоматически на сервере.</small>
                                     </div>
                                 </div>
                                 <div class="row mb-3">

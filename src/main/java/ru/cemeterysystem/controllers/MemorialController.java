@@ -16,8 +16,10 @@ import ru.cemeterysystem.dto.MemorialDTO;
 import ru.cemeterysystem.dto.UserDTO;
 import ru.cemeterysystem.models.User;
 import ru.cemeterysystem.models.Memorial;
+import ru.cemeterysystem.models.Notification;
 import ru.cemeterysystem.repositories.MemorialRepository;
 import ru.cemeterysystem.repositories.UserRepository;
+import ru.cemeterysystem.repositories.NotificationRepository;
 import ru.cemeterysystem.services.MemorialService;
 import ru.cemeterysystem.services.UserService;
 
@@ -39,6 +41,7 @@ public class MemorialController {
     private final UserService userService;
     private final MemorialRepository memorialRepository;
     private final UserRepository userRepository;
+    private final NotificationRepository notificationRepository;
 
     /**
      * Получает текущего аутентифицированного пользователя.
@@ -54,47 +57,54 @@ public class MemorialController {
     }
 
     /**
-     * Получает список всех памятников.
+     * Получает список всех памятников с пагинацией.
      *
-     * @return список всех памятников
+     * @param page номер страницы (начиная с 0)
+     * @param size размер страницы
+     * @return пагинированный список всех памятников
      */
     @GetMapping
-    public List<MemorialDTO> getAllMemorials() {
-        return memorialService.getAllMemorials();
+    public ru.cemeterysystem.dto.PagedResponse<MemorialDTO> getAllMemorials(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return memorialService.getAllMemorials(page, size);
     }
 
     /**
-     * Получает список памятников, принадлежащих текущему пользователю.
+     * Получает список памятников, принадлежащих текущему пользователю с пагинацией.
      *
-     * @return список памятников текущего пользователя
+     * @param page номер страницы (начиная с 0)
+     * @param size размер страницы
+     * @return пагинированный список памятников текущего пользователя
      */
     @GetMapping("/my")
-    public List<MemorialDTO> getMyMemorials() {
-        log.info("=== ЗАПРОС МОИ МЕМОРИАЛЫ ===");
+    public ru.cemeterysystem.dto.PagedResponse<MemorialDTO> getMyMemorials(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        log.info("=== ЗАПРОС МОИ МЕМОРИАЛЫ С ПАГИНАЦИЕЙ ===");
         User user = getCurrentUser();
-        log.info("Получение 'моих мемориалов' для пользователя: {}", user.getLogin());
+        log.info("Получение 'моих мемориалов' для пользователя: {} (страница {}, размер {})", 
+                user.getLogin(), page, size);
         
-        List<MemorialDTO> memorials = memorialService.getMyMemorials(user.getId());
-        log.info("Найдено {} мемориалов для пользователя {}", memorials.size(), user.getLogin());
+        ru.cemeterysystem.dto.PagedResponse<MemorialDTO> response = memorialService.getMyMemorials(user.getId(), page, size);
+        log.info("Найдено {} мемориалов на странице {} из {} для пользователя {}", 
+                response.getContent().size(), page + 1, response.getTotalPages(), user.getLogin());
         
-        // Логируем статус каждого мемориала
-        for (MemorialDTO memorial : memorials) {
-            log.info("Мемориал ID={}, '{}', publicationStatus={}, isPublic={}, pendingChanges={}, changesUnderModeration={}", 
-                    memorial.getId(), memorial.getFio(), memorial.getPublicationStatus(), 
-                    memorial.isPublic(), memorial.isPendingChanges(), memorial.isChangesUnderModeration());
-        }
-        
-        return memorials;
+        return response;
     }
 
     /**
-     * Получает список публичных памятников.
+     * Получает список публичных памятников с пагинацией.
      *
-     * @return список публичных памятников
+     * @param page номер страницы (начиная с 0)
+     * @param size размер страницы
+     * @return пагинированный список публичных памятников
      */
     @GetMapping("/public")
-    public List<MemorialDTO> getPublicMemorials() {
-        return memorialService.getPublicMemorials();
+    public ru.cemeterysystem.dto.PagedResponse<MemorialDTO> getPublicMemorials(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return memorialService.getPublicMemorials(page, size);
     }
 
     /**
@@ -266,24 +276,28 @@ public class MemorialController {
     }
 
     /**
-     * Ищет памятники по различным параметрам.
+     * Ищет памятники по различным параметрам с пагинацией.
      *
      * @param query строка поиска по названию или описанию памятника
      * @param location местоположение памятника
      * @param startDate дата начала периода для поиска
      * @param endDate дата окончания периода для поиска
      * @param isPublic фильтр по публичности
-     * @return список найденных памятников
+     * @param page номер страницы (начиная с 0)
+     * @param size размер страницы
+     * @return пагинированный список найденных памятников
      */
     @GetMapping("/search")
-    public List<MemorialDTO> searchMemorials(
+    public ru.cemeterysystem.dto.PagedResponse<MemorialDTO> searchMemorials(
             @RequestParam(required = false) String query,
             @RequestParam(required = false) String location,
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate,
-            @RequestParam(required = false) Boolean isPublic
+            @RequestParam(required = false) Boolean isPublic,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
     ) {
-        return memorialService.searchMemorials(query, location, startDate, endDate, isPublic);
+        return memorialService.searchMemorials(query, location, startDate, endDate, isPublic, page, size);
     }
     
     /**
@@ -483,5 +497,108 @@ public class MemorialController {
         
         log.info("Отклонение изменений мемориала ID={} администратором {}", id, user.getLogin());
         return memorialService.rejectChanges(id, reason, user);
+    }
+
+    /**
+     * Создает жалобу на мемориал
+     *
+     * @param id ID мемориала
+     * @param request данные жалобы
+     * @return ответ с результатом обработки жалобы
+     */
+    @PostMapping("/{id}/report")
+    public ru.cemeterysystem.dto.MemorialReportResponseDTO reportMemorial(
+            @PathVariable Long id, 
+            @RequestBody ru.cemeterysystem.dto.MemorialReportRequestDTO request) {
+        
+        User user = getCurrentUser();
+        
+        // Получаем мемориал и проверяем его существование
+        Memorial memorial = memorialRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Мемориал не найден"));
+        
+        // Проверяем, что мемориал публичный
+        if (!memorial.isPublic()) {
+            return new ru.cemeterysystem.dto.MemorialReportResponseDTO(
+                "error", 
+                "Жалобы можно подавать только на публичные мемориалы"
+            );
+        }
+        
+        // Проверяем, что пользователь не является владельцем мемориала
+        if (memorial.getCreatedBy().getId().equals(user.getId())) {
+            return new ru.cemeterysystem.dto.MemorialReportResponseDTO(
+                "error", 
+                "Нельзя подавать жалобу на собственный мемориал"
+            );
+        }
+        
+        // Валидируем причину жалобы
+        if (request.getReason() == null || request.getReason().trim().length() < 10) {
+            return new ru.cemeterysystem.dto.MemorialReportResponseDTO(
+                "error", 
+                "Причина жалобы должна содержать минимум 10 символов"
+            );
+        }
+        
+        try {
+            // Создаем уведомления для всех администраторов
+            createReportNotificationForAdmins(user, memorial, request.getReason());
+            
+            log.info("Создана жалоба на мемориал ID={} от пользователя {}: {}", 
+                    id, user.getLogin(), request.getReason());
+                    
+            return new ru.cemeterysystem.dto.MemorialReportResponseDTO(
+                "success", 
+                "Жалоба отправлена администратору"
+            );
+            
+        } catch (Exception e) {
+            log.error("Ошибка при создании жалобы на мемориал ID={}: {}", id, e.getMessage(), e);
+            return new ru.cemeterysystem.dto.MemorialReportResponseDTO(
+                "error", 
+                "Ошибка при отправке жалобы: " + e.getMessage()
+            );
+        }
+    }
+
+    /**
+     * Создает уведомления о жалобе для всех администраторов
+     */
+    private void createReportNotificationForAdmins(User reporter, Memorial memorial, String reason) {
+        // Находим всех администраторов
+        List<User> admins = userRepository.findByRole(User.Role.ADMIN);
+        
+        if (admins.isEmpty()) {
+            log.warn("Не найдено ни одного администратора для отправки жалобы");
+            throw new RuntimeException("Не найдено ни одного администратора");
+        }
+        
+        // Создаем уведомление для каждого администратора
+        for (User admin : admins) {
+            Notification notification = new Notification();
+            notification.setTitle("Жалоба на мемориал");
+            notification.setMessage(String.format(
+                "Пользователь %s (%s) подал жалобу на мемориал \"%s\".\n\nПричина жалобы:\n%s",
+                reporter.getFio() != null ? reporter.getFio() : reporter.getLogin(),
+                reporter.getLogin(),
+                memorial.getFio(),
+                reason
+            ));
+            notification.setUser(admin);
+            notification.setSender(reporter);
+            notification.setType(Notification.NotificationType.MEMORIAL_REPORT);
+            notification.setStatus(Notification.NotificationStatus.INFO);
+            notification.setRelatedEntityId(memorial.getId());
+            notification.setRelatedEntityName(memorial.getFio());
+            notification.setCreatedAt(java.time.LocalDateTime.now());
+            notification.setRead(false);
+            notification.setUrgent(true); // Жалобы требуют внимания
+            
+            // Сохраняем уведомление
+            notificationRepository.save(notification);
+        }
+        
+        log.info("Созданы уведомления о жалобе для {} администраторов", admins.size());
     }
 }

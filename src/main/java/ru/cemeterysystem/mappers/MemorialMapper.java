@@ -47,6 +47,12 @@ public class MemorialMapper implements RowMapper<Memorial> {
         MemorialDTO dto = new MemorialDTO();
         dto.setId(memorial.getId());
         dto.setFio(memorial.getFio());
+        
+        // Добавляем маппинг новых полей ФИО
+        dto.setFirstName(memorial.getFirstName());
+        dto.setLastName(memorial.getLastName());
+        dto.setMiddleName(memorial.getMiddleName());
+        
         dto.setBirthDate(memorial.getBirthDate() != null ? memorial.getBirthDate().format(DATE_FORMATTER) : null);
         dto.setDeathDate(memorial.getDeathDate() != null ? memorial.getDeathDate().format(DATE_FORMATTER) : null);
         dto.setBiography(memorial.getBiography());
@@ -85,8 +91,19 @@ public class MemorialMapper implements RowMapper<Memorial> {
         dto.setPendingMainLocation(memorial.getPendingMainLocation());
         dto.setPendingBurialLocation(memorial.getPendingBurialLocation());
         
+        // Маппинг pending полей для отдельных компонентов ФИО
+        dto.setPendingFirstName(memorial.getPendingFirstName());
+        dto.setPendingLastName(memorial.getPendingLastName());
+        dto.setPendingMiddleName(memorial.getPendingMiddleName());
+        
         // Маппинг количества просмотров
         dto.setViewCount(memorial.getViewCount() != null ? memorial.getViewCount() : 0);
+        
+        // Маппинг полей блокировки
+        dto.setBlocked(memorial.isBlocked());
+        dto.setBlockReason(memorial.getBlockReason());
+        dto.setBlockedAt(memorial.getBlockedAt());
+        dto.setBlockedBy(memorial.getBlockedBy() != null ? userMapper.toDTO(memorial.getBlockedBy()) : null);
         
         return dto;
     }
@@ -99,6 +116,12 @@ public class MemorialMapper implements RowMapper<Memorial> {
         Memorial memorial = new Memorial();
         memorial.setId(dto.getId());
         memorial.setFio(dto.getFio());
+        
+        // Добавляем маппинг новых полей ФИО
+        memorial.setFirstName(dto.getFirstName());
+        memorial.setLastName(dto.getLastName());
+        memorial.setMiddleName(dto.getMiddleName());
+        
         memorial.setBirthDate(dto.getBirthDate() != null ? LocalDate.parse(dto.getBirthDate(), DATE_FORMATTER) : null);
         memorial.setDeathDate(dto.getDeathDate() != null ? LocalDate.parse(dto.getDeathDate(), DATE_FORMATTER) : null);
         memorial.setBiography(dto.getBiography());

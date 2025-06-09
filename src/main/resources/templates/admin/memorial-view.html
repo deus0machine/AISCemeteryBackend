@@ -189,6 +189,58 @@
                 <h5 class="alert-heading"><i class="bi bi-pencil-square me-2"></i>Изменения требуют модерации</h5>
                 <p><strong>Внимание!</strong> Вы видите предварительный просмотр мемориала с примененными изменениями.</p>
                 <p>Ниже отображается, как будет выглядеть мемориал после одобрения изменений.</p>
+                
+                <!-- Подробная информация о pending изменениях -->
+                <div class="mt-3">
+                    <h6><i class="bi bi-list-check me-2"></i>Предложенные изменения:</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul class="list-unstyled small">
+                                <li th:if="${memorial.pendingFirstName != null}">
+                                    <i class="bi bi-arrow-right text-primary me-1"></i>
+                                    <strong>Имя:</strong> <span th:text="${memorial.pendingFirstName}"></span>
+                                </li>
+                                <li th:if="${memorial.pendingLastName != null}">
+                                    <i class="bi bi-arrow-right text-primary me-1"></i>
+                                    <strong>Фамилия:</strong> <span th:text="${memorial.pendingLastName}"></span>
+                                </li>
+                                <li th:if="${memorial.pendingMiddleName != null}">
+                                    <i class="bi bi-arrow-right text-primary me-1"></i>
+                                    <strong>Отчество:</strong> <span th:text="${memorial.pendingMiddleName}"></span>
+                                </li>
+                                <li th:if="${memorial.pendingBiography != null}">
+                                    <i class="bi bi-arrow-right text-primary me-1"></i>
+                                    <strong>Биография:</strong> изменена
+                                </li>
+                                <li th:if="${memorial.pendingBirthDate != null}">
+                                    <i class="bi bi-arrow-right text-primary me-1"></i>
+                                    <strong>Дата рождения:</strong> <span th:text="${memorial.pendingBirthDate}"></span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul class="list-unstyled small">
+                                <li th:if="${memorial.pendingDeathDate != null}">
+                                    <i class="bi bi-arrow-right text-primary me-1"></i>
+                                    <strong>Дата смерти:</strong> <span th:text="${memorial.pendingDeathDate}"></span>
+                                </li>
+                                <li th:if="${memorial.pendingPhotoUrl != null}">
+                                    <i class="bi bi-arrow-right text-primary me-1"></i>
+                                    <strong>Фотография:</strong> изменена
+                                </li>
+                                <li th:if="${memorial.pendingMainLocation != null}">
+                                    <i class="bi bi-arrow-right text-primary me-1"></i>
+                                    <strong>Основное местоположение:</strong> изменено
+                                </li>
+                                <li th:if="${memorial.pendingBurialLocation != null}">
+                                    <i class="bi bi-arrow-right text-primary me-1"></i>
+                                    <strong>Место захоронения:</strong> изменено
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
                 <hr>
                 <div class="d-flex gap-2">
                     <form th:action="@{'/admin/memorials/' + ${memorial.id} + '/approve-changes'}" method="post" class="d-inline">
@@ -216,7 +268,37 @@
                                     </div>
                                 </div>
                                 <div class="col-md-8">
-                                    <h3 th:text="${memorial.fio}">ФИО</h3>
+                                    <!-- Отображение ФИО: если есть отдельные поля, используем их, иначе fio -->
+                                    <h3>
+                                        <span th:if="${memorial.firstName != null or memorial.lastName != null or memorial.middleName != null}">
+                                            <span th:text="${memorial.lastName ?: ''}">Фамилия</span>
+                                            <span th:if="${memorial.firstName}" th:text="' ' + ${memorial.firstName}"> Имя</span>
+                                            <span th:if="${memorial.middleName}" th:text="' ' + ${memorial.middleName}"> Отчество</span>
+                                        </span>
+                                        <span th:unless="${memorial.firstName != null or memorial.lastName != null or memorial.middleName != null}" th:text="${memorial.fio}">ФИО</span>
+                                    </h3>
+                                    
+                                    <!-- Отображение отдельных компонентов ФИО для админа -->
+                                    <div class="mb-3">
+                                        <div class="row">
+                                            <div class="col-sm-4">
+                                                <strong>Фамилия:</strong>
+                                                <span th:if="${memorial.lastName}" th:text="${memorial.lastName}">Не указана</span>
+                                                <span th:unless="${memorial.lastName}" class="text-muted">Не указана</span>
+                                            </div>
+                                            <div class="col-sm-4">
+                                                <strong>Имя:</strong>
+                                                <span th:if="${memorial.firstName}" th:text="${memorial.firstName}">Не указано</span>
+                                                <span th:unless="${memorial.firstName}" class="text-muted">Не указано</span>
+                                            </div>
+                                            <div class="col-sm-4">
+                                                <strong>Отчество:</strong>
+                                                <span th:if="${memorial.middleName}" th:text="${memorial.middleName}">Не указано</span>
+                                                <span th:unless="${memorial.middleName}" class="text-muted">Не указано</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
                                     <div class="row mb-2">
                                         <div class="col-sm-6">
                                             <strong>Дата рождения:</strong>
