@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Уведомления | Система управления кладбищем</title>
+
+    <!-- Подключение ресурсов -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #198754;
+            --danger-color: #dc3545;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f8f9fa;
+        }
+
+        /* Сайдбар */
+        .sidebar {
+            background: var(--primary-color);
+            min-height: 100vh;
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.7);
+            border-left: 3px solid transparent;
+        }
+
+        .sidebar .nav-link.active {
+            background: rgba(255,255,255,0.1);
+            border-left-color: var(--secondary-color);
+            color: white;
+        }
+
+        /* Основной контент */
+        .main-content {
+            background: #f8f9fa;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* Карточки */
+        .card-modern {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            background-color: #fff;
+            border-bottom: 1px solid #eaeaea;
+            padding: 15px 20px;
+        }
+
+        .card-title {
+            margin-bottom: 0;
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        /* Кнопки действий */
+        .btn-action {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+        }
+
+        /* Статистические карточки */
+        .stat-card {
+            border-radius: 12px;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        
+        .stat-icon {
+            font-size: 2.5rem;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+        }
+        
+        .stat-primary {
+            background-color: rgba(52, 152, 219, 0.1);
+            color: #3498db;
+        }
+        
+        .stat-success {
+            background-color: rgba(46, 204, 113, 0.1);
+            color: #2ecc71;
+        }
+        
+        .stat-warning {
+            background-color: rgba(241, 196, 15, 0.1);
+            color: #f1c40f;
+        }
+        
+        .stat-danger {
+            background-color: rgba(231, 76, 60, 0.1);
+            color: #e74c3c;
+        }
+
+        /* Уведомления */
+        .notification-item {
+            border-left: 4px solid transparent;
+            transition: background-color 0.2s;
+        }
+        
+        .notification-item:hover {
+            background-color: rgba(0,0,0,0.02);
+        }
+        
+        .notification-item.unread {
+            border-left-color: var(--secondary-color);
+            background-color: rgba(52, 152, 219, 0.05);
+        }
+        
+        .notification-item.urgent {
+            border-left-color: var(--danger-color);
+        }
+        
+        .notification-type {
+            font-size: 1.5rem;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+        }
+        
+        .notification-date {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+
+        /* Адаптивность */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                z-index: 1000;
+                transform: translateX(-100%);
+            }
+
+            .sidebar.active {
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+<body>
+<!-- Шапка -->
+<header class="navbar navbar-dark bg-primary shadow-sm">
+    <div class="container-fluid">
+        <button class="navbar-toggler d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <a class="navbar-brand" href="/admin">
+            <i class="bi bi-building-gear me-2"></i>Администрирование
+        </a>
+        <div class="dropdown">
+            <a href="#" class="text-white text-decoration-none dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="bi bi-person-circle me-2"></i>
+                <span sec:authentication="name"></span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="#"><i class="bi bi-gear me-2"></i>Настройки</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <form th:action="@{/logout}" method="post">
+                        <button class="dropdown-item" type="submit">
+                            <i class="bi bi-box-arrow-right me-2"></i>Выйти
+                        </button>
+                    </form>
+                </li>
+            </ul>
+        </div>
+    </div>
+</header>
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- Боковое меню -->
+        <nav class="col-md-3 col-lg-2 sidebar collapse d-md-block" id="sidebarMenu">
+            <div class="position-sticky pt-3">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin">
+                            <i class="bi bi-speedometer2 me-2"></i>Панель управления
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/users">
+                            <i class="bi bi-people-fill me-2"></i>Пользователи
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/memorials">
+                            <i class="bi bi-bookmark-heart me-2"></i>Мемориалы
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/family-trees">
+                            <i class="bi bi-diagram-3 me-2"></i>Семейные древа
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/admin/notifications">
+                            <i class="bi bi-bell me-2"></i>Уведомления
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/reports">
+                            <i class="bi bi-bar-chart me-2"></i>Отчеты
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/settings">
+                            <i class="bi bi-gear me-2"></i>Настройки
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <!-- Основной контент -->
+        <main class="col-md-9 ms-sm-auto col-lg-10 main-content">
+            <!-- Хлебные крошки -->
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/admin">Главная</a></li>
+                    <li class="breadcrumb-item active">Уведомления</li>
+                </ol>
+            </nav>
+
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h4 mb-0">
+                    <i class="bi bi-bell me-2"></i>Управление уведомлениями
+                </h1>
+                <div>
+                    <button class="btn btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#settingsModal">
+                        <i class="bi bi-gear me-1"></i>Настройки
+                    </button>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createNotificationModal">
+                        <i class="bi bi-plus-lg me-1"></i>Создать уведомление
+                    </button>
+                </div>
+            </div>
+
+            <!-- Статистика -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card-modern stat-card bg-white">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                <div class="flex-shrink-0 stat-icon stat-primary">
+                                    <i class="bi bi-bell"></i>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                    <div class="text-muted fs-6">Всего уведомлений</div>
+                                    <div class="fs-3 fw-bold" th:text="${totalNotifications != null ? totalNotifications : '142'}">142</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card-modern stat-card bg-white">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                <div class="flex-shrink-0 stat-icon stat-danger">
+                                    <i class="bi bi-bell-fill"></i>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                    <div class="text-muted fs-6">Требуют внимания</div>
+                                    <div class="fs-3 fw-bold" th:text="${urgentNotifications != null ? urgentNotifications : '18'}">18</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card-modern stat-card bg-white">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                <div class="flex-shrink-0 stat-icon stat-success">
+                                    <i class="bi bi-check-circle"></i>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                    <div class="text-muted fs-6">Обработано</div>
+                                    <div class="fs-3 fw-bold" th:text="${processedNotifications != null ? processedNotifications : '97'}">97</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card-modern stat-card bg-white">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                <div class="flex-shrink-0 stat-icon stat-warning">
+                                    <i class="bi bi-calendar-check"></i>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                    <div class="text-muted fs-6">За последний месяц</div>
+                                    <div class="fs-3 fw-bold" th:text="${recentNotifications != null ? recentNotifications : '32'}">32</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Графики -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card-modern">
+                        <div class="card-header">
+                            <h5 class="card-title">Статистика по дням</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="notificationsChart" height="300"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card-modern">
+                        <div class="card-header">
+                            <h5 class="card-title">Распределение по типам</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="notificationsPieChart" height="300"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Поиск и фильтры -->
+            <div class="card-modern mb-4">
+                <div class="card-body">
+                    <form th:action="@{/admin/notifications}" method="get" class="row g-3">
+                        <div class="col-md-4">
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                <input type="text" class="form-control" name="search" th:value="${param.search}" placeholder="Поиск по тексту...">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select" name="status">
+                                <option value="">Все статусы</option>
+                                <option value="read" th:selected="${param.status == 'read'}">Прочитанные</option>
+                                <option value="unread" th:selected="${param.status == 'unread'}">Непрочитанные</option>
+                                <option value="urgent" th:selected="${param.status == 'urgent'}">Срочные</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select" name="type">
+                                <option value="">Все типы</option>
+                                <option value="moderation" th:selected="${param.type == 'moderation'}">Модерация контента</option>
+                                <option value="technical" th:selected="${param.type == 'technical'}">Технические вопросы</option>
+                                <option value="user" th:selected="${param.type == 'user'}">Запросы пользователей</option>
+                                <option value="system" th:selected="${param.type == 'system'}">Системные</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary w-100">Применить</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Список уведомлений -->
+            <div class="card-modern">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title">Список уведомлений</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary me-2" id="markAllRead">
+                            <i class="bi bi-check-all me-1"></i>Отметить все как прочитанные
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger me-2" id="cleanupNotifications">
+                            <i class="bi bi-trash me-1"></i>Удалить прочитанные уведомления
+                        </button>
+                        <span class="badge bg-primary rounded-pill" th:text="${notifications != null ? notifications.totalElements : '1'}">1</span>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        <!-- Динамический список уведомлений из базы данных -->
+                        <div th:if="${notificationList == null || notificationList.isEmpty()}" class="p-4 text-center">
+                            <p class="text-muted">Уведомлений пока нет</p>
+                        </div>
+                        
+                        <div th:each="notification : ${notificationList}" 
+                             th:class="'list-group-item notification-item ' + 
+                                      (${!notification.read} ? 'unread' : '') + 
+                                      (${notification.urgent} ? ' urgent' : '')">
+                            <div class="d-flex align-items-start">
+                                <!-- Иконка в зависимости от типа уведомления -->
+                                <div class="flex-shrink-0 me-3">
+                                    <div th:class="'notification-type ' + 
+                                               (${notification.type.name() == 'MODERATION'} ? 'bg-primary bg-opacity-10 text-primary' : 
+                                               (${notification.type.name() == 'TECHNICAL'} ? 'bg-danger bg-opacity-10 text-danger' :
+                                               (${notification.type.name() == 'USER_REQUEST'} ? 'bg-success bg-opacity-10 text-success' :
+                                               (${notification.type.name() == 'MEMORIAL_REPORT'} ? 'bg-danger bg-opacity-10 text-danger' :
+                                               'bg-warning bg-opacity-10 text-warning'))))">
+                                        <i th:class="'bi ' + 
+                                                  (${notification.type.name() == 'MODERATION'} ? 'bi-shield-check' : 
+                                                  (${notification.type.name() == 'FAMILY_TREE_MODERATION'} ? 'bi-diagram-3' : 
+                                                  (${notification.type.name() == 'TECHNICAL'} ? 'bi-exclamation-triangle' :
+                                                  (${notification.type.name() == 'USER_REQUEST'} ? 'bi-person-lines-fill' :
+                                                  (${notification.type.name() == 'MEMORIAL_REPORT'} ? 'bi-flag' :
+                                                  'bi-gear')))))"></i>
+                                    </div>
+                                </div>
+                                
+                                <!-- Основное содержимое -->
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h5 class="card-title mb-1 notification-title">
+                                            <span th:text="${notification.title}">Заголовок уведомления</span>
+                                            <span class="badge bg-danger ms-1" th:if="${notification.urgent}">Срочно</span>
+                                            <!-- Статус модерации -->
+                                            <span th:if="${notification.type.name() == 'MODERATION'}" 
+                                                 th:class="${notification.status.name() == 'PENDING' ? 'badge bg-warning ms-1' : 
+                                                           notification.status.name() == 'ACCEPTED' ? 'badge bg-success ms-1' : 
+                                                           notification.status.name() == 'REJECTED' ? 'badge bg-danger ms-1' : 'badge bg-secondary ms-1'}"
+                                                 th:text="${notification.status.name() == 'PENDING' ? 'На рассмотрении' :
+                                                          notification.status.name() == 'ACCEPTED' ? 'Одобрено' :
+                                                          notification.status.name() == 'REJECTED' ? 'Отклонено' : 'Информация'}">
+                                                Статус
+                                            </span>
+                                        </h5>
+                                        <small class="text-muted">
+                                            <span th:text="${#temporals.format(notification.createdAt, 'dd.MM.yyyy HH:mm')}">01.01.2023</span>
+                                        </small>
+                                    </div>
+                                    
+                                    <p class="card-text notification-text" th:text="${notification.message}">
+                                        Текст уведомления
+                                    </p>
+                                    
+                                    <!-- Информация об отправителе и получателе -->
+                                    <div class="d-flex flex-wrap notification-meta text-muted small mb-2">
+                                        <div class="me-3" th:if="${notification.sender != null}">
+                                            <i class="bi bi-person me-1"></i>
+                                            <span>От: </span>
+                                            <span th:text="${notification.sender.fio}">Иванов И.И.</span>
+                                        </div>
+                                        <div>
+                                            <i class="bi bi-envelope me-1"></i>
+                                            <span>Кому: </span>
+                                            <span th:text="${notification.user.fio}">Петров П.П.</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Кнопки действий в зависимости от типа уведомления -->
+                                    <div class="d-flex gap-2 mt-2">
+                                        <!-- Если есть связанная сущность, добавляем кнопку просмотра -->
+                                        <a th:if="${notification.relatedEntityId != null && notification.type.name() == 'MEMORIAL_OWNERSHIP'}" 
+                                           th:href="@{/admin/memorials/{id}/edit(id=${notification.relatedEntityId})}" 
+                                           class="btn btn-sm btn-primary">
+                                            <i class="bi bi-eye me-1"></i>Просмотреть мемориал
+                                        </a>
+                                        
+                                        <!-- Кнопка просмотра для уведомлений модерации -->
+                                        <a th:if="${notification.relatedEntityId != null && notification.type.name() == 'MODERATION'}" 
+                                           th:href="@{/admin/memorials/{id}(id=${notification.relatedEntityId})}" 
+                                           target="_blank"
+                                           class="btn btn-sm btn-primary">
+                                            <i class="bi bi-eye me-1"></i>Просмотреть мемориал на модерации
+                                        </a>
+                                        
+                                        <!-- Кнопка просмотра для уведомлений модерации семейных деревьев -->
+                                        <a th:if="${notification.relatedEntityId != null && notification.type.name() == 'FAMILY_TREE_MODERATION'}" 
+                                           th:href="@{/admin/family-trees/{id}(id=${notification.relatedEntityId})}" 
+                                           target="_blank"
+                                           class="btn btn-sm btn-primary">
+                                            <i class="bi bi-diagram-3 me-1"></i>Просмотреть семейное дерево
+                                        </a>
+                                        
+                                        <!-- Кнопка просмотра для жалоб на мемориалы -->
+                                        <a th:if="${notification.relatedEntityId != null && notification.type.name() == 'MEMORIAL_REPORT'}" 
+                                           th:href="@{/admin/memorials/{id}(id=${notification.relatedEntityId})}" 
+                                           target="_blank"
+                                           class="btn btn-sm btn-primary">
+                                            <i class="bi bi-eye me-1"></i>Просмотреть мемориал
+                                        </a>
+                                        
+                                        <!-- Кнопки принятия/отклонения для запросов модерации -->
+                                        <div th:if="${notification.status.name() == 'PENDING' && notification.type.name() == 'MODERATION'}">
+                                            <a th:href="@{/admin/memorials/{id}/approve(id=${notification.relatedEntityId})}" 
+                                               class="btn btn-sm btn-outline-success">
+                                                <i class="bi bi-check-lg me-1"></i>Одобрить
+                                            </a>
+                                            <a th:href="@{/admin/memorials/{id}/reject(id=${notification.relatedEntityId})}" 
+                                               class="btn btn-sm btn-outline-danger">
+                                                <i class="bi bi-x-lg me-1"></i>Отклонить
+                                            </a>
+                                        </div>
+                                        
+                                        <!-- Кнопки принятия/отклонения для других типов запросов -->
+                                        <div th:if="${notification.status.name() == 'PENDING' && notification.type.name() != 'MODERATION'}">
+                                            <button class="btn btn-sm btn-outline-success mark-accept" 
+                                                    th:data-id="${notification.id}">
+                                                <i class="bi bi-check-lg me-1"></i>Одобрить
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger mark-reject" 
+                                                    th:data-id="${notification.id}">
+                                                <i class="bi bi-x-lg me-1"></i>Отклонить
+                                            </button>
+                                        </div>
+                                        
+                                        <!-- Кнопка ответа для технических уведомлений -->
+                                        <div th:if="${notification.type.name() == 'TECHNICAL' && notification.status.name() != 'PROCESSED'}">
+                                            <button class="btn btn-sm btn-primary respond-technical" 
+                                                    th:data-id="${notification.id}"
+                                                    th:data-sender-name="${notification.sender != null ? notification.sender.fio : 'Пользователь'}">
+                                                <i class="bi bi-reply me-1"></i>Ответить
+                                            </button>
+                                        </div>
+                                        
+                                        <!-- Статус для обработанных технических уведомлений -->
+                                        <div th:if="${notification.type.name() == 'TECHNICAL' && notification.status.name() == 'PROCESSED'}">
+                                            <span class="badge bg-success">Отвечено</span>
+                                        </div>
+                                        
+                                        <!-- Кнопки для жалоб на мемориалы -->
+                                        <div th:if="${notification.type.name() == 'MEMORIAL_REPORT'}">
+                                            <!-- Показываем кнопки только если жалоба еще не обработана -->
+                                            <div th:if="${notification.status.name() != 'PROCESSED'}">
+                                                <button class="btn btn-sm btn-danger block-memorial" 
+                                                        th:data-memorial-id="${notification.relatedEntityId}"
+                                                        th:data-notification-id="${notification.id}">
+                                                    <i class="bi bi-ban me-1"></i>Заблокировать мемориал
+                                                </button>
+                                                <button class="btn btn-sm btn-secondary dismiss-report" 
+                                                        th:data-memorial-id="${notification.relatedEntityId}"
+                                                        th:data-notification-id="${notification.id}">
+                                                    <i class="bi bi-x-circle me-1"></i>Отклонить жалобу
+                                                </button>
+                                            </div>
+                                            <!-- Показываем статус для обработанных жалоб -->
+                                            <div th:if="${notification.status.name() == 'PROCESSED'}">
+                                                <span class="badge bg-success">
+                                                    <i class="bi bi-check-circle me-1"></i>Жалоба рассмотрена
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Кнопка для отметки как прочитанное -->
+                                <div class="flex-shrink-0 ms-2">
+                                    <button th:if="${!notification.read}" 
+                                            class="btn btn-sm btn-action btn-outline-secondary mark-read"
+                                            th:data-id="${notification.id}" 
+                                            title="Отметить как прочитанное">
+                                        <i class="bi bi-envelope-open"></i>
+                                    </button>
+                                    <button th:if="${notification.read}" 
+                                            class="btn btn-sm btn-action btn-outline-secondary" 
+                                            disabled title="Прочитано">
+                                        <i class="bi bi-check"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Пагинация -->
+                <div class="card-footer bg-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted" 
+                                  th:text="${notificationList != null && !notificationList.isEmpty() ? 
+                                           'Показано ' + notificationList.size() + ' из ' + notificationList.size() : 
+                                           'Уведомлений нет'}">
+                                Показано 0 из 0
+                            </span>
+                        </div>
+                        <!-- Если будет добавлена пагинация в будущем, то здесь будет соответствующий код -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- Скрипты -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Обработчик для очистки лишних уведомлений
+        const cleanupBtn = document.getElementById('cleanupNotifications');
+        if (cleanupBtn) {
+            cleanupBtn.addEventListener('click', function() {
+                if (!confirm('Вы уверены, что хотите удалить все прочитанные уведомления?')) {
+                    return;
+                }
+                
+                fetch('/admin/notifications/cleanup', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(`Удалено ${data.deletedCount} прочитанных уведомлений`);
+                        // Перезагружаем страницу для обновления списка
+                        window.location.reload();
+                    } else {
+                        alert('Ошибка при удалении уведомлений');
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                    alert('Произошла ошибка при выполнении запроса');
+                });
+            });
+        }
+        
+        // Обработчик для кнопки "Отметить все как прочитанные"
+        const markAllReadBtn = document.getElementById('markAllRead');
+        if (markAllReadBtn) {
+            markAllReadBtn.addEventListener('click', function() {
+                fetch('/admin/notifications/mark-read', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(`Отмечено ${data.updatedCount} уведомлений как прочитанные. Страница будет перезагружена.`);
+                        window.location.reload();
+                    } else {
+                        alert('Произошла ошибка при отметке уведомлений как прочитанные.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                    alert('Произошла ошибка при выполнении запроса.');
+                });
+            });
+        }
+        
+        // Обработчик для кнопок ответа на технические уведомления
+        const respondTechnicalButtons = document.querySelectorAll('.respond-technical');
+        respondTechnicalButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const notificationId = this.getAttribute('data-id');
+                const senderName = this.getAttribute('data-sender-name');
+                
+                // Заполняем модальное окно
+                document.getElementById('responseSenderName').textContent = senderName;
+                document.getElementById('responseMessage').value = '';
+                
+                // Сохраняем ID уведомления для отправки ответа
+                document.getElementById('sendResponseBtn').setAttribute('data-notification-id', notificationId);
+                
+                // Показываем модальное окно
+                new bootstrap.Modal(document.getElementById('technicalResponseModal')).show();
+            });
+        });
+        
+        // Обработчик для отправки ответа на техническое уведомление
+        const sendResponseBtn = document.getElementById('sendResponseBtn');
+        if (sendResponseBtn) {
+            sendResponseBtn.addEventListener('click', function() {
+                const notificationId = this.getAttribute('data-notification-id');
+                const responseMessage = document.getElementById('responseMessage').value.trim();
+                
+                if (!responseMessage) {
+                    alert('Введите текст ответа');
+                    return;
+                }
+                
+                // Отправляем ответ
+                const formData = new FormData();
+                formData.append('notificationId', notificationId);
+                formData.append('response', responseMessage);
+                
+                fetch('/admin/notifications/technical-response', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Ответ успешно отправлен пользователю');
+                        
+                        // Закрываем модальное окно
+                        bootstrap.Modal.getInstance(document.getElementById('technicalResponseModal')).hide();
+                        
+                        // Перезагружаем страницу для обновления статуса
+                        window.location.reload();
+                    } else {
+                        alert('Ошибка при отправке ответа: ' + (data.message || 'Неизвестная ошибка'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                    alert('Произошла ошибка при отправке ответа');
+                });
+            });
+        }
+        
+        // Обработчик для кнопок блокировки мемориала
+        const blockMemorialButtons = document.querySelectorAll('.block-memorial');
+        blockMemorialButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const memorialId = this.getAttribute('data-memorial-id');
+                const notificationId = this.getAttribute('data-notification-id');
+                
+                const reason = prompt('Укажите причину блокировки мемориала:');
+                if (!reason || reason.trim() === '') {
+                    return;
+                }
+                
+                if (!confirm('Вы уверены, что хотите заблокировать этот мемориал?')) {
+                    return;
+                }
+                
+                // Отправляем запрос на блокировку
+                const formData = new FormData();
+                formData.append('reason', reason.trim());
+                
+                fetch(`/admin/memorials/${memorialId}/block`, {
+                    method: 'POST',
+                    body: formData
+                })
+                                 .then(response => {
+                     if (response.ok) {
+                         alert('Мемориал заблокирован. Владелец и автор жалобы получили уведомления.');
+                         window.location.reload();
+                    } else {
+                        alert('Ошибка при блокировке мемориала');
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                    alert('Произошла ошибка при блокировке мемориала');
+                });
+            });
+        });
+        
+        // Обработчик для кнопок отклонения жалобы
+        const dismissReportButtons = document.querySelectorAll('.dismiss-report');
+        dismissReportButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const memorialId = this.getAttribute('data-memorial-id');
+                const notificationId = this.getAttribute('data-notification-id');
+                
+                if (!confirm('Отклонить жалобу? Мемориал останется без изменений, а пользователь получит уведомление об отклонении.')) {
+                    return;
+                }
+                
+                // Отклоняем жалобу через специальный endpoint
+                fetch(`/admin/memorials/${memorialId}/dismiss-report`, {
+                    method: 'POST'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        alert('Жалоба отклонена. Пользователь получил уведомление.');
+                        window.location.reload();
+                    } else {
+                        alert('Ошибка при отклонении жалобы');
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                    alert('Произошла ошибка при отклонении жалобы');
+                });
+            });
+        });
+    });
+</script>
+
+<!-- Модальное окно для создания уведомления -->
+<div class="modal fade" id="createNotificationModal" tabindex="-1" aria-labelledby="createNotificationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createNotificationModalLabel">
+                    <i class="bi bi-bell-plus me-2"></i>Создание уведомления
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createNotificationForm">
+                    <!-- Тип уведомления -->
+                    <div class="mb-3">
+                        <label for="notificationType" class="form-label">Тип уведомления</label>
+                        <select class="form-select" id="notificationType" required>
+                            <option value="">Выберите тип</option>
+                            <optgroup label="Информационные">
+                                <option value="admin_info">📄 Информация от администратора</option>
+                                <option value="admin_system">⚙️ Административное системное уведомление</option>
+                            </optgroup>
+                            <optgroup label="Важные">
+                                <option value="mass_announcement">📢 Массовое оповещение (важное)</option>
+                                <option value="admin_warning">⚠️ Предупреждение</option>
+                            </optgroup>
+                            <optgroup label="Устаревшие (для совместимости)">
+                                <option value="system">Обычное системное</option>
+                                <option value="technical">Техническое</option>
+                                <option value="user">Пользовательское</option>
+                            </optgroup>
+                        </select>
+                        <div class="form-text">Выберите подходящий тип для правильного отображения на клиенте</div>
+                    </div>
+                    
+                    <!-- Получатели -->
+                    <div class="mb-3">
+                        <label for="recipientType" class="form-label">Получатели</label>
+                        <select class="form-select" id="recipientType" required>
+                            <option value="">Выберите получателей</option>
+                            <option value="all_users">👥 Всем пользователям</option>
+                            <option value="all_admins">👑 Всем администраторам</option>
+                            <option value="specific_user">👤 Конкретному пользователю</option>
+                            <option value="multiple_users">👥 Нескольким пользователям</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Выбор конкретного пользователя -->
+                    <div class="mb-3" id="specificUserBlock" style="display: none;">
+                        <label for="specificUser" class="form-label">Выберите пользователя</label>
+                        <select class="form-select" id="specificUser">
+                            <option value="">Загрузка...</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Выбор нескольких пользователей -->
+                    <div class="mb-3" id="multipleUsersBlock" style="display: none;">
+                        <label for="multipleUsers" class="form-label">Выберите пользователей</label>
+                        <select class="form-select" id="multipleUsers" multiple size="8">
+                            <option value="">Загрузка...</option>
+                        </select>
+                        <div class="form-text">Удерживайте Ctrl (Cmd) для выбора нескольких пользователей</div>
+                    </div>
+                    
+                    <!-- Заголовок -->
+                    <div class="mb-3">
+                        <label for="notificationTitle" class="form-label">Заголовок</label>
+                        <input type="text" class="form-control" id="notificationTitle" required 
+                               placeholder="Введите заголовок уведомления">
+                        <div class="form-text">Краткое описание сути уведомления</div>
+                    </div>
+                    
+                    <!-- Содержание -->
+                    <div class="mb-3">
+                        <label for="notificationContent" class="form-label">Содержание</label>
+                        <textarea class="form-control" id="notificationContent" rows="5" required
+                                  placeholder="Введите подробное содержание уведомления..."></textarea>
+                        <div class="form-text">Детальное описание уведомления</div>
+                    </div>
+                    
+                    <!-- Дополнительные опции -->
+                    <div class="row">
+                        <div class="col-md-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="notificationUrgent">
+                            <label class="form-check-label" for="notificationUrgent">
+                                    <i class="bi bi-exclamation-triangle text-warning me-1"></i>
+                                Пометить как срочное
+                            </label>
+                        </div>
+                    </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="sendEmail">
+                                <label class="form-check-label" for="sendEmail">
+                                    <i class="bi bi-envelope text-primary me-1"></i>
+                                    Отправить email-уведомление
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i>Отмена
+                </button>
+                <button type="button" class="btn btn-primary" id="sendNotificationBtn">
+                    <i class="bi bi-send me-1"></i>Отправить уведомление
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно настроек уведомлений -->
+<div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="settingsModalLabel">
+                    <i class="bi bi-gear me-2"></i>Настройки уведомлений
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="notificationSettingsForm">
+                    <div class="mb-3">
+                        <label class="form-label">Автоматическое удаление</label>
+                        <select class="form-select" id="autoDeletion">
+                            <option value="never">Никогда</option>
+                            <option value="week">Через неделю</option>
+                            <option value="month" selected>Через месяц</option>
+                            <option value="quarter">Через 3 месяца</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="emailNotification" checked>
+                            <label class="form-check-label" for="emailNotification">
+                                Email-уведомления
+                            </label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="emailUrgentOnly">
+                            <label class="form-check-label" for="emailUrgentOnly">
+                                Только срочные уведомления
+                            </label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Дайджест уведомлений</label>
+                        <select class="form-select" id="digestFrequency">
+                            <option value="never">Отключен</option>
+                            <option value="daily" selected>Ежедневно</option>
+                            <option value="weekly">Еженедельно</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="saveSettingsBtn">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для ответа на техническое уведомление -->
+<div class="modal fade" id="technicalResponseModal" tabindex="-1" aria-labelledby="technicalResponseModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="technicalResponseModalLabel">
+                    <i class="bi bi-reply me-2"></i>Ответ на техническое обращение
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Пользователь:</label>
+                    <span id="responseSenderName" class="fw-bold"></span>
+                </div>
+                <div class="mb-3">
+                    <label for="responseMessage" class="form-label">Ваш ответ</label>
+                    <textarea class="form-control" id="responseMessage" rows="6" 
+                              placeholder="Введите ответ пользователю..." required></textarea>
+                    <div class="form-text">Ответ будет отправлен как уведомление пользователю</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="sendResponseBtn">Отправить ответ</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Адаптивное меню
+    document.addEventListener('DOMContentLoaded', () => {
+        const sidebar = document.getElementById('sidebarMenu');
+        document.querySelector('.navbar-toggler').addEventListener('click', () => {
+            sidebar.classList.toggle('show');
+        });
+        
+        // Обработка формы создания уведомления
+        const notificationType = document.getElementById('notificationType');
+        const recipientType = document.getElementById('recipientType');
+        const specificUserBlock = document.getElementById('specificUserBlock');
+        const multipleUsersBlock = document.getElementById('multipleUsersBlock');
+        const specificUser = document.getElementById('specificUser');
+        const multipleUsers = document.getElementById('multipleUsers');
+        
+        // Загружаем список пользователей при открытии модального окна
+        document.getElementById('createNotificationModal').addEventListener('show.bs.modal', function() {
+            loadUsers();
+        });
+        
+        // Функция загрузки пользователей
+        function loadUsers() {
+            fetch('/admin/users/api/all')
+                .then(response => response.json())
+                .then(users => {
+                    // Очищаем существующие опции
+                    specificUser.innerHTML = '<option value="">Выберите пользователя</option>';
+                    multipleUsers.innerHTML = '';
+                    
+                    // Добавляем пользователей
+                    users.forEach(user => {
+                        const option1 = new Option(`${user.fio || user.login} (${user.contacts || 'без контактов'})`, user.id);
+                        const option2 = new Option(`${user.fio || user.login} (${user.contacts || 'без контактов'})`, user.id);
+                        
+                        specificUser.appendChild(option1);
+                        multipleUsers.appendChild(option2);
+                    });
+                })
+                .catch(error => {
+                    console.error('Ошибка загрузки пользователей:', error);
+                    specificUser.innerHTML = '<option value="">Ошибка загрузки</option>';
+                    multipleUsers.innerHTML = '<option value="">Ошибка загрузки</option>';
+                });
+        }
+        
+        // Обработка изменения типа получателей
+        recipientType.addEventListener('change', function() {
+            const value = this.value;
+            
+            // Скрываем все блоки выбора пользователей
+            specificUserBlock.style.display = 'none';
+            multipleUsersBlock.style.display = 'none';
+            
+            // Показываем нужный блок
+            if (value === 'specific_user') {
+                specificUserBlock.style.display = 'block';
+            } else if (value === 'multiple_users') {
+                multipleUsersBlock.style.display = 'block';
+            }
+        });
+        
+        // Обработка кнопки отправки уведомления
+        document.getElementById('sendNotificationBtn').addEventListener('click', function() {
+            const title = document.getElementById('notificationTitle').value.trim();
+            const content = document.getElementById('notificationContent').value.trim();
+            const type = document.getElementById('notificationType').value;
+            const recipientTypeValue = recipientType.value;
+            const urgent = document.getElementById('notificationUrgent').checked;
+            const sendEmail = document.getElementById('sendEmail').checked;
+            
+            // Валидация
+            if (!title || !content || !type || !recipientTypeValue) {
+                alert('Пожалуйста, заполните все обязательные поля');
+                return;
+            }
+            
+            // Определяем получателей
+            let recipientIds = [];
+            let recipientInfo = '';
+            
+            switch (recipientTypeValue) {
+                case 'all_users':
+                    recipientInfo = 'всем пользователям';
+                    break;
+                case 'all_admins':
+                    recipientInfo = 'всем администраторам';
+                    break;
+                case 'specific_user':
+                    const selectedUser = specificUser.value;
+                    if (!selectedUser) {
+                        alert('Выберите пользователя');
+                        return;
+                    }
+                    recipientIds = [selectedUser];
+                    recipientInfo = 'выбранному пользователю';
+                    break;
+                case 'multiple_users':
+                    const selectedUsers = Array.from(multipleUsers.selectedOptions).map(option => option.value);
+                    if (selectedUsers.length === 0) {
+                        alert('Выберите хотя бы одного пользователя');
+                        return;
+                    }
+                    recipientIds = selectedUsers;
+                    recipientInfo = `${selectedUsers.length} пользователям`;
+                    break;
+            }
+            
+            // Подтверждение отправки
+            const confirmMessage = `Отправить уведомление "${title}" ${recipientInfo}?${urgent ? ' (СРОЧНОЕ)' : ''}`;
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+            
+            // Формируем данные для отправки
+            const formData = new FormData();
+            formData.append('type', type);
+            formData.append('title', title);
+            formData.append('content', content);
+            formData.append('urgent', urgent);
+            formData.append('sendEmail', sendEmail);
+            formData.append('recipientType', recipientTypeValue);
+        
+            // Добавляем ID получателей, если они есть
+            if (recipientIds.length > 0) {
+                recipientIds.forEach(id => formData.append('recipientIds', id));
+            }
+            
+            // Отправляем запрос
+            this.disabled = true;
+            this.innerHTML = '<i class="bi bi-hourglass me-1"></i>Отправка...';
+                
+            fetch('/admin/notifications/create', {
+                    method: 'POST',
+                body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                    alert(`Уведомление успешно отправлено ${recipientInfo}!`);
+        
+                    // Закрываем модальное окно
+                    bootstrap.Modal.getInstance(document.getElementById('createNotificationModal')).hide();
+                
+                    // Очищаем форму
+                    document.getElementById('createNotificationForm').reset();
+                    specificUserBlock.style.display = 'none';
+                    multipleUsersBlock.style.display = 'none';
+                        
+                    // Перезагружаем страницу для отображения нового уведомления
+                                window.location.reload();
+                    } else {
+                    alert('Ошибка при отправке уведомления: ' + (data.message || 'Неизвестная ошибка'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                alert('Произошла ошибка при отправке уведомления');
+            })
+            .finally(() => {
+                // Восстанавливаем кнопку
+                this.disabled = false;
+                this.innerHTML = '<i class="bi bi-send me-1"></i>Отправить уведомление';
+            });
+        });
+    });
+    
+    // График по дням - создаем графики с начальными данными
+    const ctx = document.getElementById('notificationsChart').getContext('2d');
+    window.notificationsChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
+            datasets: [{
+                label: 'Полученные уведомления',
+                data: [0, 0, 0, 0, 0, 0, 0], // Начальные данные будут заменены реальными
+                backgroundColor: 'rgba(52, 152, 219, 0.2)',
+                borderColor: 'rgba(52, 152, 219, 1)',
+                borderWidth: 2,
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        drawBorder: false
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            }
+        }
+    });
+    
+    // Круговая диаграмма
+    const pieCtx = document.getElementById('notificationsPieChart').getContext('2d');
+    window.notificationsPieChart = new Chart(pieCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Модерация контента', 'Технические вопросы', 'Запросы пользователей', 'Системные'],
+            datasets: [{
+                data: [0, 0, 0, 0], // Начальные данные будут заменены реальными
+                backgroundColor: [
+                    'rgba(52, 152, 219, 0.7)',
+                    'rgba(231, 76, 60, 0.7)',
+                    'rgba(46, 204, 113, 0.7)',
+                    'rgba(241, 196, 15, 0.7)'
+                ],
+                borderColor: [
+                    'rgba(52, 152, 219, 1)',
+                    'rgba(231, 76, 60, 1)',
+                    'rgba(46, 204, 113, 1)',
+                    'rgba(241, 196, 15, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right'
+                }
+            }
+        }
+    });
+</script>
+
+<script th:inline="javascript">
+    // Данные для графиков из Thymeleaf
+    document.addEventListener('DOMContentLoaded', function() {
+        // Получение данных из модели
+        const chartData = /*[[${chartData}]]*/ { 
+            days: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
+            values: [0, 0, 0, 0, 0, 0, 0]
+        };
+        
+        const pieChartData = /*[[${pieChartData}]]*/ {
+            labels: ['Модерация контента', 'Технические вопросы', 'Запросы пользователей', 'Системные'],
+            values: [0, 0, 0, 0]
+        };
+        
+        // Обновление графика по дням
+        if (window.notificationsChart) {
+            window.notificationsChart.data.labels = chartData.days;
+            window.notificationsChart.data.datasets[0].data = chartData.values;
+            window.notificationsChart.update();
+        }
+        
+        // Обновление круговой диаграммы
+        if (window.notificationsPieChart) {
+            window.notificationsPieChart.data.labels = pieChartData.labels;
+            window.notificationsPieChart.data.datasets[0].data = pieChartData.values;
+            window.notificationsPieChart.update();
+        }
+    });
+</script>
+</body>
+</html> 

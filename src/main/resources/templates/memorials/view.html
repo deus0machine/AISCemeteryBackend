@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${memorial.fio} + ' | Мемориал'">Иванов Иван Иванович | Мемориал</title>
+    
+    <!-- Подключение стилей и скриптов -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f8f9fa;
+        }
+        
+        .memorial-header {
+            background-color: #343a40;
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        
+        .memorial-photo {
+            width: 100%;
+            max-width: 400px;
+            height: auto;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        
+        .memorial-details {
+            background-color: white;
+            border-radius: 10px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .biography {
+            white-space: pre-line;
+        }
+        
+        .action-buttons {
+            margin-top: 1rem;
+        }
+        
+        .moderation-alert {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 1rem;
+            margin-bottom: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Сообщение для модераторов -->
+    <div th:if="${isAdmin == true && memorial.publicationStatus != null && memorial.publicationStatus.name() == 'PENDING_MODERATION'}" class="container mt-3">
+        <div class="moderation-alert">
+            <div class="d-flex align-items-center">
+                <i class="bi bi-exclamation-triangle-fill text-warning me-2" style="font-size: 1.5rem;"></i>
+                <div>
+                    <h5 class="mb-1">Мемориал на модерации</h5>
+                    <p class="mb-0">Этот мемориал ожидает проверки перед публикацией. Только администраторы могут видеть его сейчас.</p>
+                </div>
+            </div>
+            <div class="d-flex mt-3">
+                <a th:href="@{/admin/memorials/{id}/approve(id=${memorial.id})}" class="btn btn-success me-2">
+                    <i class="bi bi-check-lg"></i> Одобрить публикацию
+                </a>
+                <a th:href="@{/admin/memorials/{id}/reject(id=${memorial.id})}" class="btn btn-danger me-2">
+                    <i class="bi bi-x-lg"></i> Отклонить
+                </a>
+                <a th:href="@{/admin/memorials/{id}/edit(id=${memorial.id})}" class="btn btn-primary">
+                    <i class="bi bi-pencil"></i> Редактировать
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Сообщение о статусе отклонения -->
+    <div th:if="${memorial.publicationStatus != null && memorial.publicationStatus.name() == 'REJECTED'}" class="container mt-3">
+        <div class="alert alert-danger">
+            <div class="d-flex align-items-center">
+                <i class="bi bi-x-circle-fill me-2" style="font-size: 1.5rem;"></i>
+                <div>
+                    <h5 class="mb-1">Публикация мемориала отклонена</h5>
+                    <p class="mb-0">Администратор отклонил публикацию этого мемориала. Пожалуйста, проверьте уведомления для получения подробной информации.</p>
+                </div>
+            </div>
+            <div class="d-flex mt-3" th:if="${isOwner == true}">
+                <a th:href="@{/memorials/{id}/send-for-moderation(id=${memorial.id})}" class="btn btn-primary me-2">
+                    <i class="bi bi-arrow-repeat"></i> Отправить на повторную модерацию
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Сообщения об успехе или ошибке -->
+    <div class="container mt-3">
+        <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
+            <span th:text="${successMessage}">Успешно!</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        
+        <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show" role="alert">
+            <span th:text="${errorMessage}">Ошибка!</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    </div>
+    
+    <!-- Шапка страницы -->
+    <header class="memorial-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 th:text="${memorial.fio}">Иванов Иван Иванович</h1>
+                    <div class="dates">
+                        <span th:if="${memorial.birthDate != null}" th:text="${#temporals.format(memorial.birthDate, 'dd.MM.yyyy')}">01.01.1950</span>
+                        <span th:if="${memorial.birthDate != null && memorial.deathDate != null}"> — </span>
+                        <span th:if="${memorial.deathDate != null}" th:text="${#temporals.format(memorial.deathDate, 'dd.MM.yyyy')}">01.01.2020</span>
+                    </div>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <span class="badge bg-primary" th:text="${memorial.viewCount + ' просмотров'}">123 просмотров</span>
+                    <div class="mt-2" sec:authorize="isAuthenticated()">
+                        <a th:if="${isOwner == true || isAdmin == true}" th:href="@{/admin/memorials/{id}/edit(id=${memorial.id})}" class="btn btn-light btn-sm">
+                            <i class="bi bi-pencil-square"></i> Редактировать
+                        </a>
+                        <button th:if="${isEditor == true && isOwner != true}" class="btn btn-light btn-sm">
+                            <i class="bi bi-pencil-square"></i> Предложить изменения
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="row">
+            <!-- Основная информация -->
+            <div class="col-md-8">
+                <div class="memorial-details">
+                    <h2>Биография</h2>
+                    <p class="biography" th:text="${memorial.biography != null ? memorial.biography : 'Биография отсутствует'}">
+                        Здесь будет отображаться биография человека. Информация о его жизни, достижениях, семье и других важных событиях.
+                    </p>
+                    
+                    <h2 class="mt-4">Место жительства</h2>
+                    <p th:if="${memorial.mainLocation != null && memorial.mainLocation.address != null}" th:text="${memorial.mainLocation.address}">
+                        Адрес места жительства
+                    </p>
+                    <p th:if="${memorial.mainLocation == null || memorial.mainLocation.address == null}">
+                        Информация о месте жительства отсутствует
+                    </p>
+                    
+                    <h2 class="mt-4">Место захоронения</h2>
+                    <p th:if="${memorial.burialLocation != null && memorial.burialLocation.address != null}" th:text="${memorial.burialLocation.address}">
+                        Адрес места захоронения
+                    </p>
+                    <p th:if="${memorial.burialLocation == null || memorial.burialLocation.address == null}">
+                        Информация о месте захоронения отсутствует
+                    </p>
+
+                    <h2 class="mt-4">Документы</h2>
+                    <div th:if="${memorial.documentUrl}">
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-file-earmark-text text-primary me-3" style="font-size: 2rem;"></i>
+                                    <div>
+                                        <h6 class="card-title mb-1">Документ прикреплен</h6>
+                                        <p class="card-text text-muted small mb-2">К мемориалу прикреплен документ</p>
+                                        <a th:href="@{'/api/memorials/' + ${memorial.id} + '/document'}" 
+                                           class="btn btn-outline-primary btn-sm" target="_blank">
+                                            <i class="bi bi-eye me-1"></i>Просмотреть документ
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div th:unless="${memorial.documentUrl}">
+                        <p class="text-muted">Документы к мемориалу не прикреплены</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Фотография и дополнительная информация -->
+            <div class="col-md-4">
+                <div class="memorial-details text-center">
+                    <div th:if="${memorial.photoUrl != null}">
+                        <img th:src="${memorial.photoUrl}" class="memorial-photo" alt="Фото">
+                    </div>
+                    <div th:if="${memorial.photoUrl == null}" class="memorial-photo d-flex align-items-center justify-content-center bg-light">
+                        <i class="bi bi-person" style="font-size: 5rem; color: #ccc;"></i>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <h5>Информация о мемориале</h5>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Создан</span>
+                                <span th:text="${memorial.createdAt != null ? #temporals.format(memorial.createdAt, 'dd.MM.yyyy') : 'Неизвестно'}">01.01.2023</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Обновлен</span>
+                                <span th:text="${memorial.updatedAt != null ? #temporals.format(memorial.updatedAt, 'dd.MM.yyyy') : 'Неизвестно'}">01.01.2023</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Статус</span>
+                                <span th:if="${memorial.publicationStatus != null && memorial.publicationStatus.name() == 'PUBLISHED'}" 
+                                      class="badge bg-success">Опубликован</span>
+                                <span th:if="${memorial.publicationStatus != null && memorial.publicationStatus.name() == 'PENDING_MODERATION'}" 
+                                      class="badge bg-warning">На модерации</span>
+                                <span th:if="${memorial.publicationStatus != null && memorial.publicationStatus.name() == 'REJECTED'}" 
+                                      class="badge bg-danger">Отклонен</span>
+                                <span th:if="${memorial.publicationStatus != null && memorial.publicationStatus.name() == 'DRAFT'}" 
+                                      class="badge bg-secondary">Черновик</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>Документ</span>
+                                <span th:if="${memorial.documentUrl}" class="badge bg-success">
+                                    <i class="bi bi-check-circle me-1"></i>Есть
+                                </span>
+                                <span th:unless="${memorial.documentUrl}" class="badge bg-secondary">
+                                    <i class="bi bi-x-circle me-1"></i>Нет
+                                </span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Действия с мемориалом -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="action-buttons d-flex justify-content-between">
+                    <a href="/memorials" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Вернуться к списку
+                    </a>
+                    <div>
+                        <div sec:authorize="isAuthenticated()">
+                            <a th:if="${isOwner != true && isEditor != true && isAdmin != true}" href="#" class="btn btn-primary">
+                                <i class="bi bi-pencil"></i> Запросить доступ к редактированию
+                            </a>
+                        </div>
+                        
+                        <!-- Кнопки для владельца мемориала -->
+                        <div th:if="${isOwner == true && (memorial.publicationStatus == null || memorial.publicationStatus.name() == 'DRAFT')}">
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#sendForModerationModal">
+                                <i class="bi bi-send"></i> Отправить на публикацию
+                            </button>
+                        </div>
+                        
+                        <!-- Кнопки для администратора -->
+                        <div th:if="${isAdmin == true && memorial.publicationStatus != null && memorial.publicationStatus.name() == 'PENDING_MODERATION'}">
+                            <a th:href="@{/admin/memorials/{id}/approve(id=${memorial.id})}" class="btn btn-success me-2">
+                                <i class="bi bi-check-lg"></i> Одобрить
+                            </a>
+                            <a th:href="@{/admin/memorials/{id}/reject(id=${memorial.id})}" class="btn btn-danger">
+                                <i class="bi bi-x-lg"></i> Отклонить
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Подключение скриптов -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 

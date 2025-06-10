@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Отклонение мемориала | Система управления кладбищем</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-top: 2rem;
+        }
+        .card {
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .card-header {
+            background-color: #dc3545;
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+        }
+        .btn-cancel {
+            background-color: #6c757d;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header py-3">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-x-circle-fill me-2 fs-4"></i>
+                            <h4 class="m-0">Отклонение публикации мемориала</h4>
+                        </div>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            <span>Вы собираетесь отклонить публикацию мемориала "<strong th:text="${memorialFio}">Иванов И.И.</strong>". Пожалуйста, укажите причину отклонения, которая будет отправлена владельцу мемориала.</span>
+                        </div>
+                        
+                        <form th:action="@{/admin/memorials/{id}/reject(id=${memorialId})}" method="post">
+                            <div class="mb-4">
+                                <label for="rejectionReason" class="form-label">Причина отклонения</label>
+                                <textarea class="form-control" id="rejectionReason" name="reason" rows="5" placeholder="Опишите причину отклонения публикации мемориала..." required></textarea>
+                                <div class="form-text">Это сообщение будет отправлено владельцу мемориала</div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between">
+                                <a th:href="@{/memorials/{id}(id=${memorialId})}" class="btn btn-cancel">
+                                    <i class="bi bi-arrow-left me-1"></i> Отмена
+                                </a>
+                                <button type="submit" class="btn btn-danger">
+                                    <i class="bi bi-x-lg me-1"></i> Отклонить публикацию
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 
