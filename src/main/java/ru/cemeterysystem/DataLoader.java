@@ -172,7 +172,6 @@ public class DataLoader implements CommandLineRunner {
             familyTree.setName("Семья Ивановых");
             familyTree.setDescription("Генеалогическое древо семьи Ивановых");
             familyTree.setUser(user);
-            familyTree.setPublic(true);
             
             logger.info("Saving family tree to database...");
             familyTreeRepository.save(familyTree);

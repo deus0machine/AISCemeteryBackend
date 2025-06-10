@@ -236,6 +236,10 @@
                                     <i class="bi bi-arrow-right text-primary me-1"></i>
                                     <strong>Место захоронения:</strong> изменено
                                 </li>
+                                <li th:if="${memorial.pendingDocumentUrl != null}">
+                                    <i class="bi bi-arrow-right text-primary me-1"></i>
+                                    <strong>Документ:</strong> изменен
+                                </li>
                             </ul>
                         </div>
                     </div>
@@ -359,6 +363,41 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Документ -->
+                    <div class="card-modern mb-4">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-file-earmark-text me-2"></i>Документ
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div th:if="${memorial.documentUrl}">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-file-earmark-check text-success me-2" style="font-size: 1.5rem;"></i>
+                                    <div>
+                                        <p class="mb-1"><strong>Документ прикреплен</strong></p>
+                                        <p class="text-muted small mb-0">Нажмите для просмотра</p>
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <a th:href="@{'/admin/memorials/' + ${memorial.id} + '/document'}" 
+                                       class="btn btn-outline-primary btn-sm" target="_blank">
+                                        <i class="bi bi-eye me-1"></i>Просмотреть документ
+                                    </a>
+                                </div>
+                            </div>
+                            <div th:unless="${memorial.documentUrl}">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-file-earmark-x text-muted me-2" style="font-size: 1.5rem;"></i>
+                                    <div>
+                                        <p class="mb-1 text-muted"><strong>Документ не найден</strong></p>
+                                        <p class="text-muted small mb-0">Пользователь не прикрепил документ к мемориалу</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Боковая панель с дополнительной информацией -->
@@ -386,6 +425,15 @@
                                     Последнее обновление
                                     <span th:if="${memorial.updatedAt}" th:text="${#temporals.format(memorial.updatedAt, 'dd.MM.yyyy')}">01.01.2023</span>
                                     <span th:unless="${memorial.updatedAt}" class="text-muted">Не указана</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    Документ
+                                    <span th:if="${memorial.documentUrl}" class="badge bg-success rounded-pill">
+                                        <i class="bi bi-check-circle me-1"></i>Есть
+                                    </span>
+                                    <span th:unless="${memorial.documentUrl}" class="badge bg-secondary rounded-pill">
+                                        <i class="bi bi-x-circle me-1"></i>Нет
+                                    </span>
                                 </li>
                             </ul>
                         </div>

@@ -174,7 +174,7 @@ public class AdminUserController {
                     Map<String, Object> userMap = new HashMap<>();
                     userMap.put("id", user.getId());
                     userMap.put("login", user.getLogin());
-                    userMap.put("email", user.getContacts());
+                    userMap.put("contacts", user.getContacts());
                     userMap.put("fio", user.getFio());
                     userMap.put("role", user.getRole().name());
                     return userMap;

@@ -3,9 +3,12 @@ package ru.cemeterysystem.controllers.admin;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
@@ -415,6 +418,58 @@ public class AdminMemorialController {
                 model.getAttribute("changesNeedModeration"));
         
         return "admin/memorial-view";
+    }
+
+    /**
+     * Получает документ мемориала для просмотра администратором
+     */
+    @GetMapping("/{id}/document")
+    public ResponseEntity<org.springframework.core.io.Resource> getMemorialDocument(@PathVariable Long id) {
+        log.info("=== АДМИН ЗАПРАШИВАЕТ ДОКУМЕНТ ===");
+        log.info("AdminMemorialController.getMemorialDocument: запрос документа мемориала ID={}", id);
+        
+        try {
+            // Получаем текущего пользователя
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String currentUsername = authentication.getName();
+            log.info("Текущий админ: {}", currentUsername);
+            
+            User currentUser = userRepository.findByLogin(currentUsername)
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+            log.info("Найден пользователь: ID={}, роль={}", currentUser.getId(), currentUser.getRole());
+            
+            // Только администраторы могут просматривать документы в админке
+            if (currentUser.getRole() != User.Role.ADMIN) {
+                log.warn("Попытка доступа к документу мемориала не-администратором: {}", currentUsername);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+            
+            // Проверяем существование мемориала
+            Memorial memorial = memorialRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Мемориал не найден"));
+            log.info("Мемориал найден: ID={}, ФИО='{}', documentUrl={}", 
+                    memorial.getId(), memorial.getFio(), memorial.getDocumentUrl());
+            
+            // Проверяем наличие документа
+            if (memorial.getDocumentUrl() == null || memorial.getDocumentUrl().trim().isEmpty()) {
+                log.warn("У мемориала {} отсутствует документ", id);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .header("X-Error", "Document not found")
+                    .build();
+            }
+            
+            log.info("Админ получает документ через MemorialService...");
+            // Используем уже существующий метод из MemorialService
+            return memorialService.getMemorialDocument(id);
+            
+        } catch (Exception e) {
+            log.error("ОШИБКА при получении документа администратором для мемориала {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .header("X-Error", "Internal server error: " + e.getMessage())
+                .build();
+        } finally {
+            log.info("=== КОНЕЦ ЗАПРОСА ДОКУМЕНТА АДМИНОМ ===");
+        }
     }
     
     @PostMapping("/{id}/approve")

@@ -59,6 +59,7 @@ public class MemorialMapper implements RowMapper<Memorial> {
         dto.setMainLocation(memorial.getMainLocation());
         dto.setBurialLocation(memorial.getBurialLocation());
         dto.setPhotoUrl(memorial.getPhotoUrl());
+        dto.setDocumentUrl(memorial.getDocumentUrl());
         dto.setPublic(memorial.isPublic());
         dto.setTreeId(memorial.getTreeId());
         dto.setCreatedBy(userMapper.toDTO(memorial.getCreatedBy()));
@@ -81,6 +82,7 @@ public class MemorialMapper implements RowMapper<Memorial> {
         
         // Маппинг полей ожидающих изменений
         dto.setPendingPhotoUrl(memorial.getPendingPhotoUrl());
+        dto.setPendingDocumentUrl(memorial.getPendingDocumentUrl());
         dto.setPendingFio(memorial.getPendingFio());
         dto.setPendingBiography(memorial.getPendingBiography());
         dto.setPendingBirthDate(memorial.getPendingBirthDate() != null ? 
@@ -128,6 +130,7 @@ public class MemorialMapper implements RowMapper<Memorial> {
         memorial.setMainLocation(dto.getMainLocation());
         memorial.setBurialLocation(dto.getBurialLocation());
         memorial.setPhotoUrl(dto.getPhotoUrl());
+        memorial.setDocumentUrl(dto.getDocumentUrl());
         memorial.setPublic(dto.isPublic());
         memorial.setTreeId(dto.getTreeId());
         

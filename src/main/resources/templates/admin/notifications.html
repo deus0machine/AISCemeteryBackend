@@ -427,10 +427,11 @@
                                                'bg-warning bg-opacity-10 text-warning'))))">
                                         <i th:class="'bi ' + 
                                                   (${notification.type.name() == 'MODERATION'} ? 'bi-shield-check' : 
+                                                  (${notification.type.name() == 'FAMILY_TREE_MODERATION'} ? 'bi-diagram-3' : 
                                                   (${notification.type.name() == 'TECHNICAL'} ? 'bi-exclamation-triangle' :
                                                   (${notification.type.name() == 'USER_REQUEST'} ? 'bi-person-lines-fill' :
                                                   (${notification.type.name() == 'MEMORIAL_REPORT'} ? 'bi-flag' :
-                                                  'bi-gear'))))"></i>
+                                                  'bi-gear')))))"></i>
                                     </div>
                                 </div>
                                 
@@ -489,6 +490,14 @@
                                            target="_blank"
                                            class="btn btn-sm btn-primary">
                                             <i class="bi bi-eye me-1"></i>Просмотреть мемориал на модерации
+                                        </a>
+                                        
+                                        <!-- Кнопка просмотра для уведомлений модерации семейных деревьев -->
+                                        <a th:if="${notification.relatedEntityId != null && notification.type.name() == 'FAMILY_TREE_MODERATION'}" 
+                                           th:href="@{/admin/family-trees/{id}(id=${notification.relatedEntityId})}" 
+                                           target="_blank"
+                                           class="btn btn-sm btn-primary">
+                                            <i class="bi bi-diagram-3 me-1"></i>Просмотреть семейное дерево
                                         </a>
                                         
                                         <!-- Кнопка просмотра для жалоб на мемориалы -->
@@ -1024,8 +1033,8 @@
                     
                     // Добавляем пользователей
                     users.forEach(user => {
-                        const option1 = new Option(`${user.fio || user.login} (${user.email})`, user.id);
-                        const option2 = new Option(`${user.fio || user.login} (${user.email})`, user.id);
+                        const option1 = new Option(`${user.fio || user.login} (${user.contacts || 'без контактов'})`, user.id);
+                        const option2 = new Option(`${user.fio || user.login} (${user.contacts || 'без контактов'})`, user.id);
                         
                         specificUser.appendChild(option1);
                         multipleUsers.appendChild(option2);

@@ -18,6 +18,8 @@ import ru.cemeterysystem.models.User;
 import ru.cemeterysystem.services.FamilyTreeService;
 import ru.cemeterysystem.services.UserService;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api/family-trees")
@@ -83,6 +85,25 @@ public class FamilyTreeController {
         }
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<?> searchFamilyTrees(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String ownerName,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(defaultValue = "false") boolean myOnly) {
+        try {
+            User user = getCurrentUser();
+            logger.debug("Searching family trees with query: {}, ownerName: {}, startDate: {}, endDate: {}, myOnly: {}", 
+                query, ownerName, startDate, endDate, myOnly);
+            return ResponseEntity.ok(familyTreeService.searchFamilyTrees(query, ownerName, startDate, endDate, myOnly ? user : null));
+        } catch (Exception e) {
+            logger.error("Error searching family trees: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Failed to search family trees: " + e.getMessage());
+        }
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<FamilyTreeDTO> updateFamilyTree(
             @PathVariable Long id,
@@ -121,6 +142,88 @@ public class FamilyTreeController {
                 .body("Failed to get family tree: " + e.getMessage());
         }
     }
+
+    @GetMapping("/{id}/full-data")
+    public ResponseEntity<?> getFamilyTreeFullData(@PathVariable Long id) {
+        try {
+            User user = getCurrentUser();
+            logger.debug("Getting full data for family tree {} for user {}", id, user.getId());
+            
+            FamilyTreeDTO familyTree = familyTreeService.getFamilyTreeById(id, user);
+            List<MemorialRelationDTO> relations = familyTreeService.getRelations(id);
+            List<TreeMemorialDTO> memorials = familyTreeService.getTreeMemorials(id);
+            
+            // Создаем объект с полными данными
+            Map<String, Object> fullData = new HashMap<>();
+            fullData.put("familyTree", familyTree);
+            fullData.put("relations", relations);
+            fullData.put("memorials", memorials);
+            
+            return ResponseEntity.ok(fullData);
+        } catch (Exception e) {
+            logger.error("Error getting full data for family tree {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("message", "Произошла непредвиденная ошибка"));
+        }
+    }
+
+    // API эндпоинты для модерации семейных деревьев
+    @PostMapping("/{id}/send-for-moderation")
+    public ResponseEntity<?> sendFamilyTreeForModeration(@PathVariable Long id) {
+        try {
+            User user = getCurrentUser();
+            logger.debug("Sending family tree {} for moderation by user: {}", id, user.getLogin());
+            FamilyTreeDTO result = familyTreeService.sendForModeration(id, user);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            logger.error("Error sending family tree {} for moderation: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body("Failed to send family tree for moderation: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/{id}/unpublish")
+    public ResponseEntity<?> unpublishFamilyTree(@PathVariable Long id) {
+        try {
+            User user = getCurrentUser();
+            logger.debug("Unpublishing family tree {} by user: {}", id, user.getLogin());
+            FamilyTree result = familyTreeService.unpublishTree(id, user);
+            return ResponseEntity.ok(familyTreeService.getFamilyTreeById(id, user));
+        } catch (Exception e) {
+            logger.error("Error unpublishing family tree {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body("Failed to unpublish family tree: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/{id}/approve")
+    public ResponseEntity<?> approveFamilyTree(@PathVariable Long id) {
+        try {
+            User admin = getCurrentUser();
+            logger.debug("Approving family tree {} by admin: {}", id, admin.getLogin());
+            FamilyTreeDTO result = familyTreeService.approveTree(id, admin);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            logger.error("Error approving family tree {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body("Failed to approve family tree: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/{id}/reject")
+    public ResponseEntity<?> rejectFamilyTree(@PathVariable Long id, @RequestBody String reason) {
+        try {
+            User admin = getCurrentUser();
+            logger.debug("Rejecting family tree {} by admin: {} with reason: {}", id, admin.getLogin(), reason);
+            FamilyTreeDTO result = familyTreeService.rejectTree(id, admin, reason);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            logger.error("Error rejecting family tree {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body("Failed to reject family tree: " + e.getMessage());
+        }
+    }
+
     @PostMapping("/{id}/relations")
     public ResponseEntity<?> addRelation(
             @PathVariable Long id,

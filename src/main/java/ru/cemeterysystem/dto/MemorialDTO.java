@@ -23,6 +23,7 @@ public class MemorialDTO {
     private Location mainLocation;
     private Location burialLocation;
     private String photoUrl;
+    private String documentUrl;
     @JsonProperty("is_public")
     private boolean isPublic;
     private Long treeId;
@@ -50,6 +51,7 @@ public class MemorialDTO {
     
     // Поля для ожидающих изменений
     private String pendingPhotoUrl;
+    private String pendingDocumentUrl;
     private String pendingFio;
     private String pendingBiography;
     private String pendingBirthDate;

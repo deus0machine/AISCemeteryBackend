@@ -163,6 +163,28 @@
                     <p th:if="${memorial.burialLocation == null || memorial.burialLocation.address == null}">
                         Информация о месте захоронения отсутствует
                     </p>
+
+                    <h2 class="mt-4">Документы</h2>
+                    <div th:if="${memorial.documentUrl}">
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-file-earmark-text text-primary me-3" style="font-size: 2rem;"></i>
+                                    <div>
+                                        <h6 class="card-title mb-1">Документ прикреплен</h6>
+                                        <p class="card-text text-muted small mb-2">К мемориалу прикреплен документ</p>
+                                        <a th:href="@{'/api/memorials/' + ${memorial.id} + '/document'}" 
+                                           class="btn btn-outline-primary btn-sm" target="_blank">
+                                            <i class="bi bi-eye me-1"></i>Просмотреть документ
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div th:unless="${memorial.documentUrl}">
+                        <p class="text-muted">Документы к мемориалу не прикреплены</p>
+                    </div>
                 </div>
             </div>
             
@@ -197,6 +219,15 @@
                                       class="badge bg-danger">Отклонен</span>
                                 <span th:if="${memorial.publicationStatus != null && memorial.publicationStatus.name() == 'DRAFT'}" 
                                       class="badge bg-secondary">Черновик</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>Документ</span>
+                                <span th:if="${memorial.documentUrl}" class="badge bg-success">
+                                    <i class="bi bi-check-circle me-1"></i>Есть
+                                </span>
+                                <span th:unless="${memorial.documentUrl}" class="badge bg-secondary">
+                                    <i class="bi bi-x-circle me-1"></i>Нет
+                                </span>
                             </li>
                         </ul>
                     </div>

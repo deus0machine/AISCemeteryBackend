@@ -149,6 +149,10 @@ public class Memorial {
     @Column(name = "pending_photo_url")
     private String pendingPhotoUrl;
     
+    // Временный URL документа при редактировании
+    @Column(name = "pending_document_url")
+    private String pendingDocumentUrl;
+    
     // Временные данные для ФИО при редактировании
     @Column(name = "pending_fio")
     private String pendingFio;

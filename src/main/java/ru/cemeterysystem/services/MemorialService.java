@@ -1091,6 +1091,155 @@ public class MemorialService {
     }
 
     @Transactional
+    public String uploadDocument(Long id, MultipartFile file) {
+        Memorial memorial = memorialRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Memorial not found"));
+        
+        // Получаем текущего пользователя
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String login = authentication.getName();
+        User currentUser = userRepository.findByLogin(login)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        // Проверяем права доступа - только владелец может загружать документы
+        if (!memorial.getCreatedBy().equals(currentUser)) {
+            throw new RuntimeException("Only memorial owner can upload documents");
+        }
+        
+        // Проверяем, что у пользователя есть подписка
+        if (currentUser.getHasSubscription() != Boolean.TRUE) {
+            throw new RuntimeException("Document upload requires subscription");
+        }
+        
+        // Валидация файла
+        if (file.isEmpty()) {
+            throw new RuntimeException("File is empty");
+        }
+        
+        // Проверка типа файла
+        String contentType = file.getContentType();
+        if (contentType == null || (!contentType.equals("application/pdf") && 
+                                    !contentType.startsWith("image/"))) {
+            throw new RuntimeException("Only PDF and image files are allowed");
+        }
+        
+        // Проверка размера файла (максимум 10MB)
+        if (file.getSize() > 10 * 1024 * 1024) {
+            throw new RuntimeException("File size must not exceed 10MB");
+        }
+        
+        log.info("Загрузка документа для мемориала ID={}: пользователь={}, размер={}, тип={}", 
+                id, currentUser.getLogin(), file.getSize(), contentType);
+        
+        // Сохраняем документ в хранилище
+        String documentUrl = fileStorageService.storeFile(file);
+        
+        // Удаляем старый документ, если есть
+        if (memorial.getDocumentUrl() != null) {
+            try {
+                fileStorageService.deleteFile(memorial.getDocumentUrl());
+            } catch (Exception e) {
+                log.warn("Не удалось удалить старый документ: {}", e.getMessage());
+            }
+        }
+        
+        // Сохраняем URL документа
+        memorial.setDocumentUrl(documentUrl);
+        memorialRepository.save(memorial);
+        
+        log.info("Документ загружен для мемориала ID={}, URL: {}", id, documentUrl);
+        return documentUrl;
+    }
+
+    /**
+     * Получает документ мемориала для просмотра или скачивания
+     */
+    public org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> getMemorialDocument(Long id) {
+        log.info("MemorialService.getMemorialDocument: начало получения документа для мемориала {}", id);
+        
+        Memorial memorial = memorialRepository.findById(id)
+            .orElseThrow(() -> {
+                log.error("MemorialService.getMemorialDocument: мемориал {} не найден", id);
+                return new RuntimeException("Memorial not found");
+            });
+        
+        log.info("MemorialService.getMemorialDocument: мемориал найден, documentUrl={}", memorial.getDocumentUrl());
+        
+        if (memorial.getDocumentUrl() == null || memorial.getDocumentUrl().trim().isEmpty()) {
+            log.error("MemorialService.getMemorialDocument: у мемориала {} отсутствует документ", id);
+            throw new RuntimeException("Document not found");
+        }
+        
+        log.info("MemorialService.getMemorialDocument: передаем запрос в FileStorageService для URL: {}", memorial.getDocumentUrl());
+        
+        try {
+            org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> result = fileStorageService.getFile(memorial.getDocumentUrl());
+            log.info("MemorialService.getMemorialDocument: документ успешно получен из FileStorageService, статус: {}", result.getStatusCode());
+            return result;
+        } catch (Exception e) {
+            log.error("MemorialService.getMemorialDocument: ошибка при получении файла: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    /**
+     * Проверяет наличие документа у мемориала
+     */
+    public boolean hasDocument(Long id) {
+        Memorial memorial = memorialRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Memorial not found"));
+        
+        return memorial.getDocumentUrl() != null && !memorial.getDocumentUrl().isEmpty();
+    }
+
+    /**
+     * Проверяет права доступа пользователя к просмотру мемориала
+     */
+    public boolean hasViewAccess(Long memorialId, Long userId) {
+        Memorial memorial = memorialRepository.findById(memorialId)
+            .orElseThrow(() -> new RuntimeException("Memorial not found"));
+        
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        // Владелец всегда имеет доступ
+        if (memorial.getCreatedBy().equals(user)) {
+            return true;
+        }
+        
+        // Редакторы имеют доступ
+        if (memorial.isEditor(user)) {
+            return true;
+        }
+        
+        // Для опубликованных мемориалов - доступ есть у всех
+        if (memorial.isPublic() && memorial.getPublicationStatus() == Memorial.PublicationStatus.PUBLISHED) {
+            return true;
+        }
+        
+        return false;
+    }
+
+    /**
+     * Проверяет права доступа пользователя к редактированию мемориала
+     */
+    public boolean hasEditAccess(Long memorialId, Long userId) {
+        Memorial memorial = memorialRepository.findById(memorialId)
+            .orElseThrow(() -> new RuntimeException("Memorial not found"));
+        
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        // Владелец всегда имеет доступ
+        if (memorial.getCreatedBy().equals(user)) {
+            return true;
+        }
+        
+        // Редакторы имеют доступ
+        return memorial.isEditor(user);
+    }
+
+    @Transactional
     public void deleteMemorial(Long id) {
         // ... существующий код удаления мемориала ...
         Memorial memorial = memorialRepository.findById(id)

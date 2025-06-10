@@ -51,9 +51,32 @@ public class MemorialController {
      */
     private User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        log.info("getCurrentUser: authentication = {}", authentication);
+        log.info("getCurrentUser: principal = {}", authentication != null ? authentication.getPrincipal() : "null");
+        log.info("getCurrentUser: authenticated = {}", authentication != null ? authentication.isAuthenticated() : "null");
+        
+        if (authentication == null) {
+            log.error("getCurrentUser: Authentication is null!");
+            throw new RuntimeException("Authentication is null");
+        }
+        
         String login = authentication.getName();
-        return userService.findByLogin(login)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        log.info("getCurrentUser: извлеченный login = {}", login);
+        
+        if (login == null || login.trim().isEmpty()) {
+            log.error("getCurrentUser: Login is null or empty!");
+            throw new RuntimeException("Login is null or empty");
+        }
+        
+        User user = userService.findByLogin(login)
+                .orElseThrow(() -> {
+                    log.error("getCurrentUser: Пользователь с login '{}' не найден в базе данных", login);
+                    return new RuntimeException("User not found: " + login);
+                });
+        
+        log.info("getCurrentUser: найден пользователь: id={}, login={}, role={}", 
+                user.getId(), user.getLogin(), user.getRole());
+        return user;
     }
 
     /**
@@ -105,6 +128,134 @@ public class MemorialController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return memorialService.getPublicMemorials(page, size);
+    }
+
+    /**
+     * Получает документ мемориала для просмотра или скачивания.
+     * Доступно для владельцев, редакторов и администраторов.
+     *
+     * @param id ID мемориала
+     * @return ResponseEntity с содержимым документа
+     */
+    @GetMapping("/{id}/document")
+    public ResponseEntity<org.springframework.core.io.Resource> getMemorialDocument(@PathVariable Long id) {
+        log.info("=== НАЧАЛО ЗАПРОСА ДОКУМЕНТА ===");
+        log.info("Запрошен документ для мемориала с ID: {}", id);
+        
+        try {
+            User user = getCurrentUser();
+            log.info("Текущий пользователь: login={}, id={}, role={}", 
+                    user.getLogin(), user.getId(), user.getRole());
+            
+            // Проверяем существование мемориала
+            log.info("Проверяем существование мемориала с ID: {}", id);
+            Memorial memorial = memorialRepository.findById(id).orElse(null);
+            if (memorial == null) {
+                log.error("Мемориал с ID {} не найден", id);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            }
+            log.info("Мемориал найден: id={}, fio={}, owner={}, documentUrl={}", 
+                    memorial.getId(), memorial.getFio(), 
+                    memorial.getUser().getLogin(), memorial.getDocumentUrl());
+            
+            // Проверяем наличие документа
+            if (memorial.getDocumentUrl() == null || memorial.getDocumentUrl().trim().isEmpty()) {
+                log.warn("У мемориала {} отсутствует документ", id);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .header("X-Error", "Document not found")
+                    .build();
+            }
+            log.info("URL документа: {}", memorial.getDocumentUrl());
+            
+            // Проверяем права доступа к мемориалу
+            log.info("Проверяем права доступа...");
+            boolean isOwner = memorial.getUser().getId().equals(user.getId());
+            log.info("Является ли пользователь владельцем: {}", isOwner);
+            
+            boolean isEditor = memorial.getEditors() != null && 
+                             memorial.getEditors().stream().anyMatch(editor -> editor.getId().equals(user.getId()));
+            log.info("Является ли пользователь редактором: {}", isEditor);
+            
+            boolean isAdmin = user.getRole() == User.Role.ADMIN;
+            log.info("Является ли пользователь администратором: {}", isAdmin);
+            
+            boolean hasAccess = isOwner || isEditor || isAdmin;
+            log.info("Общий результат проверки доступа: {}", hasAccess);
+            
+            if (!hasAccess) {
+                log.warn("ОТКАЗ В ДОСТУПЕ к документу мемориала {} для пользователя {}", id, user.getLogin());
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .header("X-Error", "Access denied")
+                    .build();
+            }
+            
+            log.info("Доступ разрешен, получаем документ из сервиса...");
+            // Получаем документ
+            ResponseEntity<org.springframework.core.io.Resource> result = memorialService.getMemorialDocument(id);
+            log.info("Документ успешно получен, статус ответа: {}", result.getStatusCode());
+            return result;
+            
+        } catch (Exception e) {
+            log.error("КРИТИЧЕСКАЯ ОШИБКА при получении документа мемориала {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .header("X-Error", "Internal server error: " + e.getMessage())
+                .build();
+        } finally {
+            log.info("=== КОНЕЦ ЗАПРОСА ДОКУМЕНТА ===");
+        }
+    }
+
+    /**
+     * Проверяет наличие документа у мемориала.
+     *
+     * @param id ID мемориала
+     * @return true если документ есть, false если нет
+     */
+    @GetMapping("/{id}/has-document")
+    public boolean hasDocument(@PathVariable Long id) {
+        try {
+            User user = getCurrentUser();
+            log.info("Проверка наличия документа мемориала {} пользователем {}", id, user.getLogin());
+            
+            // Проверяем права доступа к мемориалу
+            boolean hasAccess = memorialService.hasViewAccess(id, user.getId()) || 
+                               user.getRole() == User.Role.ADMIN;
+            
+            if (!hasAccess) {
+                log.warn("Отказ в доступе к информации о документе мемориала {} для пользователя {}", id, user.getLogin());
+                return false;
+            }
+            
+            return memorialService.hasDocument(id);
+        } catch (Exception e) {
+            log.error("Ошибка при проверке наличия документа мемориала {}: {}", id, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Получает список редакторов мемориала
+     * 
+     * @param id ID мемориала
+     * @return список пользователей-редакторов
+     */
+    @GetMapping("/{id}/editors")
+    public List<UserDTO> getMemorialEditors(@PathVariable Long id) {
+        log.info("Получение редакторов для мемориала с ID: {}", id);
+        return memorialService.getMemorialEditors(id);
+    }
+
+    /**
+     * Получает информацию о ожидающих изменениях мемориала
+     * 
+     * @param id ID мемориала
+     * @return мемориал с информацией о ожидающих изменениях
+     */
+    @GetMapping("/{id}/pending-changes")
+    public MemorialDTO getMemorialPendingChanges(@PathVariable Long id) {
+        User currentUser = getCurrentUser();
+        log.info("Получение информации о ожидающих изменениях мемориала с ID: {}", id);
+        return memorialService.getMemorialPendingChanges(id, currentUser);
     }
 
     /**
@@ -276,6 +427,28 @@ public class MemorialController {
     }
 
     /**
+     * Загружает документ, подтверждающий существование человека.
+     * Доступно только пользователям с подпиской.
+     *
+     * @param id ID памятника
+     * @param file файл документа
+     * @return URL загруженного документа
+     */
+    @PostMapping("/{id}/document")
+    public String uploadDocument(@PathVariable Long id,
+                                 @RequestParam("document") MultipartFile file) {
+        User user = getCurrentUser();
+        
+        // Проверяем наличие подписки
+        if (user.getHasSubscription() != Boolean.TRUE) {
+            throw new IllegalStateException("Для загрузки документов требуется подписка");
+        }
+        
+        log.info("Загрузка документа для мемориала ID={} пользователем {}", id, user.getLogin());
+        return memorialService.uploadDocument(id, file);
+    }
+
+    /**
      * Ищет памятники по различным параметрам с пагинацией.
      *
      * @param query строка поиска по названию или описанию памятника
@@ -298,18 +471,6 @@ public class MemorialController {
             @RequestParam(defaultValue = "10") int size
     ) {
         return memorialService.searchMemorials(query, location, startDate, endDate, isPublic, page, size);
-    }
-    
-    /**
-     * Получает список редакторов мемориала
-     * 
-     * @param id ID мемориала
-     * @return список пользователей-редакторов
-     */
-    @GetMapping("/{id}/editors")
-    public List<UserDTO> getMemorialEditors(@PathVariable Long id) {
-        log.info("Получение редакторов для мемориала с ID: {}", id);
-        return memorialService.getMemorialEditors(id);
     }
     
     /**
@@ -340,19 +501,6 @@ public class MemorialController {
         User currentUser = getCurrentUser();
         log.info("Получение мемориалов с изменениями для пользователя: {}", currentUser.getLogin());
         return memorialService.getEditedMemorials(currentUser);
-    }
-    
-    /**
-     * Получает информацию о ожидающих изменениях мемориала
-     * 
-     * @param id ID мемориала
-     * @return мемориал с информацией о ожидающих изменениях
-     */
-    @GetMapping("/{id}/pending-changes")
-    public MemorialDTO getMemorialPendingChanges(@PathVariable Long id) {
-        User currentUser = getCurrentUser();
-        log.info("Получение информации о ожидающих изменениях мемориала с ID: {}", id);
-        return memorialService.getMemorialPendingChanges(id, currentUser);
     }
     
     /**

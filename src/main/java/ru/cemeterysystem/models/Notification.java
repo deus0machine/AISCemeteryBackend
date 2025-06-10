@@ -73,7 +73,8 @@ public class Notification {
         MASS_ANNOUNCEMENT,        // Массовое оповещение о важном
         ADMIN_SYSTEM,             // Административное системное уведомление 
         ADMIN_WARNING,            // Предупреждение от администратора
-        MEMORIAL_REPORT           // Жалоба на мемориал
+        MEMORIAL_REPORT,          // Жалоба на мемориал
+        FAMILY_TREE_MODERATION    // Модерация семейного дерева
     }
     
     public enum NotificationStatus {

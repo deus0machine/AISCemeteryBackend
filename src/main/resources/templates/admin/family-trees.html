@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Управление семейными деревьями | Админ-панель</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #198754;
+            --danger-color: #dc3545;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+
+        .sidebar {
+            background: var(--primary-color);
+            min-height: 100vh;
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.7);
+            border-left: 3px solid transparent;
+        }
+
+        .sidebar .nav-link.active {
+            background: rgba(255,255,255,0.1);
+            border-left-color: var(--secondary-color);
+            color: white;
+        }
+
+        .status-badge {
+            font-weight: 500;
+            padding: 0.4em 0.7em;
+        }
+        .stats-card {
+            border-left: 4px solid;
+            transition: transform 0.2s;
+        }
+        .stats-card:hover {
+            transform: translateY(-2px);
+        }
+        .stats-card.total { border-left-color: #6c757d; }
+        .stats-card.pending { border-left-color: #ffc107; }
+        .stats-card.published { border-left-color: #198754; }
+        .stats-card.rejected { border-left-color: #dc3545; }
+        .stats-card.draft { border-left-color: #6f42c1; }
+        
+        .action-buttons {
+            display: flex;
+            gap: 0.25rem;
+        }
+        
+        .tree-preview {
+            max-width: 200px;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+        
+        .filters-section {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .table-actions {
+            min-width: 140px;
+        }
+    </style>
+</head>
+<body>
+<!-- Шапка -->
+<header class="navbar navbar-dark bg-primary shadow-sm">
+    <div class="container-fluid">
+        <button class="navbar-toggler d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <a class="navbar-brand" href="/admin">
+            <i class="bi bi-building-gear me-2"></i>Администрирование
+        </a>
+        <div class="dropdown">
+            <a href="#" class="text-white text-decoration-none dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="bi bi-person-circle me-2"></i>
+                <span sec:authentication="name"></span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="#"><i class="bi bi-gear me-2"></i>Настройки</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <form th:action="@{/logout}" method="post">
+                        <button class="dropdown-item" type="submit">
+                            <i class="bi bi-box-arrow-right me-2"></i>Выйти
+                        </button>
+                    </form>
+                </li>
+            </ul>
+        </div>
+    </div>
+</header>
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- Боковое меню -->
+        <nav class="col-md-3 col-lg-2 sidebar collapse d-md-block" id="sidebarMenu">
+            <div class="position-sticky pt-3">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin">
+                            <i class="bi bi-speedometer2 me-2"></i>Панель управления
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/users">
+                            <i class="bi bi-people-fill me-2"></i>Пользователи
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/memorials">
+                            <i class="bi bi-bookmark-heart me-2"></i>Мемориалы
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/admin/family-trees">
+                            <i class="bi bi-diagram-3 me-2"></i>Семейные древа
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/notifications">
+                            <i class="bi bi-bell me-2"></i>Уведомления
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <!-- Основной контент -->
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <h1 class="h2">
+                <i class="bi bi-diagram-3 me-2"></i>
+                Управление семейными деревьями
+            </h1>
+        </div>
+
+        <!-- Статистика -->
+        <div class="row mb-4">
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="card stats-card total">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="card-subtitle mb-2 text-muted">Всего деревьев</h6>
+                                <h4 class="card-title mb-0" th:text="${stats.total}">0</h4>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="bi bi-diagram-3 text-muted" style="font-size: 2rem;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="card stats-card pending">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="card-subtitle mb-2 text-muted">На модерации</h6>
+                                <h4 class="card-title mb-0" th:text="${stats.pending}">0</h4>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="bi bi-hourglass-split text-warning" style="font-size: 2rem;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="card stats-card published">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="card-subtitle mb-2 text-muted">Опубликованы</h6>
+                                <h4 class="card-title mb-0" th:text="${stats.published}">0</h4>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="card stats-card rejected">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="card-subtitle mb-2 text-muted">Отклонены</h6>
+                                <h4 class="card-title mb-0" th:text="${stats.rejected}">0</h4>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="bi bi-x-circle text-danger" style="font-size: 2rem;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Фильтры и поиск -->
+        <div class="filters-section">
+            <form method="get" th:action="@{/admin/family-trees}">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label for="search" class="form-label">Поиск по названию</label>
+                        <input type="text" class="form-control" id="search" name="search" 
+                               th:value="${search}" placeholder="Введите название дерева...">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="status" class="form-label">Статус</label>
+                        <select class="form-select" id="status" name="status">
+                            <option value="">Все статусы</option>
+                            <option value="pending" th:selected="${status == 'pending'}">На модерации</option>
+                            <option value="published" th:selected="${status == 'published'}">Опубликованы</option>
+                            <option value="rejected" th:selected="${status == 'rejected'}">Отклонены</option>
+                            <option value="draft" th:selected="${status == 'draft'}">Приватные</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="sortBy" class="form-label">Сортировка</label>
+                        <select class="form-select" id="sortBy" name="sortBy">
+                            <option value="createdAt" th:selected="${sortBy == 'createdAt'}">По дате создания</option>
+                            <option value="name" th:selected="${sortBy == 'name'}">По названию</option>
+                            <option value="publicationStatus" th:selected="${sortBy == 'publicationStatus'}">По статусу</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <div class="btn-group w-100" role="group">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-search"></i> Поиск
+                            </button>
+                            <a href="/admin/family-trees" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Таблица деревьев -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-table me-2"></i>
+                    Список семейных деревьев
+                    <span class="badge bg-secondary ms-2" th:text="${familyTrees.totalElements}">0</span>
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>ID</th>
+                                <th>Название</th>
+                                <th>Владелец</th>
+                                <th>Мемориалы</th>
+                                <th>Статус</th>
+                                <th>Дата создания</th>
+                                <th class="table-actions">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="tree : ${familyTrees.content}">
+                                <td th:text="${tree.id}">#1</td>
+                                <td>
+                                    <div class="tree-preview">
+                                        <strong th:text="${tree.name}">Название дерева</strong>
+                                        <div class="text-muted small" th:text="${tree.description}">Описание дерева</div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span th:text="${tree.user != null ? tree.user.fio : 'Неизвестно'}">Владелец</span>
+                                    <div class="text-muted small" th:text="${tree.user != null ? tree.user.contacts : ''}">контакты</div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-info" th:text="${tree.memorialRelations != null ? tree.memorialRelations.size() : 0}">0</span>
+                                </td>
+                                <td>
+                                    <span class="badge status-badge"
+                                          th:classappend="${tree.publicationStatus?.name() == 'PUBLISHED' ? 'bg-success' : 
+                                                          tree.publicationStatus?.name() == 'PENDING_MODERATION' ? 'bg-warning' : 
+                                                          tree.publicationStatus?.name() == 'REJECTED' ? 'bg-danger' : 'bg-secondary'}"
+                                          th:text="${tree.publicationStatus?.name() == 'PUBLISHED' ? 'Опубликовано' : 
+                                                   tree.publicationStatus?.name() == 'PENDING_MODERATION' ? 'На модерации' : 
+                                                   tree.publicationStatus?.name() == 'REJECTED' ? 'Отклонено' : 'Приватное'}">
+                                        Статус
+                                    </span>
+                                </td>
+                                <td th:text="${#temporals.format(tree.createdAt, 'dd.MM.yyyy HH:mm')}">01.01.2024 12:00</td>
+                                <td class="table-actions">
+                                    <div class="action-buttons">
+                                        <a th:href="@{/admin/family-trees/{id}(id=${tree.id})}" 
+                                           class="btn btn-sm btn-outline-primary" title="Просмотр">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        
+                                        <!-- Кнопки модерации для деревьев на рассмотрении -->
+                                        <div th:if="${tree.publicationStatus?.name() == 'PENDING_MODERATION'}">
+                                            <button class="btn btn-sm btn-success btn-approve-tree" 
+                                                    th:data-tree-id="${tree.id}" 
+                                                    title="Одобрить">
+                                                <i class="bi bi-check"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-warning btn-reject-tree" 
+                                                    th:data-tree-id="${tree.id}" 
+                                                    th:data-tree-name="${tree.name}" 
+                                                    title="Отклонить">
+                                                <i class="bi bi-x"></i>
+                                            </button>
+                                        </div>
+                                        
+                                        <button class="btn btn-sm btn-outline-danger btn-delete-tree" 
+                                                th:data-tree-id="${tree.id}" 
+                                                th:data-tree-name="${tree.name}" 
+                                                title="Удалить">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr th:if="${familyTrees.empty}">
+                                <td colspan="7" class="text-center text-muted py-4">
+                                    <i class="bi bi-inbox display-4 d-block mb-2"></i>
+                                    Деревья не найдены
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Пагинация -->
+        <nav th:if="${totalPages > 1}" aria-label="Навигация по страницам" class="mt-4">
+            <ul class="pagination justify-content-center">
+                <li class="page-item" th:classappend="${currentPage == 0 ? 'disabled' : ''}">
+                    <a class="page-link" th:href="@{/admin/family-trees(page=0, search=${search}, status=${status}, sortBy=${sortBy})}">
+                        Первая
+                    </a>
+                </li>
+                <li class="page-item" th:classappend="${currentPage == 0 ? 'disabled' : ''}">
+                    <a class="page-link" th:href="@{/admin/family-trees(page=${currentPage-1}, search=${search}, status=${status}, sortBy=${sortBy})}">
+                        Предыдущая
+                    </a>
+                </li>
+                
+                <li th:each="i : ${#numbers.sequence(T(java.lang.Math).max(0, currentPage-2), T(java.lang.Math).min(totalPages-1, currentPage+2))}"
+                    class="page-item" th:classappend="${i == currentPage ? 'active' : ''}">
+                    <a class="page-link" th:href="@{/admin/family-trees(page=${i}, search=${search}, status=${status}, sortBy=${sortBy})}" th:text="${i+1}">1</a>
+                </li>
+                
+                <li class="page-item" th:classappend="${currentPage == totalPages-1 ? 'disabled' : ''}">
+                    <a class="page-link" th:href="@{/admin/family-trees(page=${currentPage+1}, search=${search}, status=${status}, sortBy=${sortBy})}">
+                        Следующая
+                    </a>
+                </li>
+                <li class="page-item" th:classappend="${currentPage == totalPages-1 ? 'disabled' : ''}">
+                    <a class="page-link" th:href="@{/admin/family-trees(page=${totalPages-1}, search=${search}, status=${status}, sortBy=${sortBy})}">
+                        Последняя
+                    </a>
+                </li>
+            </ul>
+        </nav>
+        </main>
+    </div>
+</div>
+
+    <!-- Модальное окно для отклонения дерева -->
+    <div class="modal fade" id="rejectModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Отклонить семейное дерево</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Вы действительно хотите отклонить дерево "<span id="rejectTreeName"></span>"?</p>
+                    <div class="mb-3">
+                        <label for="rejectReason" class="form-label">Причина отклонения:</label>
+                        <textarea class="form-control" id="rejectReason" rows="3" 
+                                  placeholder="Укажите причину отклонения дерева..." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-danger" onclick="confirmReject()">Отклонить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentTreeId = null;
+        const rejectModal = new bootstrap.Modal(document.getElementById('rejectModal'));
+        
+        // Добавляем обработчики событий для кнопок
+        document.addEventListener('DOMContentLoaded', function() {
+            // Обработчики для кнопок одобрения
+            document.querySelectorAll('.btn-approve-tree').forEach(button => {
+                button.addEventListener('click', function() {
+                    const treeId = this.getAttribute('data-tree-id');
+                    approveTree(treeId);
+                });
+            });
+            
+            // Обработчики для кнопок отклонения
+            document.querySelectorAll('.btn-reject-tree').forEach(button => {
+                button.addEventListener('click', function() {
+                    const treeId = this.getAttribute('data-tree-id');
+                    const treeName = this.getAttribute('data-tree-name');
+                    showRejectModal(treeId, treeName);
+                });
+            });
+            
+            // Обработчики для кнопок удаления
+            document.querySelectorAll('.btn-delete-tree').forEach(button => {
+                button.addEventListener('click', function() {
+                    const treeId = this.getAttribute('data-tree-id');
+                    const treeName = this.getAttribute('data-tree-name');
+                    deleteTree(treeId, treeName);
+                });
+            });
+        });
+
+        function approveTree(treeId) {
+            if (confirm('Вы действительно хотите одобрить это семейное дерево?')) {
+                fetch(`/admin/family-trees/${treeId}/approve`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert('success', data.message);
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showAlert('danger', data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showAlert('danger', 'Произошла ошибка при одобрении дерева');
+                });
+            }
+        }
+
+        function showRejectModal(treeId, treeName) {
+            currentTreeId = treeId;
+            document.getElementById('rejectTreeName').textContent = treeName;
+            document.getElementById('rejectReason').value = '';
+            rejectModal.show();
+        }
+
+        function confirmReject() {
+            const reason = document.getElementById('rejectReason').value.trim();
+            if (!reason) {
+                showAlert('warning', 'Необходимо указать причину отклонения');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('reason', reason);
+
+            fetch(`/admin/family-trees/${currentTreeId}/reject`, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                rejectModal.hide();
+                if (data.success) {
+                    showAlert('success', data.message);
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showAlert('danger', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                rejectModal.hide();
+                showAlert('danger', 'Произошла ошибка при отклонении дерева');
+            });
+        }
+
+        function deleteTree(treeId, treeName) {
+            if (confirm(`Вы действительно хотите удалить дерево "${treeName}"?\n\nЭто действие нельзя отменить!`)) {
+                fetch(`/admin/family-trees/${treeId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert('success', data.message);
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showAlert('danger', data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showAlert('danger', 'Произошла ошибка при удалении дерева');
+                });
+            }
+        }
+
+        function showAlert(type, message) {
+            const alertContainer = document.createElement('div');
+            alertContainer.innerHTML = `
+                <div class="alert alert-${type} alert-dismissible fade show position-fixed" 
+                     style="top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            document.body.appendChild(alertContainer);
+            
+            setTimeout(() => {
+                alertContainer.remove();
+            }, 5000);
+        }
+    </script>
+</body>
+</html> 

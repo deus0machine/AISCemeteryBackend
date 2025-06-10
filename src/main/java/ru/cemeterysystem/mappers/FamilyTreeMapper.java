@@ -1,5 +1,6 @@
 package ru.cemeterysystem.mappers;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import ru.cemeterysystem.dto.FamilyTreeDTO;
 import ru.cemeterysystem.dto.MemorialRelationDTO;
@@ -9,20 +10,32 @@ import ru.cemeterysystem.models.FamilyTree;
 import ru.cemeterysystem.models.MemorialRelation;
 import ru.cemeterysystem.models.Memorial;
 
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
 public class FamilyTreeMapper {
+    
+    @Autowired
+    private UserMapper userMapper;
     public FamilyTreeDTO toDTO(FamilyTree tree) {
         FamilyTreeDTO dto = new FamilyTreeDTO();
         dto.setId(tree.getId());
         dto.setName(tree.getName());
         dto.setDescription(tree.getDescription());
         dto.setUserId(tree.getUser() != null ? tree.getUser().getId() : null);
+        
+        // Добавляем полную информацию о владельце
+        dto.setOwner(userMapper.toDTO(tree.getUser()));
+        
         dto.setPublic(tree.isPublic());
-        dto.setCreatedAt(tree.getCreatedAt());
-        dto.setUpdatedAt(tree.getUpdatedAt());
+        dto.setPublicationStatus(tree.getPublicationStatus());
+        
+        // Форматируем даты как строки
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+        dto.setCreatedAt(tree.getCreatedAt() != null ? tree.getCreatedAt().format(formatter) : null);
+        dto.setUpdatedAt(tree.getUpdatedAt() != null ? tree.getUpdatedAt().format(formatter) : null);
         if (tree.getMemorialRelations() != null) {
             List<MemorialRelationDTO> relations = tree.getMemorialRelations().stream().map(this::toRelationDTO).collect(Collectors.toList());
             dto.setMemorialRelations(relations);

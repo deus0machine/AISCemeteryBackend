@@ -31,6 +31,19 @@ public class FamilyTree {
     @JsonProperty("is_public")
     private boolean isPublic;
 
+    // Статус публикации дерева
+    @Enumerated(EnumType.STRING)
+    @Column(name = "publication_status", nullable = false, columnDefinition = "VARCHAR(255) default 'DRAFT'")
+    private PublicationStatus publicationStatus = PublicationStatus.DRAFT;
+    
+    // Enum для статуса публикации (используем тот же что и у Memorial)
+    public enum PublicationStatus {
+        DRAFT,               // Черновик (не опубликован)
+        PENDING_MODERATION,  // На модерации
+        PUBLISHED,           // Опубликован
+        REJECTED             // Отклонен
+    }
+
     @Column(name = "created_at", nullable = false)
     @JsonProperty("created_at")
     private LocalDateTime createdAt;
