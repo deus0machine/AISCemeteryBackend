@@ -41,36 +41,9 @@ public class SecurityConfig {
         return new JwtAuthenticationFilter(jwtUtils, userService);
     }
 
-    // Конфигурация для API с JWT аутентификацией
+    // Основная конфигурация безопасности
     @Bean
-    @Order(1)
-    public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) throws Exception {
-        http
-                .securityMatcher("/api/**") // Применять только к API эндпоинтам
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable())
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                "/api/login",
-                                "/api/register",
-                                "/api/memorials/public"
-                        ).permitAll()
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .anyRequest().authenticated()
-                )
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
-                .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
-
-        logger.info("API Security configuration applied");
-        return http.build();
-    }
-
-    // Конфигурация для веб-интерфейса с форм-аутентификацией
-    @Bean
-    @Order(2)
-    public SecurityFilterChain webSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .securityMatcher(AntPathRequestMatcher.antMatcher("/**")) // Применять ко всем другим эндпоинтам
                 .cors(cors -> cors.disable())

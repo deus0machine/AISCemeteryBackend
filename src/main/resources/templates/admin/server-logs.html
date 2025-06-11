@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Логи сервера | Система управления кладбищем</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        
+        /* Стили для информационных карточек */
+        .dashboard-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+            border-radius: 0.75rem;
+            overflow: hidden;
+        }
+        
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+        }
+        
+        /* Стили для иконок в карточках */
+        .stat-icon-primary, .stat-icon-success, .stat-icon-info, .stat-icon-warning, .stat-icon-danger {
+            width: 54px;
+            height: 54px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            font-size: 1.75rem;
+        }
+        
+        .stat-icon-primary {
+            background-color: rgba(13, 110, 253, 0.1);
+            color: #0d6efd;
+        }
+        
+        .stat-icon-success {
+            background-color: rgba(25, 135, 84, 0.1);
+            color: #198754;
+        }
+        
+        .stat-icon-info {
+            background-color: rgba(13, 202, 240, 0.1);
+            color: #0dcaf0;
+        }
+        
+        .stat-icon-warning {
+            background-color: rgba(255, 193, 7, 0.1);
+            color: #ffc107;
+        }
+        
+        .stat-icon-danger {
+            background-color: rgba(220, 53, 69, 0.1);
+            color: #dc3545;
+        }
+        
+        /* Стили для таблиц */
+        .custom-table thead th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+            border-top: none;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .custom-table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        
+        .custom-table tbody tr:hover {
+            background-color: rgba(13, 110, 253, 0.05);
+        }
+        
+        /* Стили для сайдбара */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            background-color: #2c3e50;
+            transition: all 0.3s;
+        }
+        
+        .sidebar-sticky {
+            height: calc(100vh - 48px);
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+        
+        .nav-link {
+            padding: 0.75rem 1.25rem;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.8);
+            border-left: 4px solid transparent;
+            transition: all 0.2s;
+        }
+        
+        .nav-link:hover {
+            color: #fff;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-left-color: #3498db;
+        }
+        
+        .nav-link.active {
+            color: #fff;
+            background-color: #1a252f;
+            border-left-color: #3498db;
+        }
+        
+        .nav-link i {
+            margin-right: 0.5rem;
+            font-size: 1.1rem;
+        }
+        
+        /* Стили для заголовка "Система" */
+        .sidebar-heading {
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #3498db !important;
+            background: linear-gradient(135deg, rgba(52, 152, 219, 0.1), rgba(52, 152, 219, 0.05));
+            border-radius: 0.375rem;
+            padding: 0.5rem 1rem !important;
+            margin: 1rem 0.75rem 0.5rem 0.75rem !important;
+            border-left: 3px solid #3498db;
+            position: relative;
+        }
+        
+        .sidebar-heading::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(52, 152, 219, 0.05), transparent);
+            border-radius: 0.375rem;
+            z-index: -1;
+        }
+        
+        .sidebar-heading span {
+            display: flex;
+            align-items: center;
+        }
+        
+        .sidebar-heading span::before {
+            content: '⚙️';
+            margin-right: 0.5rem;
+            font-size: 0.875rem;
+        }
+        
+        /* Стили для блока логов */
+        .log-container {
+            max-height: 500px;
+            overflow-y: auto;
+            background: #1a1a1a;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            border-left: 3px solid transparent;
+            word-wrap: break-word;
+        }
+        
+        .log-entry.ERROR {
+            background: rgba(220, 53, 69, 0.1);
+            border-left-color: #dc3545;
+            color: #f8d7da;
+        }
+        
+        .log-entry.WARN {
+            background: rgba(255, 193, 7, 0.1);
+            border-left-color: #ffc107;
+            color: #fff3cd;
+        }
+        
+        .log-entry.INFO {
+            background: rgba(13, 202, 240, 0.1);
+            border-left-color: #0dcaf0;
+            color: #d1ecf1;
+        }
+        
+        .log-entry.DEBUG {
+            background: rgba(108, 117, 125, 0.1);
+            border-left-color: #6c757d;
+            color: #d6d8db;
+        }
+        
+        .log-timestamp {
+            color: #6c757d;
+            font-weight: bold;
+        }
+        
+        .log-level {
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        
+        .log-level.ERROR { background: #dc3545; color: white; }
+        .log-level.WARN { background: #ffc107; color: black; }
+        .log-level.INFO { background: #0dcaf0; color: black; }
+        .log-level.DEBUG { background: #6c757d; color: white; }
+        
+        .log-logger {
+            color: #20c997;
+            font-weight: 500;
+        }
+        
+        .log-message {
+            color: #f8f9fa;
+            margin-left: 10px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-online { 
+            background: #28a745; 
+            animation: pulse 2s infinite; 
+        }
+        
+        .status-offline { 
+            background: #dc3545; 
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Навигационная панель -->
+    <header class="navbar navbar-dark sticky-top bg-dark flex-md-nowrap p-0 shadow">
+        <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3" href="/admin">
+            <i class="bi bi-building-gear me-2"></i> Администрирование
+        </a>
+        <button class="navbar-toggler position-absolute d-md-none collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="w-100"></div>
+        <div class="navbar-nav">
+            <div class="nav-item text-nowrap d-flex align-items-center">
+                <span class="text-white me-3" sec:authentication="name">Username</span>
+                <form th:action="@{/logout}" method="post">
+                    <button class="nav-link px-3 bg-dark border-0" type="submit">
+                        <i class="bi bi-box-arrow-right me-1"></i> Выйти
+                    </button>
+                </form>
+            </div>
+        </div>
+    </header>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Боковое меню -->
+            <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                <div class="position-sticky pt-3 sidebar-sticky">
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin">
+                                <i class="bi bi-speedometer2"></i> Панель управления
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/users">
+                                <i class="bi bi-people"></i> Пользователи
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/memorials">
+                                <i class="bi bi-bookmark-heart"></i> Мемориалы
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/family-trees">
+                                <i class="bi bi-diagram-3"></i> Семейные древа
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/notifications">
+                                <i class="bi bi-bell"></i> Уведомления
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/reports">
+                                <i class="bi bi-bar-chart"></i> Отчеты
+                            </a>
+                        </li>
+                    </ul>
+
+                    <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
+                        <span>Система</span>
+                    </h6>
+                    <ul class="nav flex-column mb-2">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/logs">
+                                <i class="bi bi-file-text"></i> Журналы
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" href="/admin/server-logs">
+                                <i class="bi bi-terminal"></i> Логи сервера
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Основной контент -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4 border-bottom">
+                    <h1 class="h2"><i class="bi bi-terminal me-2 text-primary"></i>Логи сервера</h1>
+                    <div class="btn-toolbar mb-2 mb-md-0">
+                        <div class="btn-group me-2">
+                            <button type="button" class="btn btn-sm btn-primary" onclick="refreshLogs()">
+                                <i class="bi bi-arrow-clockwise me-1"></i> Обновить
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearLogs()">
+                                <i class="bi bi-trash me-1"></i> Очистить
+                            </button>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle d-flex align-items-center" onclick="downloadLogs()">
+                            <i class="bi bi-download me-1"></i> Скачать логи
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Информационные карточки -->
+                <div class="row mb-4">
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card dashboard-card border-start border-primary border-4 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs text-uppercase fw-bold text-primary mb-1">
+                                            Всего логов</div>
+                                        <div class="h3 mb-0 fw-bold" id="totalLogs">0</div>
+                                        <div class="text-muted small mt-2">
+                                            <span class="status-indicator status-online"></span>
+                                            <span>Система активна</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <div class="stat-icon-primary">
+                                            <i class="bi bi-terminal"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card dashboard-card border-start border-danger border-4 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs text-uppercase fw-bold text-danger mb-1">
+                                            Ошибок</div>
+                                        <div class="h3 mb-0 fw-bold" id="errorLogsCount">0</div>
+                                        <div class="text-muted small mt-2">
+                                            <i class="bi bi-exclamation-triangle text-danger"></i> 
+                                            <span>Требуют внимания</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <div class="stat-icon-danger">
+                                            <i class="bi bi-exclamation-triangle"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card dashboard-card border-start border-warning border-4 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs text-uppercase fw-bold text-warning mb-1">
+                                            Предупреждений</div>
+                                        <div class="h3 mb-0 fw-bold" id="warnLogsCount">0</div>
+                                        <div class="text-muted small mt-2">
+                                            <i class="bi bi-exclamation-circle text-warning"></i> 
+                                            <span>За сегодня</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <div class="stat-icon-warning">
+                                            <i class="bi bi-exclamation-circle"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card dashboard-card border-start border-info border-4 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs text-uppercase fw-bold text-info mb-1">
+                                            Информации</div>
+                                        <div class="h3 mb-0 fw-bold" id="infoLogsCount">0</div>
+                                        <div class="text-muted small mt-2">
+                                            <i class="bi bi-info-circle text-info"></i> 
+                                            <span>За сегодня</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <div class="stat-icon-info">
+                                            <i class="bi bi-info-circle"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card dashboard-card border-start border-success border-4 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs text-uppercase fw-bold text-success mb-1">
+                                            Отладки</div>
+                                        <div class="h3 mb-0 fw-bold" id="debugLogsCount">0</div>
+                                        <div class="text-muted small mt-2">
+                                            <i class="bi bi-bug text-success"></i> 
+                                            <span>За сегодня</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <div class="stat-icon-success">
+                                            <i class="bi bi-bug"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Логи в реальном времени -->
+                <div class="row">
+                    <div class="col-lg-8">
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                                <h5 class="card-title m-0 text-primary">
+                                    <i class="bi bi-list-ul me-2"></i>Логи в реальном времени
+                                </h5>
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-outline-primary active" onclick="setLogLevel('ALL')">Все</button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="setLogLevel('ERROR')">Ошибки</button>
+                                    <button class="btn btn-sm btn-outline-warning" onclick="setLogLevel('WARN')">Предупреждения</button>
+                                    <button class="btn btn-sm btn-outline-info" onclick="setLogLevel('INFO')">Информация</button>
+                                    <button class="btn btn-sm btn-outline-success" onclick="setLogLevel('DEBUG')">Отладка</button>
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="log-container" id="logContainer">
+                                    <div class="text-center text-muted">
+                                        <i class="bi bi-hourglass-split"></i> Загрузка логов...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Статус системы -->
+                    <div class="col-lg-4">
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header bg-white py-3">
+                                <h5 class="card-title m-0 text-primary">
+                                    <i class="bi bi-info-circle me-2"></i>Статус системы
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-3">
+                                    <span class="status-indicator status-online me-2"></span>
+                                    <div>
+                                        <div class="fw-bold">Состояние: Активно</div>
+                                        <div class="small text-muted">Логирование работает</div>
+                                    </div>
+                                </div>
+                                
+                                <hr>
+                                
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between">
+                                        <span class="small">Уровень логирования:</span>
+                                        <span class="badge bg-info">INFO</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between">
+                                        <span class="small">Файл логов:</span>
+                                        <span class="small text-muted">application.log</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between">
+                                        <span class="small">Ротация:</span>
+                                        <span class="small text-muted">24 часа</span>
+                                    </div>
+                                </div>
+                                
+                                <hr>
+                                
+                                <div class="text-center">
+                                    <button class="btn btn-sm btn-outline-primary me-2" onclick="toggleAutoScroll()">
+                                        <i class="bi bi-arrow-down-circle" id="scrollIcon"></i> Автопрокрутка
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let autoScroll = true;
+        let currentLogLevel = 'ALL';
+        let isRefreshing = false; // Флаг для предотвращения множественных запросов
+        let logCounts = {
+            ERROR: 0,
+            WARN: 0,
+            INFO: 0,
+            DEBUG: 0,
+            total: 0
+        };
+
+        function refreshLogs() {
+            if (isRefreshing) {
+                return;
+            }
+            
+            isRefreshing = true;
+            const container = document.getElementById('logContainer');
+            
+            // Показать индикатор загрузки
+            container.innerHTML = '<div class="text-center text-muted"><i class="bi bi-hourglass-split"></i> Загрузка логов...</div>';
+            
+            // Получаем реальные логи с сервера (без ограничений - limit=0)
+            const url = `/admin/server-logs/api/logs?level=${currentLogLevel}&limit=0`;
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        displayLogs(data.logs);
+                        updateLogCounts(data.stats);
+                    } else {
+                        showError(data.error || 'Ошибка при загрузке логов');
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка при загрузке логов:', error);
+                    showError('Ошибка сети при загрузке логов');
+                })
+                .finally(() => {
+                    isRefreshing = false;
+                });
+        }
+
+        function displayLogs(logs) {
+            const container = document.getElementById('logContainer');
+            
+            // Обновляем терминальный вид
+            if (logs.length === 0) {
+                container.innerHTML = '<div class="text-center text-muted"><i class="bi bi-inbox"></i> Нет логов для отображения</div>';
+            } else {
+                const logHtml = logs.map(log => `
+                    <div class="log-entry ${log.level}">
+                        <span class="log-timestamp">${log.timestamp}</span>
+                        <span class="log-level ${log.level}">${log.level}</span>
+                        <span class="log-logger">[${log.logger}]</span>
+                        <span class="log-message">${escapeHtml(log.message)}</span>
+                    </div>
+                `).join('');
+                container.innerHTML = logHtml;
+                
+                // Автопрокрутка к концу
+                if (autoScroll) {
+                    container.scrollTop = container.scrollHeight;
+                }
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showError(message) {
+            const container = document.getElementById('logContainer');
+            
+            container.innerHTML = `<div class="text-center text-danger"><i class="bi bi-exclamation-triangle"></i> ${message}</div>`;
+        }
+
+        function setLogLevel(level) {
+            currentLogLevel = level;
+            
+            // Обновляем активную кнопку
+            document.querySelectorAll('.btn-group .btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            refreshLogs();
+        }
+
+        function toggleAutoScroll() {
+            autoScroll = !autoScroll;
+            const icon = document.getElementById('scrollIcon');
+            icon.className = autoScroll ? 'bi bi-arrow-down-circle' : 'bi bi-pause-circle';
+        }
+
+        function clearLogs() {
+            if (confirm('Вы уверены, что хотите очистить логи?')) {
+                fetch('/admin/server-logs/api/clear', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('logContainer').innerHTML = '<div class="text-center text-success"><i class="bi bi-check-circle"></i> Логи успешно очищены</div>';
+                        resetLogCounts();
+                    } else {
+                        alert('Ошибка при очистке логов: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка при очистке логов:', error);
+                    alert('Ошибка сети при очистке логов');
+                });
+            }
+        }
+
+        function downloadLogs() {
+            // Создаем ссылку для скачивания
+            const link = document.createElement('a');
+            link.href = '/admin/server-logs/api/download';
+            link.download = 'application_logs.log';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function updateLogCounts(stats) {
+            // Перезаписываем значения счетчиков (не добавляем к существующим)
+            logCounts = {
+                ERROR: stats.ERROR || 0,
+                WARN: stats.WARN || 0,
+                INFO: stats.INFO || 0,
+                DEBUG: stats.DEBUG || 0,
+                total: stats.total || 0
+            };
+
+            document.getElementById('totalLogs').textContent = logCounts.total;
+            document.getElementById('errorLogsCount').textContent = logCounts.ERROR;
+            document.getElementById('warnLogsCount').textContent = logCounts.WARN;
+            document.getElementById('infoLogsCount').textContent = logCounts.INFO;
+            document.getElementById('debugLogsCount').textContent = logCounts.DEBUG;
+        }
+
+        function resetLogCounts() {
+            logCounts = { ERROR: 0, WARN: 0, INFO: 0, DEBUG: 0, total: 0 };
+            updateLogCounts(logCounts);
+        }
+
+        // Инициализация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            // Не загружаем логи автоматически при загрузке страницы
+            // Инициализируем только интерфейс с пустыми значениями
+            resetLogCounts();
+            
+            // Инициализируем пустое состояние для контейнера логов
+            const container = document.getElementById('logContainer');
+            container.innerHTML = '<div class="text-center text-muted"><i class="bi bi-info-circle"></i> Нажмите "Обновить" для загрузки логов</div>';
+            
+            // Убираем автообновление каждые 30 секунд
+            // Обновление будет происходить только при нажатии кнопки "Обновить"
+        });
+    </script>
+</body>
+</html> 

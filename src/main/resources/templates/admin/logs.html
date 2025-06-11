@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Журналы системы - Система управления кладбищем</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <style>
+        /* Стили в стиле dashboard */
+        .dashboard-card {
+            border-radius: 0.75rem;
+            transition: all 0.3s ease;
+        }
+        
+        .dashboard-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1) !important;
+        }
+        
+        .stat-icon-primary {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            background-color: rgba(13, 110, 253, 0.1);
+            color: #0d6efd;
+        }
+        
+        .stat-icon-success {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            background-color: rgba(25, 135, 84, 0.1);
+            color: #198754;
+        }
+        
+        .stat-icon-info {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            background-color: rgba(13, 202, 240, 0.1);
+            color: #0dcaf0;
+        }
+        
+        .stat-icon-warning {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            background-color: rgba(255, 193, 7, 0.1);
+            color: #ffc107;
+        }
+        
+        /* Стили для сайдбара */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            background-color: #2c3e50;
+            transition: all 0.3s;
+        }
+        
+        .sidebar-sticky {
+            height: calc(100vh - 48px);
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+        
+        .nav-link {
+            padding: 0.75rem 1.25rem;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.8);
+            border-left: 4px solid transparent;
+            transition: all 0.2s;
+        }
+        
+        .nav-link:hover {
+            color: #fff;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-left-color: #3498db;
+        }
+        
+        .nav-link.active {
+            color: #fff;
+            background-color: #1a252f;
+            border-left-color: #3498db;
+        }
+        
+        .nav-link i {
+            margin-right: 0.5rem;
+            font-size: 1.1rem;
+        }
+        
+        /* Стили для таблиц */
+        .custom-table thead th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+            border-top: none;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .custom-table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        
+        .custom-table tbody tr:hover {
+            background-color: rgba(13, 110, 253, 0.05);
+        }
+        
+        /* Стили для логов */
+        .log-item {
+            transition: all 0.2s ease;
+            border-left: 4px solid transparent;
+        }
+        
+        .log-item:hover {
+            background-color: rgba(13, 110, 253, 0.05);
+            transform: translateX(2px);
+        }
+        
+        .log-item.severity-INFO {
+            border-left-color: #17a2b8;
+        }
+        
+        .log-item.severity-WARNING {
+            border-left-color: #ffc107;
+        }
+        
+        .log-item.severity-ERROR {
+            border-left-color: #dc3545;
+        }
+        
+        .log-item.severity-CRITICAL {
+            border-left-color: #6f42c1;
+        }
+        
+        .badge-action-CREATE { background-color: #28a745; }
+        .badge-action-UPDATE { background-color: #17a2b8; }
+        .badge-action-DELETE { background-color: #dc3545; }
+        .badge-action-LOGIN { background-color: #007bff; }
+        .badge-action-LOGOUT { background-color: #6c757d; }
+        .badge-action-VIEW { background-color: #20c997; }
+        .badge-action-SYSTEM { background-color: #6f42c1; }
+        .badge-action-EXPORT { background-color: #fd7e14; }
+        
+        .filter-section {
+            background-color: #f8f9fa;
+            border-radius: 0.75rem;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .log-details {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        
+        .sidebar-heading {
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #3498db !important;
+            background: linear-gradient(135deg, rgba(52, 152, 219, 0.1), rgba(52, 152, 219, 0.05));
+            border-radius: 0.375rem;
+            padding: 0.5rem 1rem !important;
+            margin: 1rem 0.75rem 0.5rem 0.75rem !important;
+            border-left: 3px solid #3498db;
+            position: relative;
+        }
+        
+        .sidebar-heading::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(52, 152, 219, 0.05), transparent);
+            border-radius: 0.375rem;
+            z-index: -1;
+        }
+        
+        .sidebar-heading span {
+            display: flex;
+            align-items: center;
+        }
+        
+        .sidebar-heading span::before {
+            content: '⚙️';
+            margin-right: 0.5rem;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Навигационная панель -->
+    <header class="navbar navbar-dark sticky-top bg-dark flex-md-nowrap p-0 shadow">
+        <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3" href="/admin">
+            <i class="bi bi-building-gear me-2"></i> Администрирование
+        </a>
+        <button class="navbar-toggler position-absolute d-md-none collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="w-100"></div>
+        <div class="navbar-nav">
+            <div class="nav-item text-nowrap d-flex align-items-center">
+                <span class="text-white me-3" sec:authentication="name">Username</span>
+                <form th:action="@{/logout}" method="post">
+                    <button class="nav-link px-3 bg-dark border-0" type="submit">
+                        <i class="bi bi-box-arrow-right me-1"></i> Выйти
+                    </button>
+                </form>
+            </div>
+        </div>
+    </header>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Боковое меню -->
+            <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                <div class="position-sticky pt-3 sidebar-sticky">
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin">
+                                <i class="bi bi-speedometer2"></i> Панель управления
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/users">
+                                <i class="bi bi-people"></i> Пользователи
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/memorials">
+                                <i class="bi bi-bookmark-heart"></i> Мемориалы
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/family-trees">
+                                <i class="bi bi-diagram-3"></i> Семейные древа
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/notifications">
+                                <i class="bi bi-bell"></i> Уведомления
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/reports">
+                                <i class="bi bi-bar-chart"></i> Отчеты
+                            </a>
+                        </li>
+                    </ul>
+
+                    <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
+                        <span>Система</span>
+                    </h6>
+                    <ul class="nav flex-column mb-2">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="/admin/logs">
+                                <i class="bi bi-file-text"></i> Журналы
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/server-logs">
+                                <i class="bi bi-terminal"></i> Логи сервера
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Основной контент -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4 border-bottom">
+                    <h1 class="h2">
+                        <i class="bi bi-file-text me-2 text-primary"></i>Системные журналы
+                    </h1>
+                    <div class="btn-toolbar mb-2 mb-md-0">
+                        <div class="btn-group me-2">
+                            <button type="button" class="btn btn-sm btn-primary" onclick="location.reload()">
+                                <i class="bi bi-arrow-clockwise me-1"></i> Обновить
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#cleanupModal">
+                                <i class="bi bi-trash me-1"></i> Очистка
+                            </button>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle d-flex align-items-center">
+                            <i class="bi bi-funnel me-1"></i> Фильтры
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Уведомления -->
+                <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle me-2"></i>
+                    <span th:text="${success}"></span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                
+                <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <span th:text="${error}"></span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+
+                <!-- Информационные карточки -->
+                <div class="row mb-4">
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card dashboard-card border-start border-primary border-4 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs text-uppercase fw-bold text-primary mb-1">
+                                            Записей сегодня</div>
+                                        <div class="h3 mb-0 fw-bold" th:text="${statistics.todayTotal ?: 0}">0</div>
+                                        <div class="text-muted small mt-2">
+                                            <i class="bi bi-clock text-info"></i> 
+                                            <span>За сегодня</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <div class="stat-icon-primary">
+                                            <i class="bi bi-file-text"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card dashboard-card border-start border-warning border-4 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs text-uppercase fw-bold text-warning mb-1">
+                                            Ошибок сегодня</div>
+                                        <div class="h3 mb-0 fw-bold" th:text="${statistics.todayErrors ?: 0}">0</div>
+                                        <div class="text-muted small mt-2">
+                                            <i class="bi bi-exclamation-triangle text-warning"></i> 
+                                            <span>Требуют внимания</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <div class="stat-icon-warning">
+                                            <i class="bi bi-exclamation-triangle"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card dashboard-card border-start border-success border-4 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs text-uppercase fw-bold text-success mb-1">
+                                            Входов за неделю</div>
+                                        <div class="h3 mb-0 fw-bold" th:text="${statistics.weekLogins ?: 0}">0</div>
+                                        <div class="text-muted small mt-2">
+                                            <i class="bi bi-arrow-right text-success"></i> 
+                                            <span>Активность пользователей</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <div class="stat-icon-success">
+                                            <i class="bi bi-box-arrow-in-right"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card dashboard-card border-start border-info border-4 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs text-uppercase fw-bold text-info mb-1">
+                                            Всего за месяц</div>
+                                        <div class="h3 mb-0 fw-bold" th:text="${statistics.monthTotal ?: 0}">0</div>
+                                        <div class="text-muted small mt-2">
+                                            <i class="bi bi-calendar text-info"></i> 
+                                            <span>Общая активность</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <div class="stat-icon-info">
+                                            <i class="bi bi-graph-up"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Фильтры -->
+                <div class="filter-section">
+                    <form method="get" action="/admin/logs">
+                        <div class="row g-3">
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold">Тип действия</label>
+                                <select name="actionType" class="form-select">
+                                    <option value="">Все</option>
+                                    <option th:each="type : ${actionTypes}" 
+                                            th:value="${type}" 
+                                            th:text="${type}" 
+                                            th:selected="${actionType == type.toString()}"></option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold">Тип сущности</label>
+                                <select name="entityType" class="form-select">
+                                    <option value="">Все</option>
+                                    <option th:each="type : ${entityTypes}" 
+                                            th:value="${type}" 
+                                            th:text="${type}" 
+                                            th:selected="${entityType == type.toString()}"></option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold">Важность</label>
+                                <select name="severity" class="form-select">
+                                    <option value="">Все</option>
+                                    <option th:each="sev : ${severities}" 
+                                            th:value="${sev}" 
+                                            th:text="${sev}" 
+                                            th:selected="${severity == sev.toString()}"></option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold">Пользователь</label>
+                                <select name="userId" class="form-select">
+                                    <option value="">Все</option>
+                                    <option th:each="user : ${users}" 
+                                            th:value="${user.id}" 
+                                            th:text="${user.fio}" 
+                                            th:selected="${userId != null && userId == user.id}"></option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">Поиск</label>
+                                <input type="text" name="searchText" class="form-control" 
+                                       th:value="${searchText}" placeholder="Поиск по описанию...">
+                            </div>
+                            
+                            <div class="col-md-1">
+                                <label class="form-label">&nbsp;</label>
+                                <button type="submit" class="btn btn-primary d-block">
+                                    <i class="bi bi-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="row mt-3">
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">С даты</label>
+                                <input type="datetime-local" name="startDate" class="form-control" 
+                                       th:value="${startDate != null ? #temporals.format(startDate, 'yyyy-MM-dd''T''HH:mm') : ''}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">По дату</label>
+                                <input type="datetime-local" name="endDate" class="form-control" 
+                                       th:value="${endDate != null ? #temporals.format(endDate, 'yyyy-MM-dd''T''HH:mm') : ''}">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold">Размер страницы</label>
+                                <select name="size" class="form-select">
+                                    <option value="10" th:selected="${size == 10}">10</option>
+                                    <option value="20" th:selected="${size == 20}">20</option>
+                                    <option value="50" th:selected="${size == 50}">50</option>
+                                    <option value="100" th:selected="${size == 100}">100</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">&nbsp;</label>
+                                <a href="/admin/logs" class="btn btn-outline-secondary d-block">
+                                    <i class="bi bi-x-circle me-1"></i>Сбросить
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Журналы -->
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                        <h5 class="card-title m-0 text-primary">
+                            <i class="bi bi-list-ul me-2"></i>
+                            Записи журнала
+                            <span class="badge bg-secondary ms-2" th:text="${totalElements}">0</span>
+                        </h5>
+                    </div>
+                    
+                    <div class="card-body p-0">
+                        <div th:if="${logs.empty}" class="text-center py-5">
+                            <i class="bi bi-inbox fs-1 text-muted"></i>
+                            <p class="text-muted mt-3">Записи журнала не найдены</p>
+                        </div>
+                        
+                        <div th:if="${!logs.empty}">
+                            <div th:each="log : ${logs.content}" 
+                                 class="log-item p-3 border-bottom" 
+                                 th:classappend="'severity-' + ${log.severity}">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <span class="badge me-2" 
+                                                  th:classappend="'badge-action-' + ${log.actionType}" 
+                                                  th:text="${log.actionType}">ACTION</span>
+                                            <span class="badge bg-light text-dark me-2" th:text="${log.entityType}">ENTITY</span>
+                                            <span class="badge" 
+                                                  th:classappend="${log.severity == T(ru.cemeterysystem.models.SystemLog.Severity).INFO ? 'bg-info' : 
+                                                                  log.severity == T(ru.cemeterysystem.models.SystemLog.Severity).WARNING ? 'bg-warning' : 
+                                                                  log.severity == T(ru.cemeterysystem.models.SystemLog.Severity).ERROR ? 'bg-danger' : 'bg-dark'}" 
+                                                  th:text="${log.severity}">SEVERITY</span>
+                                        </div>
+                                        <h6 class="mb-1 fw-medium" th:text="${log.description}">Описание действия</h6>
+                                        <div class="log-details">
+                                            <i class="bi bi-person me-1"></i>
+                                            <span th:text="${log.user != null ? log.user.fio : 'Система'}">Пользователь</span>
+                                            <span class="mx-2">•</span>
+                                            <i class="bi bi-clock me-1"></i>
+                                            <span th:text="${#temporals.format(log.createdAt, 'dd.MM.yyyy HH:mm:ss')}">Время</span>
+                                            <span th:if="${log.ipAddress}" class="mx-2">•</span>
+                                            <span th:if="${log.ipAddress}">
+                                                <i class="bi bi-geo-alt me-1"></i>
+                                                <span th:text="${log.ipAddress}">IP</span>
+                                            </span>
+                                        </div>
+                                        <div th:if="${log.details}" class="mt-2">
+                                            <small class="text-muted" th:text="${log.details}">Дополнительная информация</small>
+                                        </div>
+                                    </div>
+                                    <div class="flex-shrink-0">
+                                        <a th:href="@{/admin/logs/{id}(id=${log.id})}" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Пагинация -->
+                    <div th:if="${totalPages > 1}" class="card-footer bg-white">
+                        <nav aria-label="Навигация по страницам">
+                            <ul class="pagination justify-content-center mb-0">
+                                <li class="page-item" th:classappend="${currentPage == 0} ? 'disabled'">
+                                    <a class="page-link" th:href="@{/admin/logs(page=0, size=${size}, actionType=${actionType}, entityType=${entityType}, severity=${severity}, userId=${userId}, startDate=${startDate}, endDate=${endDate}, searchText=${searchText})}">
+                                        <i class="bi bi-chevron-double-left"></i>
+                                    </a>
+                                </li>
+                                <li class="page-item" th:classappend="${currentPage == 0} ? 'disabled'">
+                                    <a class="page-link" th:href="@{/admin/logs(page=${currentPage - 1}, size=${size}, actionType=${actionType}, entityType=${entityType}, severity=${severity}, userId=${userId}, startDate=${startDate}, endDate=${endDate}, searchText=${searchText})}">
+                                        <i class="bi bi-chevron-left"></i>
+                                    </a>
+                                </li>
+                                
+                                <li th:each="i : ${#numbers.sequence(T(java.lang.Math).max(0, currentPage - 2), T(java.lang.Math).min(totalPages - 1, currentPage + 2))}" 
+                                    class="page-item" th:classappend="${i == currentPage} ? 'active'">
+                                    <a class="page-link" th:href="@{/admin/logs(page=${i}, size=${size}, actionType=${actionType}, entityType=${entityType}, severity=${severity}, userId=${userId}, startDate=${startDate}, endDate=${endDate}, searchText=${searchText})}" th:text="${i + 1}">1</a>
+                                </li>
+                                
+                                <li class="page-item" th:classappend="${currentPage == totalPages - 1} ? 'disabled'">
+                                    <a class="page-link" th:href="@{/admin/logs(page=${currentPage + 1}, size=${size}, actionType=${actionType}, entityType=${entityType}, severity=${severity}, userId=${userId}, startDate=${startDate}, endDate=${endDate}, searchText=${searchText})}">
+                                        <i class="bi bi-chevron-right"></i>
+                                    </a>
+                                </li>
+                                <li class="page-item" th:classappend="${currentPage == totalPages - 1} ? 'disabled'">
+                                    <a class="page-link" th:href="@{/admin/logs(page=${totalPages - 1}, size=${size}, actionType=${actionType}, entityType=${entityType}, severity=${severity}, userId=${userId}, startDate=${startDate}, endDate=${endDate}, searchText=${searchText})}">
+                                        <i class="bi bi-chevron-double-right"></i>
+                                    </a>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Модальное окно очистки логов -->
+    <div class="modal fade" id="cleanupModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Очистка журналов</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post" action="/admin/logs/cleanup">
+                    <div class="modal-body">
+                        <p>Выберите, сколько дней логов оставить в системе. Более старые записи будут удалены.</p>
+                        <div class="mb-3">
+                            <label for="daysToKeep" class="form-label">Дней для хранения:</label>
+                            <select id="daysToKeep" name="daysToKeep" class="form-select">
+                                <option value="7">7 дней</option>
+                                <option value="30" selected>30 дней</option>
+                                <option value="90">90 дней</option>
+                                <option value="365">1 год</option>
+                            </select>
+                        </div>
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            <strong>Внимание!</strong> Это действие необратимо. Удаленные записи восстановить будет невозможно.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash me-1"></i>Очистить
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 

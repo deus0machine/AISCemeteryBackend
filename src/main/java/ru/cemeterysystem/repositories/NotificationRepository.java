@@ -60,4 +60,10 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     
     // Подсчитывает количество уведомлений после указанной даты
     long countByCreatedAtAfter(LocalDateTime date);
+    
+    // Подсчёт уведомлений по статусу
+    long countByStatus(Notification.NotificationStatus status);
+    
+    // Подсчёт уведомлений по прочтению
+    long countByRead(boolean read);
 } 

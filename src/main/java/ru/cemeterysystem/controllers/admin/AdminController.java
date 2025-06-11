@@ -9,10 +9,12 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import ru.cemeterysystem.models.Memorial;
+import ru.cemeterysystem.models.SystemLog;
 import ru.cemeterysystem.models.User;
 import ru.cemeterysystem.repositories.FamilyTreeRepository;
 import ru.cemeterysystem.repositories.MemorialRepository;
 import ru.cemeterysystem.repositories.UserRepository;
+import ru.cemeterysystem.services.SystemLogService;
 import ru.cemeterysystem.services.UserService;
 
 import java.time.LocalDate;
@@ -34,6 +36,7 @@ public class AdminController {
     private final UserRepository userRepository;
     private final MemorialRepository memorialRepository;
     private final FamilyTreeRepository familyTreeRepository;
+    private final SystemLogService systemLogService;
 
     @GetMapping
     public String adminHome(Model model) {
@@ -65,8 +68,8 @@ public class AdminController {
         List<Map<String, Object>> chartData = getRegistrationChartData();
         model.addAttribute("chartData", chartData);
         
-        // Недавние действия в системе
-        List<Map<String, Object>> recentActions = getRecentActions();
+        // Недавние действия в системе (используем новую систему логов)
+        List<SystemLog> recentActions = systemLogService.getRecentActions();
         model.addAttribute("recentActions", recentActions);
         
         return "admin/dashboard";
@@ -119,41 +122,5 @@ public class AdminController {
         return chartData;
     }
     
-    private List<Map<String, Object>> getRecentActions() {
-        // Создаем имитацию списка недавних действий
-        // В реальном приложении здесь должен быть запрос к журналу аудита или подобной системе
-        List<Map<String, Object>> actions = new ArrayList<>();
-        
-        // Получаем последних добавленных пользователей
-        List<User> recentUsers = userRepository.findAll(
-                PageRequest.of(0, 3, Sort.by("dateOfRegistration").descending()))
-                .getContent();
-        
-        for (User user : recentUsers) {
-            Map<String, Object> action = new HashMap<>();
-            action.put("type", "USER");
-            action.put("date", user.getDateOfRegistration());
-            action.put("description", "Регистрация пользователя: " + user.getFio());
-            actions.add(action);
-        }
-        
-        // Получаем последние добавленные мемориалы
-        List<Memorial> recentMemorials = memorialRepository.findAll(
-                PageRequest.of(0, 3, Sort.by("createdAt").descending()))
-                .getContent();
-        
-        for (Memorial memorial : recentMemorials) {
-            Map<String, Object> action = new HashMap<>();
-            action.put("type", "MEMORIAL");
-            action.put("date", Date.from(memorial.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant()));
-            action.put("description", "Добавление захоронения: " + memorial.getFio());
-            actions.add(action);
-        }
-        
-        // Сортируем все действия по дате (от новых к старым)
-        actions.sort((a, b) -> ((Date) b.get("date")).compareTo((Date) a.get("date")));
-        
-        // Возвращаем только первые 5 действий
-        return actions.stream().limit(5).collect(Collectors.toList());
-    }
+    // Метод удален - теперь используем SystemLogService.getRecentActions()
 } 

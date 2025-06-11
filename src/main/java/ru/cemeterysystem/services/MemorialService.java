@@ -26,6 +26,8 @@ import ru.cemeterysystem.repositories.MemorialRepository;
 import ru.cemeterysystem.repositories.NotificationRepository;
 import ru.cemeterysystem.repositories.UserRepository;
 import ru.cemeterysystem.services.FileStorageService;
+import ru.cemeterysystem.annotations.LogActivity;
+import ru.cemeterysystem.models.SystemLog;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -306,6 +308,13 @@ public class MemorialService {
         return dto;
     }
 
+    @LogActivity(
+        action = SystemLog.ActionType.CREATE,
+        entityType = SystemLog.EntityType.MEMORIAL,
+        description = "Создание мемориала: #{#dto.firstName} #{#dto.lastName}",
+        entityIdExpression = "#result.id",
+        includeDetails = true
+    )
     public MemorialDTO createMemorial(MemorialDTO dto, Long userId) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("User not found"));
@@ -328,6 +337,13 @@ public class MemorialService {
      * @param user пользователь, выполняющий обновление
      * @return обновленный мемориал
      */
+    @LogActivity(
+        action = SystemLog.ActionType.UPDATE,
+        entityType = SystemLog.EntityType.MEMORIAL,
+        description = "Обновление мемориала: #{#memorialDTO.firstName} #{#memorialDTO.lastName}",
+        entityIdExpression = "#id",
+        includeDetails = true
+    )
     @Transactional
     public MemorialDTO updateMemorial(Long id, MemorialDTO memorialDTO, User user) {
         Memorial memorial = memorialRepository.findById(id)
@@ -1239,6 +1255,13 @@ public class MemorialService {
         return memorial.isEditor(user);
     }
 
+    @LogActivity(
+        action = SystemLog.ActionType.DELETE,
+        entityType = SystemLog.EntityType.MEMORIAL,
+        description = "Удаление мемориала ID: #{#id}",
+        entityIdExpression = "#id",
+        severity = SystemLog.Severity.WARNING
+    )
     @Transactional
     public void deleteMemorial(Long id) {
         // ... существующий код удаления мемориала ...

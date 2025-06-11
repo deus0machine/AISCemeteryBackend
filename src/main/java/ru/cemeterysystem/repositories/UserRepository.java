@@ -19,4 +19,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
     
     // Поиск пользователей по роли
     List<User> findByRole(User.Role role);
+    
+    // Подсчёт пользователей по роли
+    long countByRole(User.Role role);
+    
+    // Подсчёт пользователей с подпиской
+    long countByHasSubscription(boolean hasSubscription);
+    
+    // Подсчёт пользователей зарегистрированных после указанной даты
+    long countByDateOfRegistrationAfter(Date date);
 }

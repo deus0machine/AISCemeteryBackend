@@ -27,8 +27,10 @@ import ru.cemeterysystem.dto.MemorialDTO;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/admin/memorials")
@@ -100,15 +102,15 @@ public class AdminMemorialController {
         
         model.addAttribute("memorials", memorials);
         
-        // Статистика для отображения
+        // Статистика для отображения (реальные данные)
         long totalMemorials = memorialRepository.count();
-        long publicMemorials = memorialRepository.countByIsPublic(true);
-        long pendingMemorials = memorialRepository.countByIsPublic(false);
+        long publicMemorials = memorialRepository.countByPublicationStatus(Memorial.PublicationStatus.PUBLISHED);
+        long pendingModerationMemorials = memorialRepository.countByPublicationStatus(Memorial.PublicationStatus.PENDING_MODERATION);
         long recentMemorials = memorialRepository.countByCreatedAtAfter(LocalDateTime.now().minusMonths(1));
         
         model.addAttribute("totalMemorials", totalMemorials);
         model.addAttribute("publicMemorials", publicMemorials);
-        model.addAttribute("pendingMemorials", pendingMemorials);
+        model.addAttribute("pendingMemorials", pendingModerationMemorials);
         model.addAttribute("recentMemorials", recentMemorials);
         
         // Данные для графика по месяцам (реальные данные вместо заглушек)
@@ -123,15 +125,26 @@ public class AdminMemorialController {
             monthlyData[i] = (int) count;
         }
         
-        model.addAttribute("monthlyData", monthlyData);
+        // Преобразуем массивы в списки для корректной передачи в Thymeleaf
+        List<Integer> monthlyDataList = Arrays.stream(monthlyData).boxed().collect(Collectors.toList());
+        model.addAttribute("monthlyData", monthlyDataList);
         
         // Данные для круговой диаграммы (реальные данные)
-        int[] pieChartData = new int[3];
-        pieChartData[0] = (int) publicMemorials;  // Опубликованные
-        pieChartData[1] = (int) pendingMemorials; // Не опубликованные
-        pieChartData[2] = 0; // Ожидают модерации (пока нет такого статуса)
+        long privateMemorials = memorialRepository.countByIsPublic(false) - pendingModerationMemorials;
+        List<Integer> pieChartDataList = Arrays.asList(
+            (int) publicMemorials,  // Опубликованные
+            (int) privateMemorials, // Не опубликованные (приватные)
+            (int) pendingModerationMemorials // Ожидают модерации
+        );
         
-        model.addAttribute("pieChartData", pieChartData);
+        model.addAttribute("pieChartData", pieChartDataList);
+        
+        // Отладочный вывод
+        log.info("=== СТАТИСТИКА МЕМОРИАЛОВ ===");
+        log.info("Total: {}, Public: {}, Pending Moderation: {}, Recent: {}", 
+                totalMemorials, publicMemorials, pendingModerationMemorials, recentMemorials);
+        log.info("Monthly data: {}", monthlyDataList);
+        log.info("Pie chart data: {}", pieChartDataList);
         
         return "admin/memorials";
     }
@@ -262,7 +275,7 @@ public class AdminMemorialController {
         // Проверяем, что пользователь действительно администратор
         if (admin.getRole() != User.Role.ADMIN) {
             redirectAttributes.addFlashAttribute("errorMessage", "Только администратор может одобрять мемориалы");
-            return "redirect:/memorials/" + id;
+            return "redirect:/admin/memorials/" + id;
         }
         
         try {
@@ -289,7 +302,7 @@ public class AdminMemorialController {
             redirectAttributes.addFlashAttribute("errorMessage", "Ошибка при публикации мемориала: " + e.getMessage());
         }
         
-        return "redirect:/memorials/" + id;
+        return "redirect:/admin/memorials/" + id;
     }
     
     /**

@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Отчеты | Система управления кладбищем</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        
+        /* Общие стили карточек */
+        .card-modern {
+            border: none;
+            border-radius: 0.75rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .card-modern:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
+        }
+        
+        /* Стили для статистических карточек */
+        .dashboard-card {
+            border-radius: 0.75rem;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .dashboard-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
+        }
+        
+        /* Стили для иконок в карточках */
+        .stat-icon-primary, .stat-icon-success, .stat-icon-info, .stat-icon-warning {
+            width: 54px;
+            height: 54px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            font-size: 1.75rem;
+        }
+        
+        .stat-icon-primary {
+            background-color: rgba(13, 110, 253, 0.1);
+            color: #0d6efd;
+        }
+        
+        .stat-icon-success {
+            background-color: rgba(25, 135, 84, 0.1);
+            color: #198754;
+        }
+        
+        .stat-icon-info {
+            background-color: rgba(13, 202, 240, 0.1);
+            color: #0dcaf0;
+        }
+        
+        .stat-icon-warning {
+            background-color: rgba(255, 193, 7, 0.1);
+            color: #ffc107;
+        }
+        
+        /* Стили для таблиц */
+        .table-modern {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        
+        .table-modern thead th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+            border-top: none;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .table-modern tbody tr:hover {
+            background-color: rgba(13, 110, 253, 0.05);
+        }
+        
+        /* Стили для кнопок */
+        .btn-action {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.875rem;
+        }
+        
+        /* Стили для сайдбара */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            background-color: #2c3e50;
+            transition: all 0.3s;
+        }
+        
+        .sidebar-sticky {
+            height: calc(100vh - 48px);
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+        
+        .nav-link {
+            padding: 0.75rem 1.25rem;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.8);
+            border-left: 4px solid transparent;
+            transition: all 0.2s;
+        }
+        
+        .nav-link:hover {
+            color: #fff;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-left-color: #3498db;
+        }
+        
+        .nav-link.active {
+            color: #fff;
+            background-color: #1a252f;
+            border-left-color: #3498db;
+        }
+        
+        .nav-link i {
+            margin-right: 0.5rem;
+            font-size: 1.1rem;
+        }
+        
+        /* Стили для заголовка "Система" */
+        .sidebar-heading {
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #3498db !important;
+            background: linear-gradient(135deg, rgba(52, 152, 219, 0.1), rgba(52, 152, 219, 0.05));
+            border-radius: 0.375rem;
+            padding: 0.5rem 1rem !important;
+            margin: 1rem 0.75rem 0.5rem 0.75rem !important;
+            border-left: 3px solid #3498db;
+            position: relative;
+        }
+        
+        .sidebar-heading::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(52, 152, 219, 0.05), transparent);
+            border-radius: 0.375rem;
+            z-index: -1;
+        }
+        
+        .sidebar-heading span {
+            display: flex;
+            align-items: center;
+        }
+        
+        .sidebar-heading span::before {
+            content: '⚙️';
+            margin-right: 0.5rem;
+            font-size: 0.875rem;
+        }
+        
+        /* Стили для основного контента */
+        .main-content {
+            padding: 20px;
+        }
+        
+        /* Дополнительные стили для формы */
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .btn-download {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        /* Скрытие элементов по умолчанию */
+        .d-none {
+            display: none !important;
+        }
+        
+        /* Стили алертов */
+        .alert {
+            border-radius: 0.5rem;
+        }
+        
+        /* Стили для улучшения видимости вкладок */
+        .nav-tabs {
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .nav-tabs .nav-link {
+            border: 1px solid transparent;
+            border-top-left-radius: 0.375rem;
+            border-top-right-radius: 0.375rem;
+            padding: 0.75rem 1.5rem;
+            font-weight: 500;
+            color: #6c757d;
+            background-color: #f8f9fa;
+            transition: all 0.3s ease;
+            margin-right: 0.25rem;
+        }
+        
+        .nav-tabs .nav-link:hover {
+            border-color: #e9ecef #e9ecef #dee2e6;
+            background-color: #e9ecef;
+            color: #495057;
+            transform: translateY(-2px);
+        }
+        
+        .nav-tabs .nav-link.active {
+            color: #0d6efd;
+            background-color: #fff;
+            border-color: #dee2e6 #dee2e6 #fff;
+            font-weight: 600;
+        }
+        
+        .nav-tabs .nav-link:not(.active) {
+            opacity: 0.8;
+        }
+        
+        .nav-tabs .nav-link:not(.active):hover {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <!-- Навигационная панель -->
+    <header class="navbar navbar-dark sticky-top bg-dark flex-md-nowrap p-0 shadow">
+        <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3" href="/admin">
+            <i class="bi bi-building-gear me-2"></i> Администрирование
+        </a>
+        <button class="navbar-toggler position-absolute d-md-none collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="w-100"></div>
+        <div class="navbar-nav">
+            <div class="nav-item text-nowrap d-flex align-items-center">
+                <span class="text-white me-3" sec:authentication="name">Username</span>
+                <form th:action="@{/logout}" method="post">
+                    <button class="nav-link px-3 bg-dark border-0" type="submit">
+                        <i class="bi bi-box-arrow-right me-1"></i> Выйти
+                    </button>
+                </form>
+            </div>
+        </div>
+    </header>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Боковое меню -->
+            <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                <div class="position-sticky pt-3 sidebar-sticky">
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin">
+                                <i class="bi bi-speedometer2"></i> Панель управления
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/users">
+                                <i class="bi bi-people"></i> Пользователи
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/memorials">
+                                <i class="bi bi-bookmark-heart"></i> Мемориалы
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/family-trees">
+                                <i class="bi bi-diagram-3"></i> Семейные древа
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/notifications">
+                                <i class="bi bi-bell"></i> Уведомления
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" href="/admin/reports">
+                                <i class="bi bi-bar-chart"></i> Отчеты
+                            </a>
+                        </li>
+                    </ul>
+
+                    <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
+                        <span>Система</span>
+                    </h6>
+                    <ul class="nav flex-column mb-2">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/logs">
+                                <i class="bi bi-file-text"></i> Журналы
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/server-logs">
+                                <i class="bi bi-terminal"></i> Логи сервера
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Основной контент -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 main-content">
+                <!-- Хлебные крошки -->
+                <nav aria-label="breadcrumb" class="mb-4">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="/admin">Главная</a></li>
+                        <li class="breadcrumb-item active">Отчеты</li>
+                    </ol>
+                </nav>
+
+                <!-- Заголовок -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="h4 mb-0"><i class="bi bi-bar-chart me-2"></i>Система отчетов</h1>
+                    <div class="btn-toolbar">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshStats()">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Обновить
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Статистические карточки -->
+                <div class="row mb-4">
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card dashboard-card border-start border-primary border-4 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs text-uppercase fw-bold text-primary mb-1">Мемориалов</div>
+                                        <div class="h3 mb-0 fw-bold" th:text="${stats.totalMemorials}">0</div>
+                                        <div class="text-muted small mt-1">Всего в системе</div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <div class="stat-icon-primary">
+                                            <i class="bi bi-bookmark-heart"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card dashboard-card border-start border-success border-4 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs text-uppercase fw-bold text-success mb-1">Пользователей</div>
+                                        <div class="h3 mb-0 fw-bold" th:text="${stats.totalUsers}">0</div>
+                                        <div class="text-muted small mt-1">Всего зарегистрировано</div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <div class="stat-icon-success">
+                                            <i class="bi bi-people"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card dashboard-card border-start border-info border-4 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs text-uppercase fw-bold text-info mb-1">Уведомлений</div>
+                                        <div class="h3 mb-0 fw-bold" th:text="${stats.totalNotifications}">0</div>
+                                        <div class="text-muted small mt-1">Всего отправлено</div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <div class="stat-icon-info">
+                                            <i class="bi bi-bell"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card dashboard-card border-start border-warning border-4 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs text-uppercase fw-bold text-warning mb-1">Семейных древ</div>
+                                        <div class="h3 mb-0 fw-bold" th:text="${stats.totalFamilyTrees}">0</div>
+                                        <div class="text-muted small mt-1">Создано древ</div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <div class="stat-icon-warning">
+                                            <i class="bi bi-diagram-3"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Вкладки отчетов -->
+                <div class="card-modern">
+                    <div class="card-body">
+                        <ul class="nav nav-tabs mb-4">
+                            <li class="nav-item">
+                                <a class="nav-link active" data-bs-toggle="tab" href="#reports-tab">Подробные отчеты</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" data-bs-toggle="tab" href="#quick-tab">Быстрые отчеты</a>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content">
+                            <!-- Подробные отчеты -->
+                            <div class="tab-pane fade show active" id="reports-tab">
+                                <div class="row">
+                                    <!-- Отчеты по мемориалам -->
+                                    <div class="col-lg-6 mb-4">
+                                        <div class="card h-100">
+                                            <div class="card-header">
+                                                <h5 class="card-title mb-0">
+                                                    <i class="bi bi-bookmark-heart me-2 text-primary"></i>Отчеты по мемориалам
+                                                </h5>
+                                            </div>
+                                            <div class="card-body">
+                                                <form id="memorialReportForm">
+                                                    <div class="form-group">
+                                                        <label class="form-label">Период:</label>
+                                                        <div class="row">
+                                                            <div class="col-md-6">
+                                                                <input type="date" class="form-control" name="startDate" id="memorialStartDate">
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <input type="date" class="form-control" name="endDate" id="memorialEndDate">
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label class="form-label">Статус:</label>
+                                                        <select class="form-select" name="status" id="memorialStatus">
+                                                            <option value="">Все статусы</option>
+                                                            <option value="PUBLISHED">Опубликованные</option>
+                                                            <option value="PENDING_MODERATION">На модерации</option>
+                                                            <option value="REJECTED">Отклоненные</option>
+                                                            <option value="PRIVATE">Приватные</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="d-flex gap-2">
+                                                        <button type="button" class="btn btn-primary btn-download" onclick="downloadMemorialReport('pdf')">
+                                                            <i class="bi bi-file-earmark-pdf"></i> PDF
+                                                        </button>
+                                                        <button type="button" class="btn btn-success btn-download" onclick="downloadMemorialReport('excel')">
+                                                            <i class="bi bi-file-earmark-spreadsheet"></i> CSV
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Отчеты по пользователям -->
+                                    <div class="col-lg-6 mb-4">
+                                        <div class="card h-100">
+                                            <div class="card-header">
+                                                <h5 class="card-title mb-0">
+                                                    <i class="bi bi-people me-2 text-success"></i>Отчеты по пользователям
+                                                </h5>
+                                            </div>
+                                            <div class="card-body">
+                                                <form id="userReportForm">
+                                                    <div class="form-group">
+                                                        <label class="form-label">Период:</label>
+                                                        <div class="row">
+                                                            <div class="col-md-6">
+                                                                <input type="date" class="form-control" name="startDate" id="userStartDate">
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <input type="date" class="form-control" name="endDate" id="userEndDate">
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label class="form-label">Роль:</label>
+                                                        <select class="form-select" name="role" id="userRole">
+                                                            <option value="">Все роли</option>
+                                                            <option value="USER">Пользователи</option>
+                                                            <option value="ADMIN">Администраторы</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="d-flex gap-2">
+                                                        <button type="button" class="btn btn-primary btn-download" onclick="downloadUserReport('pdf')">
+                                                            <i class="bi bi-file-earmark-pdf"></i> PDF
+                                                        </button>
+                                                        <button type="button" class="btn btn-success btn-download" onclick="downloadUserReport('excel')">
+                                                            <i class="bi bi-file-earmark-spreadsheet"></i> CSV
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Сводные отчеты -->
+                                    <div class="col-lg-6 mb-4">
+                                        <div class="card h-100">
+                                            <div class="card-header">
+                                                <h5 class="card-title mb-0">
+                                                    <i class="bi bi-graph-up me-2 text-info"></i>Сводные отчеты
+                                                </h5>
+                                            </div>
+                                            <div class="card-body">
+                                                <form id="summaryReportForm">
+                                                    <div class="form-group">
+                                                        <label class="form-label">Период:</label>
+                                                        <div class="row">
+                                                            <div class="col-md-6">
+                                                                <input type="date" class="form-control" name="startDate" id="summaryStartDate">
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <input type="date" class="form-control" name="endDate" id="summaryEndDate">
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="d-flex gap-2">
+                                                        <button type="button" class="btn btn-primary btn-download" onclick="downloadSummaryReport()">
+                                                            <i class="bi bi-file-earmark-pdf"></i> Сводный отчет PDF
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Отчеты по модерации -->
+                                    <div class="col-lg-6 mb-4">
+                                        <div class="card h-100">
+                                            <div class="card-header">
+                                                <h5 class="card-title mb-0">
+                                                    <i class="bi bi-shield-check me-2 text-warning"></i>Отчеты по модерации
+                                                </h5>
+                                            </div>
+                                            <div class="card-body">
+                                                <form id="moderationReportForm">
+                                                    <div class="form-group">
+                                                        <label class="form-label">Период:</label>
+                                                        <div class="row">
+                                                            <div class="col-md-6">
+                                                                <input type="date" class="form-control" name="startDate" id="moderationStartDate">
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <input type="date" class="form-control" name="endDate" id="moderationEndDate">
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="d-flex gap-2">
+                                                        <button type="button" class="btn btn-primary btn-download" onclick="downloadModerationReport()">
+                                                            <i class="bi bi-file-earmark-pdf"></i> Отчет по модерации PDF
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Быстрые отчеты -->
+                            <div class="tab-pane fade" id="quick-tab">
+                                <div class="row">
+                                    <div class="col-lg-3 col-md-6 mb-3">
+                                        <div class="card text-center">
+                                            <div class="card-body">
+                                                <i class="bi bi-clock-history text-warning display-4 mb-3"></i>
+                                                <h6 class="card-title">Мемориалы на модерации</h6>
+                                                <p class="card-text text-muted small">Список всех мемориалов, ожидающих проверки</p>
+                                                <button class="btn btn-outline-primary btn-sm" onclick="downloadQuickReport('pending-memorials')">
+                                                    <i class="bi bi-download me-1"></i> Скачать
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-lg-3 col-md-6 mb-3">
+                                        <div class="card text-center">
+                                            <div class="card-body">
+                                                <i class="bi bi-person-plus text-success display-4 mb-3"></i>
+                                                <h6 class="card-title">Новые пользователи</h6>
+                                                <p class="card-text text-muted small">Пользователи, зарегистрированные за последний месяц</p>
+                                                <button class="btn btn-outline-primary btn-sm" onclick="downloadQuickReport('new-users')">
+                                                    <i class="bi bi-download me-1"></i> Скачать
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-lg-3 col-md-6 mb-3">
+                                        <div class="card text-center">
+                                            <div class="card-body">
+                                                <i class="bi bi-heart text-danger display-4 mb-3"></i>
+                                                <h6 class="card-title">Популярные мемориалы</h6>
+                                                <p class="card-text text-muted small">Самые посещаемые мемориалы за период</p>
+                                                <button class="btn btn-outline-primary btn-sm" onclick="downloadQuickReport('popular-memorials')">
+                                                    <i class="bi bi-download me-1"></i> Скачать
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-lg-3 col-md-6 mb-3">
+                                        <div class="card text-center">
+                                            <div class="card-body">
+                                                <i class="bi bi-star text-primary display-4 mb-3"></i>
+                                                <h6 class="card-title">Статистика подписок</h6>
+                                                <p class="card-text text-muted small">Информация о подписчиках и их активности</p>
+                                                <button class="btn btn-outline-primary btn-sm" onclick="downloadQuickReport('subscription-stats')">
+                                                    <i class="bi bi-download me-1"></i> Скачать
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Индикатор загрузки -->
+                <div id="loadingIndicator" class="d-none">
+                    <div class="alert alert-info">
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm me-2" role="status">
+                                <span class="visually-hidden">Загрузка...</span>
+                            </div>
+                            Формируется отчет...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Алерт для успешной загрузки -->
+                <div id="successAlert" class="alert alert-success d-none">
+                    <i class="bi bi-check-circle me-2"></i>
+                    Отчет успешно сформирован и загружен!
+                </div>
+
+                <!-- Алерт для ошибок -->
+                <div id="errorAlert" class="alert alert-danger d-none">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <span id="errorMessage">Произошла ошибка при формировании отчета.</span>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Инициализация дат
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date();
+            const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+            
+            const todayStr = today.toISOString().split('T')[0];
+            const lastMonthStr = lastMonth.toISOString().split('T')[0];
+            
+            // Устанавливаем значения по умолчанию для всех форм
+            const startDateInputs = document.querySelectorAll('input[name="startDate"]');
+            const endDateInputs = document.querySelectorAll('input[name="endDate"]');
+            
+            startDateInputs.forEach(input => input.value = lastMonthStr);
+            endDateInputs.forEach(input => input.value = todayStr);
+        });
+
+        // Обновление статистики
+        function refreshStats() {
+            location.reload();
+        }
+
+        // Показать индикатор загрузки
+        function showLoading() {
+            document.getElementById('loadingIndicator').classList.remove('d-none');
+            hideAlerts();
+        }
+
+        // Скрыть индикатор загрузки
+        function hideLoading() {
+            document.getElementById('loadingIndicator').classList.add('d-none');
+        }
+
+        // Показать успешное уведомление
+        function showSuccess() {
+            hideLoading();
+            const alert = document.getElementById('successAlert');
+            alert.classList.remove('d-none');
+            setTimeout(() => alert.classList.add('d-none'), 3000);
+        }
+
+        // Показать ошибку
+        function showError(message) {
+            hideLoading();
+            document.getElementById('errorMessage').textContent = message;
+            const alert = document.getElementById('errorAlert');
+            alert.classList.remove('d-none');
+            setTimeout(() => alert.classList.add('d-none'), 5000);
+        }
+
+        // Скрыть все алерты
+        function hideAlerts() {
+            document.getElementById('successAlert').classList.add('d-none');
+            document.getElementById('errorAlert').classList.add('d-none');
+        }
+
+        // Загрузка отчета по мемориалам
+        function downloadMemorialReport(format) {
+            const form = document.getElementById('memorialReportForm');
+            const formData = new FormData(form);
+            
+            showLoading();
+            
+            const url = `/admin/reports/memorials/${format}?` + 
+                       `startDate=${formData.get('startDate')}&` +
+                       `endDate=${formData.get('endDate')}&` +
+                       `status=${formData.get('status')}`;
+            
+            downloadFile(url, `memorial_report.${format === 'pdf' ? 'pdf' : 'csv'}`);
+        }
+
+        // Загрузка отчета по пользователям
+        function downloadUserReport(format) {
+            const form = document.getElementById('userReportForm');
+            const formData = new FormData(form);
+            
+            showLoading();
+            
+            const url = `/admin/reports/users/${format}?` + 
+                       `startDate=${formData.get('startDate')}&` +
+                       `endDate=${formData.get('endDate')}&` +
+                       `role=${formData.get('role')}`;
+            
+            downloadFile(url, `user_report.${format === 'pdf' ? 'pdf' : 'csv'}`);
+        }
+
+        // Загрузка сводного отчета
+        function downloadSummaryReport() {
+            const form = document.getElementById('summaryReportForm');
+            const formData = new FormData(form);
+            
+            showLoading();
+            
+            const url = `/admin/reports/summary?` + 
+                       `startDate=${formData.get('startDate')}&` +
+                       `endDate=${formData.get('endDate')}`;
+            
+            downloadFile(url, 'summary_report.pdf');
+        }
+
+        // Загрузка отчета по модерации
+        function downloadModerationReport() {
+            const form = document.getElementById('moderationReportForm');
+            const formData = new FormData(form);
+            
+            showLoading();
+            
+            const url = `/admin/reports/moderation?` + 
+                       `startDate=${formData.get('startDate')}&` +
+                       `endDate=${formData.get('endDate')}`;
+            
+            downloadFile(url, 'moderation_report.pdf');
+        }
+
+        // Загрузка быстрых отчетов
+        function downloadQuickReport(type) {
+            showLoading();
+            const url = `/admin/reports/quick/${type}`;
+            downloadFile(url, `${type}_report.pdf`);
+        }
+
+        // Универсальная функция загрузки файла
+        function downloadFile(url, filename) {
+            fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/octet-stream'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = downloadUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(downloadUrl);
+                document.body.removeChild(a);
+                showSuccess();
+            })
+            .catch(error => {
+                console.error('Error downloading file:', error);
+                showError('Ошибка при загрузке файла: ' + error.message);
+            });
+        }
+    </script>
+</body>
+</html>

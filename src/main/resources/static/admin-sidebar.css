@@ -1,0 +1,86 @@
+/* Унифицированные стили для админской панели */
+/* Основано на стилях из dashboard.html */
+
+/* Стили для шапки */
+.admin-header {
+    position: sticky;
+    top: 0;
+    z-index: 1030;
+    background-color: #343a40 !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,.1);
+}
+
+.admin-header .navbar-brand {
+    color: #fff !important;
+    font-weight: 600;
+}
+
+.admin-header .navbar-toggler {
+    border: none;
+    color: rgba(255,255,255,.75);
+}
+
+/* Стили для сайдбара */
+.sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 100;
+    padding: 48px 0 0;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    background-color: #2c3e50;
+    transition: all 0.3s;
+}
+
+.sidebar-sticky {
+    height: calc(100vh - 48px);
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.sidebar .nav-link {
+    padding: 0.75rem 1.25rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.8);
+    border-left: 4px solid transparent;
+    transition: all 0.2s;
+}
+
+.sidebar .nav-link:hover {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-left-color: #3498db;
+}
+
+.sidebar .nav-link.active {
+    color: #fff;
+    background-color: #1a252f;
+    border-left-color: #3498db;
+}
+
+.sidebar .nav-link i {
+    margin-right: 0.5rem;
+    font-size: 1.1rem;
+}
+
+.sidebar-heading {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.1rem;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 768px) {
+    .sidebar {
+        position: static;
+        height: auto;
+        padding: 0;
+    }
+    
+    .sidebar-sticky {
+        height: auto;
+    }
+} 

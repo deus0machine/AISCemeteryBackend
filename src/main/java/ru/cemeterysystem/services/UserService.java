@@ -10,6 +10,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import ru.cemeterysystem.annotations.LogActivity;
+import ru.cemeterysystem.models.SystemLog;
 import ru.cemeterysystem.models.User;
 import ru.cemeterysystem.repositories.UserRepository;
 
@@ -55,7 +57,14 @@ public class UserService implements UserDetailsService {
         userRepository.deleteById(id);
     }
 
-    public void registerGuest(User user) {
+    @LogActivity(
+        action = SystemLog.ActionType.CREATE,
+        entityType = SystemLog.EntityType.USER,
+        description = "Регистрация нового пользователя: #{#user.fio} (#{#user.login})",
+        entityIdExpression = "#result.id",
+        includeDetails = true
+    )
+    public User registerGuest(User user) {
         Optional<User> existingGuest = userRepository.findByLogin(user.getLogin());
         if (existingGuest.isPresent()) {
             throw new IllegalArgumentException("Guest with this login already exists.");
@@ -64,7 +73,7 @@ public class UserService implements UserDetailsService {
         user.setHasSubscription(false);
         user.setDateOfRegistration(new Date());
         user.setRole(User.Role.USER);
-        userRepository.save(user); // Сохраняем гостя в базу
+        return userRepository.save(user); // Сохраняем гостя в базу
     }
 
     @Override
@@ -100,10 +109,24 @@ public class UserService implements UserDetailsService {
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
     }
     
+    @LogActivity(
+        action = SystemLog.ActionType.UPDATE,
+        entityType = SystemLog.EntityType.USER,
+        description = "Обновление информации пользователя: #{#user.fio}",
+        entityIdExpression = "#user.id",
+        includeDetails = true
+    )
     public User updateUser(User user) {
         return userRepository.save(user);
     }
     
+    @LogActivity(
+        action = SystemLog.ActionType.UPDATE,
+        entityType = SystemLog.EntityType.USER,
+        description = "Изменение статуса пользователя: #{#user.fio} - #{#user.hasSubscription ? 'активирован' : 'деактивирован'}",
+        entityIdExpression = "#id",
+        severity = SystemLog.Severity.WARNING
+    )
     public void toggleUserActiveStatus(Long id) {
         User user = getUserById(id);
         // В текущей модели нет поля active, поэтому используем hasSubscription

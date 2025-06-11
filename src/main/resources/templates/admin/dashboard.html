@@ -161,6 +161,44 @@
             margin-right: 0.5rem;
             font-size: 1.1rem;
         }
+        
+        /* Стили для заголовка "Система" */
+        .sidebar-heading {
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #3498db !important;
+            background: linear-gradient(135deg, rgba(52, 152, 219, 0.1), rgba(52, 152, 219, 0.05));
+            border-radius: 0.375rem;
+            padding: 0.5rem 1rem !important;
+            margin: 1rem 0.75rem 0.5rem 0.75rem !important;
+            border-left: 3px solid #3498db;
+            position: relative;
+        }
+        
+        .sidebar-heading::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(52, 152, 219, 0.05), transparent);
+            border-radius: 0.375rem;
+            z-index: -1;
+        }
+        
+        .sidebar-heading span {
+            display: flex;
+            align-items: center;
+        }
+        
+        .sidebar-heading span::before {
+            content: '⚙️';
+            margin-right: 0.5rem;
+            font-size: 0.875rem;
+        }
     </style>
 </head>
 <body>
@@ -221,11 +259,6 @@
                                 <i class="bi bi-bar-chart"></i> Отчеты
                             </a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/admin/settings">
-                                <i class="bi bi-gear"></i> Настройки
-                            </a>
-                        </li>
                     </ul>
 
                     <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
@@ -238,8 +271,8 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/admin/backups">
-                                <i class="bi bi-database"></i> Резервные копии
+                            <a class="nav-link" href="/admin/server-logs">
+                                <i class="bi bi-terminal"></i> Логи сервера
                             </a>
                         </li>
                     </ul>
@@ -250,19 +283,6 @@
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4 border-bottom">
                     <h1 class="h2"><i class="bi bi-speedometer2 me-2 text-primary"></i>Панель управления</h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <div class="btn-group me-2">
-                            <button type="button" class="btn btn-sm btn-primary" onclick="refreshStats()">
-                                <i class="bi bi-arrow-clockwise me-1"></i> Обновить
-                            </button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary">
-                                <i class="bi bi-download me-1"></i> Экспорт
-                            </button>
-                        </div>
-                        <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle d-flex align-items-center">
-                            <i class="bi bi-calendar3 me-1"></i> Текущий период
-                        </button>
-                    </div>
                 </div>
                 
                 <!-- Информационные карточки -->
@@ -392,12 +412,13 @@
                             <div class="card-body p-0">
                                 <ul class="activity-timeline list-group list-group-flush">
                                     <li class="list-group-item py-3 d-flex" th:each="action : ${recentActions}">
-                                        <div class="activity-icon me-3" th:classappend="${action.type == 'USER' ? 'bg-primary' : action.type == 'MEMORIAL' ? 'bg-success' : 'bg-info'}">
-                                            <i class="bi" th:classappend="${action.type == 'USER' ? 'bi-person' : action.type == 'MEMORIAL' ? 'bi-bookmark' : 'bi-diagram-3'}"></i>
+                                        <div class="activity-icon me-3" th:classappend="${action.entityType.toString() == 'USER' ? 'bg-primary' : action.entityType.toString() == 'MEMORIAL' ? 'bg-success' : 'bg-info'}">
+                                            <i class="bi" th:classappend="${action.entityType.toString() == 'USER' ? 'bi-person' : action.entityType.toString() == 'MEMORIAL' ? 'bi-bookmark' : 'bi-diagram-3'}"></i>
                                         </div>
                                         <div class="activity-content">
-                                            <div class="small text-muted" th:text="${#dates.format(action.date, 'dd.MM.yyyy HH:mm')}">01.01.2023 12:00</div>
+                                            <div class="small text-muted" th:text="${#temporals.format(action.createdAt, 'dd.MM.yyyy HH:mm')}">01.01.2023 12:00</div>
                                             <div class="mb-0 fw-medium" th:text="${action.description}">Описание действия</div>
+                                            <div class="small text-muted" th:if="${action.user != null}" th:text="'Пользователь: ' + ${action.user.fio}">Пользователь</div>
                                         </div>
                                     </li>
                                     <li class="list-group-item py-4 text-center" th:if="${#lists.isEmpty(recentActions)}">
