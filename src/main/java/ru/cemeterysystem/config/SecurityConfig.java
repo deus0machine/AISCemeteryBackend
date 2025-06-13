@@ -41,13 +41,35 @@ public class SecurityConfig {
         return new JwtAuthenticationFilter(jwtUtils, userService);
     }
 
-    // Основная конфигурация безопасности
+    // API конфигурация безопасности (приоритет выше)
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    @Order(1)
+    public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) throws Exception {
         http
-                .securityMatcher(AntPathRequestMatcher.antMatcher("/**")) // Применять ко всем другим эндпоинтам
+                .securityMatcher("/api/**") // Применять только к API эндпоинтам
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/login", "/api/register").permitAll()
+                        .requestMatchers("/api/memorials/public").permitAll()
+                        .requestMatchers("/api/guest/**").permitAll()
+                        .anyRequest().authenticated()
+                )
+                .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+
+        logger.info("API Security configuration applied");
+        return http.build();
+    }
+
+    // Веб конфигурация безопасности
+    @Bean
+    @Order(2)
+    public SecurityFilterChain webSecurityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher(AntPathRequestMatcher.antMatcher("/**")) // Применять ко всем остальным эндпоинтам
                 .cors(cors -> cors.disable())
-                .csrf(csrf -> csrf.disable()) // В продакшн стоит включить
+                .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/h2-console/**").permitAll()
                         .requestMatchers(

@@ -85,6 +85,18 @@ public class FamilyTreeController {
         }
     }
 
+    @GetMapping("/shared")
+    public ResponseEntity<?> getSharedFamilyTrees() {
+        try {
+            User user = getCurrentUser();
+            return ResponseEntity.ok(familyTreeService.getSharedFamilyTrees(user));
+        } catch (Exception e) {
+            logger.error("Error getting shared family trees: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Failed to get shared family trees: " + e.getMessage());
+        }
+    }
+
     @GetMapping("/search")
     public ResponseEntity<?> searchFamilyTrees(
             @RequestParam(required = false) String query,

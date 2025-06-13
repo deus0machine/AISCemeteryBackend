@@ -21,4 +21,5 @@ public class FamilyTreeDTO {
     private String updatedAt; // Изменяем на String для передачи на клиент
     private List<MemorialRelationDTO> memorialRelations;
     private Integer memorialCount;
+    private List<FamilyTreeAccessDTO> accessList; // Добавляем информацию о доступе
 } 

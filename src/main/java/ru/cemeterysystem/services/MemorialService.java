@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.HashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -1879,5 +1880,130 @@ public class MemorialService {
         // Вызываем новый метод с пагинацией и возвращаем первую страницу большого размера
         PagedResponse<MemorialDTO> pagedResponse = getPublicMemorials(0, 1000);
         return pagedResponse.getContent();
+    }
+
+    /**
+     * Расширенный поиск мемориалов по различным критериям
+     */
+    public PagedResponse<MemorialDTO> advancedSearchMemorials(
+            String query, String firstName, String lastName, String middleName,
+            String birthDateFrom, String birthDateTo, String deathDateFrom, String deathDateTo,
+            String location, Boolean isPublic, String sortBy, String sortDirection,
+            int page, int size) {
+        
+        log.info("Advanced search with parameters: query={}, firstName={}, lastName={}, middleName={}, location={}",
+                query, firstName, lastName, middleName, location);
+        
+        List<Memorial> allResults = memorialRepository.advancedSearch(
+            query, firstName, lastName, middleName,
+            birthDateFrom, birthDateTo, deathDateFrom, deathDateTo,
+            location, isPublic, sortBy, sortDirection
+        );
+        
+        // Применяем пагинацию
+        long totalElements = allResults.size();
+        int startIndex = page * size;
+        int endIndex = Math.min(startIndex + size, allResults.size());
+        
+        List<Memorial> pageResults = startIndex < allResults.size() ? 
+            allResults.subList(startIndex, endIndex) : new ArrayList<>();
+        
+        List<MemorialDTO> memorialDTOs = pageResults.stream()
+            .map(memorialMapper::toDTO)
+            .collect(Collectors.toList());
+            
+        return PagedResponse.of(memorialDTOs, page, size, totalElements);
+    }
+
+    /**
+     * Быстрый поиск мемориалов для автодополнения
+     */
+    public List<MemorialDTO> quickSearchMemorials(String query, int limit) {
+        log.info("Quick search for query: {}, limit: {}", query, limit);
+        
+        List<Memorial> results = memorialRepository.quickSearch(query, limit);
+        
+        return results.stream()
+            .map(memorialMapper::toDTO)
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * Поиск мемориалов по годовщинам
+     */
+    public PagedResponse<MemorialDTO> searchAnniversaries(String type, Integer month, Integer day, int page, int size) {
+        log.info("Anniversary search: type={}, month={}, day={}", type, month, day);
+        
+        List<Memorial> allResults = memorialRepository.searchAnniversaries(type, month, day);
+        
+        // Применяем пагинацию
+        long totalElements = allResults.size();
+        int startIndex = page * size;
+        int endIndex = Math.min(startIndex + size, allResults.size());
+        
+        List<Memorial> pageResults = startIndex < allResults.size() ? 
+            allResults.subList(startIndex, endIndex) : new ArrayList<>();
+        
+        List<MemorialDTO> memorialDTOs = pageResults.stream()
+            .map(memorialMapper::toDTO)
+            .collect(Collectors.toList());
+            
+        return PagedResponse.of(memorialDTOs, page, size, totalElements);
+    }
+
+    /**
+     * Получает статистику для поиска мемориалов
+     */
+    public Map<String, Object> getSearchStats() {
+        Map<String, Object> stats = new HashMap<>();
+        
+        // Общая статистика
+        long totalMemorials = memorialRepository.count();
+        long publicMemorials = memorialRepository.countByIsPublic(true);
+        long publishedMemorials = memorialRepository.countByPublicationStatus(Memorial.PublicationStatus.PUBLISHED);
+        
+        stats.put("totalMemorials", totalMemorials);
+        stats.put("publicMemorials", publicMemorials);
+        stats.put("publishedMemorials", publishedMemorials);
+        
+        // Статистика по годам
+        LocalDateTime currentYear = LocalDateTime.of(LocalDate.now().getYear(), 1, 1, 0, 0);
+        LocalDateTime lastYear = currentYear.minusYears(1);
+        
+        long memorialsThisYear = memorialRepository.countByCreatedAtAfter(currentYear);
+        long memorialsLastYear = memorialRepository.countByCreatedAtBetween(lastYear, currentYear);
+        
+        stats.put("memorialsThisYear", memorialsThisYear);
+        stats.put("memorialsLastYear", memorialsLastYear);
+        
+        // Популярные локации (топ 5)
+        List<String> popularLocations = getPopularLocations();
+        stats.put("popularLocations", popularLocations);
+        
+        log.info("Search stats generated: {}", stats);
+        return stats;
+    }
+    
+    /**
+     * Получает список популярных локаций
+     */
+    private List<String> getPopularLocations() {
+        // Простая реализация - можно улучшить с помощью GROUP BY запроса
+        List<Memorial> allMemorials = memorialRepository.findByIsPublicTrueAndPublicationStatusAndIsBlockedFalse(
+            Memorial.PublicationStatus.PUBLISHED
+        );
+        
+        Map<String, Long> locationCounts = allMemorials.stream()
+            .filter(m -> m.getMainLocation() != null && m.getMainLocation().getAddress() != null)
+            .collect(Collectors.groupingBy(
+                m -> m.getMainLocation().getAddress(),
+                Collectors.counting()
+            ));
+        
+        return locationCounts.entrySet().stream()
+            .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+            .limit(5)
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toList());
     }
 }

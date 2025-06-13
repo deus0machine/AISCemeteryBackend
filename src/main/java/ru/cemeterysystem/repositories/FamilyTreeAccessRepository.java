@@ -25,4 +25,11 @@ public interface FamilyTreeAccessRepository extends JpaRepository<FamilyTreeAcce
     void deleteByFamilyTreeIdAndUserId(Long familyTreeId, Long userId);
     
     boolean existsByFamilyTreeIdAndUserId(Long familyTreeId, Long userId);
+    
+    /**
+     * Проверяет, имеет ли пользователь доступ уровня EDITOR или выше к дереву
+     */
+    @Query("SELECT CASE WHEN COUNT(fa) > 0 THEN true ELSE false END FROM FamilyTreeAccess fa " +
+           "WHERE fa.familyTree.id = ?1 AND fa.user.id = ?2 AND fa.accessLevel IN ('EDITOR', 'ADMIN')")
+    boolean hasAccess(Long familyTreeId, Long userId);
 } 

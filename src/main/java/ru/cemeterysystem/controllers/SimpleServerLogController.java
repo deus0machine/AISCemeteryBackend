@@ -155,21 +155,21 @@ public class SimpleServerLogController {
         }
         
         try {
-            List<String> lines = Files.readAllLines(logPath);
-            List<LogEntry> logs = new ArrayList<>();
-            
-            // Читаем файл с конца для получения последних записей
-            Collections.reverse(lines);
+        List<String> lines = Files.readAllLines(logPath);
+        List<LogEntry> logs = new ArrayList<>();
+        
+        // Читаем файл с конца для получения последних записей
+        Collections.reverse(lines);
             
             int parsedCount = 0;
+        
+        for (String line : lines) {
+            // Если limit = 0, читаем все строки, иначе ограничиваем
+            if (limit > 0 && logs.size() >= limit) break;
             
-            for (String line : lines) {
-                // Если limit = 0, читаем все строки, иначе ограничиваем
-                if (limit > 0 && logs.size() >= limit) break;
-                
-                LogEntry entry = parseLogLine(line);
-                if (entry != null && (level.equals("ALL") || entry.getLevel().equals(level))) {
-                    logs.add(entry);
+            LogEntry entry = parseLogLine(line);
+            if (entry != null && (level.equals("ALL") || entry.getLevel().equals(level))) {
+                logs.add(entry);
                     parsedCount++;
                 }
             }
@@ -179,9 +179,9 @@ public class SimpleServerLogController {
                 System.out.println("INFO: Too few logs parsed (" + logs.size() + "), adding sample logs");
                 List<LogEntry> sampleLogs = createSampleLogs();
                 logs.addAll(sampleLogs);
-            }
-            
-            return logs;
+        }
+        
+        return logs;
             
         } catch (Exception e) {
             System.err.println("ERROR: Could not read log file: " + e.getMessage());

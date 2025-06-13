@@ -74,7 +74,11 @@ public class Notification {
         ADMIN_SYSTEM,             // Административное системное уведомление 
         ADMIN_WARNING,            // Предупреждение от администратора
         MEMORIAL_REPORT,          // Жалоба на мемориал
-        FAMILY_TREE_MODERATION    // Модерация семейного дерева
+        FAMILY_TREE_MODERATION,   // Модерация семейного дерева
+        FAMILY_TREE_ACCESS_REQUEST, // Запрос на доступ к семейному дереву
+        FAMILY_TREE_ACCESS_GRANTED, // Доступ к семейному дереву предоставлен
+        FAMILY_TREE_ACCESS_REVOKED, // Доступ к семейному дереву отозван
+        FAMILY_TREE_CHANGES_PENDING // Изменения в семейном дереве ожидают одобрения
     }
     
     public enum NotificationStatus {

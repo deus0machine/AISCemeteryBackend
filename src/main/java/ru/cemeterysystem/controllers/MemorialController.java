@@ -24,6 +24,7 @@ import ru.cemeterysystem.services.MemorialService;
 import ru.cemeterysystem.services.UserService;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -748,5 +749,129 @@ public class MemorialController {
         }
         
         log.info("Созданы уведомления о жалобе для {} администраторов", admins.size());
+    }
+
+    /**
+     * Расширенный поиск мемориалов по различным критериям
+     * 
+     * @param query общий поисковый запрос (ФИО)
+     * @param firstName имя
+     * @param lastName фамилия
+     * @param middleName отчество
+     * @param birthDateFrom дата рождения от
+     * @param birthDateTo дата рождения до
+     * @param deathDateFrom дата смерти от
+     * @param deathDateTo дата смерти до
+     * @param location местоположение (адрес)
+     * @param isPublic публичность
+     * @param sortBy поле для сортировки
+     * @param sortDirection направление сортировки
+     * @param page номер страницы
+     * @param size размер страницы
+     * @return пагинированный список найденных памятников
+     */
+    @GetMapping("/search/advanced")
+    public ru.cemeterysystem.dto.PagedResponse<MemorialDTO> advancedSearchMemorials(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String firstName,
+            @RequestParam(required = false) String lastName,
+            @RequestParam(required = false) String middleName,
+            @RequestParam(required = false) String birthDateFrom,
+            @RequestParam(required = false) String birthDateTo,
+            @RequestParam(required = false) String deathDateFrom,
+            @RequestParam(required = false) String deathDateTo,
+            @RequestParam(required = false) String location,
+            @RequestParam(required = false) Boolean isPublic,
+            @RequestParam(defaultValue = "lastName") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDirection,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        log.info("Advanced search: query={}, firstName={}, lastName={}, middleName={}, location={}", 
+                query, firstName, lastName, middleName, location);
+        
+        return memorialService.advancedSearchMemorials(
+            query, firstName, lastName, middleName,
+            birthDateFrom, birthDateTo, deathDateFrom, deathDateTo,
+            location, isPublic, sortBy, sortDirection, page, size
+        );
+    }
+
+    /**
+     * Быстрый поиск мемориалов (автодополнение)
+     * 
+     * @param query поисковый запрос
+     * @param limit максимальное количество результатов
+     * @return список найденных памятников
+     */
+    @GetMapping("/search/quick")
+    public List<MemorialDTO> quickSearchMemorials(
+            @RequestParam String query,
+            @RequestParam(defaultValue = "10") int limit
+    ) {
+        log.info("Quick search: query={}, limit={}", query, limit);
+        return memorialService.quickSearchMemorials(query, limit);
+    }
+
+    /**
+     * Поиск мемориалов по годовщинам (дни рождения/смерти)
+     * 
+     * @param type тип годовщины (birth/death)
+     * @param month месяц (1-12)
+     * @param day день (1-31)
+     * @param page номер страницы
+     * @param size размер страницы
+     * @return пагинированный список мемориалов с годовщинами
+     */
+    @GetMapping("/search/anniversaries")
+    public ru.cemeterysystem.dto.PagedResponse<MemorialDTO> searchAnniversaries(
+            @RequestParam String type,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer day,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        log.info("Anniversary search: type={}, month={}, day={}", type, month, day);
+        return memorialService.searchAnniversaries(type, month, day, page, size);
+    }
+
+    /**
+     * Поиск мемориалов с использованием DTO фильтров
+     * 
+     * @param searchDTO объект с параметрами поиска
+     * @return пагинированный список найденных памятников
+     */
+    @PostMapping("/search/filter")
+    public ru.cemeterysystem.dto.PagedResponse<MemorialDTO> searchMemorialsWithFilter(
+            @RequestBody ru.cemeterysystem.dto.MemorialSearchDTO searchDTO
+    ) {
+        log.info("Search with filter DTO: {}", searchDTO);
+        
+        return memorialService.advancedSearchMemorials(
+            searchDTO.getQuery(), 
+            searchDTO.getFirstName(), 
+            searchDTO.getLastName(), 
+            searchDTO.getMiddleName(),
+            searchDTO.getBirthDateFrom(), 
+            searchDTO.getBirthDateTo(), 
+            searchDTO.getDeathDateFrom(), 
+            searchDTO.getDeathDateTo(),
+            searchDTO.getLocation(), 
+            searchDTO.getIsPublic(), 
+            searchDTO.getSortBy(), 
+            searchDTO.getSortDirection(), 
+            searchDTO.getPage(), 
+            searchDTO.getSize()
+        );
+    }
+
+    /**
+     * Получает статистику поиска
+     * 
+     * @return статистика по мемориалам
+     */
+    @GetMapping("/search/stats")
+    public Map<String, Object> getSearchStats() {
+        return memorialService.getSearchStats();
     }
 }

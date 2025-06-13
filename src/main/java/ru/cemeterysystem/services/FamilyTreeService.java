@@ -119,6 +119,23 @@ public class FamilyTreeService {
     }
 
     @Transactional(readOnly = true)
+    public List<FamilyTreeDTO> getSharedFamilyTrees(User user) {
+        try {
+            if (user == null) {
+                throw new IllegalArgumentException("User cannot be null");
+            }
+            // Получаем только деревья с явным доступом (не публичные)
+            List<FamilyTreeAccess> userAccess = accessRepository.findByUserId(user.getId());
+            return userAccess.stream()
+                .map(access -> familyTreeMapper.toDTO(access.getFamilyTree()))
+                .toList();
+        } catch (Exception e) {
+            logger.error("Error getting shared family trees for user {}: {}", user.getId(), e.getMessage(), e);
+            throw new RuntimeException("Failed to get shared family trees", e);
+        }
+    }
+
+    @Transactional(readOnly = true)
     public List<FamilyTreeDTO> searchFamilyTrees(String query, String ownerName, String startDate, String endDate, User currentUser) {
         try {
             logger.debug("Searching family trees with parameters: query={}, ownerName={}, startDate={}, endDate={}, currentUser={}", 
@@ -143,30 +160,41 @@ public class FamilyTreeService {
                 .orElseThrow(() -> new RuntimeException("Family tree not found"));
 
             boolean isOwner = existingTree.getUser().getId().equals(user.getId());
-            boolean hasAccess = isOwner || accessService.hasAccess(id, user.getId(), FamilyTreeAccess.AccessLevel.ADMIN);
+            boolean hasAdminAccess = isOwner || accessService.hasAccess(id, user.getId(), FamilyTreeAccess.AccessLevel.ADMIN);
+            boolean hasEditorAccess = accessService.hasAccess(id, user.getId(), FamilyTreeAccess.AccessLevel.EDITOR);
             
-            logger.debug("Update tree access check - isOwner: {}, hasExplicitAccess: {}", 
-                isOwner, !isOwner ? accessService.hasAccess(id, user.getId(), FamilyTreeAccess.AccessLevel.ADMIN) : "not_checked");
+            logger.debug("Update tree access check - isOwner: {}, hasAdminAccess: {}, hasEditorAccess: {}", 
+                isOwner, hasAdminAccess, hasEditorAccess);
             
-            if (!hasAccess) {
+            // Владельцы и админы могут редактировать напрямую
+            if (hasAdminAccess) {
+                // Проверяем, не находится ли дерево на модерации
+                if (existingTree.getPublicationStatus() == FamilyTree.PublicationStatus.PENDING_MODERATION) {
+                    throw new RuntimeException("Cannot edit family tree that is under moderation");
+                }
+                
+                logger.debug("Direct update allowed for owner/admin - updating tree {} with name: '{}', description: '{}'", 
+                    id, updateDTO.getName(), updateDTO.getDescription());
+                
+                existingTree.setName(updateDTO.getName());
+                existingTree.setDescription(updateDTO.getDescription());
+                // НЕ обновляем isPublic напрямую - это управляется через модерацию
+                
+                FamilyTree savedTree = familyTreeRepository.save(existingTree);
+                logger.debug("Successfully updated family tree {}", id);
+                return familyTreeMapper.toDTO(savedTree);
+            }
+            // Редакторы должны работать через систему черновиков
+            else if (hasEditorAccess) {
+                logger.info("Editor {} attempting direct update of tree {} - should use draft system instead", 
+                    user.getId(), id);
+                throw new RuntimeException("Editors must use draft system for changes. Please create a draft with your changes and submit for review.");
+            }
+            // Нет доступа вообще
+            else {
                 logger.warn("Access denied for user {} to update family tree {}", user.getId(), id);
                 throw new RuntimeException("Insufficient permissions to update family tree");
             }
-
-            // Проверяем, не находится ли дерево на модерации
-            if (existingTree.getPublicationStatus() == FamilyTree.PublicationStatus.PENDING_MODERATION) {
-                throw new RuntimeException("Cannot edit family tree that is under moderation");
-            }
-            
-            logger.debug("Updating tree {} with name: '{}', description: '{}'", id, updateDTO.getName(), updateDTO.getDescription());
-            
-            existingTree.setName(updateDTO.getName());
-            existingTree.setDescription(updateDTO.getDescription());
-            // НЕ обновляем isPublic напрямую - это управляется через модерацию
-            
-            FamilyTree savedTree = familyTreeRepository.save(existingTree);
-            logger.debug("Successfully updated family tree {}", id);
-            return familyTreeMapper.toDTO(savedTree);
         } catch (Exception e) {
             logger.error("Error updating family tree {}: {}", id, e.getMessage(), e);
             throw new RuntimeException("Failed to update family tree", e);
@@ -244,16 +272,27 @@ public class FamilyTreeService {
             
             logger.info("Checking access permissions...");
             boolean isOwner = tree.getUser().getId().equals(user.getId());
-            boolean hasAccess = isOwner || accessService.hasAccess(treeId, user.getId(), FamilyTreeAccess.AccessLevel.EDITOR);
+            boolean hasAdminAccess = isOwner || accessService.hasAccess(treeId, user.getId(), FamilyTreeAccess.AccessLevel.ADMIN);
+            boolean hasEditorAccess = accessService.hasAccess(treeId, user.getId(), FamilyTreeAccess.AccessLevel.EDITOR);
             
-            logger.info("Add relation access check - isOwner: {}, hasExplicitAccess: {}", 
-                isOwner, !isOwner ? accessService.hasAccess(treeId, user.getId(), FamilyTreeAccess.AccessLevel.EDITOR) : "not_checked");
+            logger.info("Add relation access check - isOwner: {}, hasAdminAccess: {}, hasEditorAccess: {}", 
+                isOwner, hasAdminAccess, hasEditorAccess);
             
-            if (!hasAccess) {
+            // Владельцы и админы могут добавлять связи напрямую
+            if (hasAdminAccess) {
+                logger.info("Direct relation addition allowed for owner/admin");
+            }
+            // Редакторы должны работать через систему черновиков
+            else if (hasEditorAccess) {
+                logger.info("Editor {} attempting direct relation addition to tree {} - should use draft system instead", 
+                    user.getId(), treeId);
+                throw new RuntimeException("Editors must use draft system for changes. Please create a draft with your changes and submit for review.");
+            }
+            // Нет доступа вообще
+            else {
                 logger.error("Access denied for user {} to tree {}", user.getId(), treeId);
                 throw new RuntimeException("Insufficient permissions to add relation");
             }
-            logger.info("Access granted");
 
             logger.info("Finding source memorial...");
             Long sourceMemorialId = relationDTO.getSourceMemorial() != null ? relationDTO.getSourceMemorial().getId() : null;
@@ -350,19 +389,29 @@ public class FamilyTreeService {
 
             FamilyTree tree = relation.getFamilyTree();
             boolean isOwner = tree.getUser().getId().equals(user.getId());
-            boolean hasAccess = isOwner || accessService.hasAccess(treeId, user.getId(), FamilyTreeAccess.AccessLevel.EDITOR);
+            boolean hasAdminAccess = isOwner || accessService.hasAccess(treeId, user.getId(), FamilyTreeAccess.AccessLevel.ADMIN);
+            boolean hasEditorAccess = accessService.hasAccess(treeId, user.getId(), FamilyTreeAccess.AccessLevel.EDITOR);
             
-            logger.debug("Delete relation access check - isOwner: {}, hasExplicitAccess: {}", 
-                isOwner, !isOwner ? accessService.hasAccess(treeId, user.getId(), FamilyTreeAccess.AccessLevel.EDITOR) : "not_checked");
+            logger.debug("Delete relation access check - isOwner: {}, hasAdminAccess: {}, hasEditorAccess: {}", 
+                isOwner, hasAdminAccess, hasEditorAccess);
             
-            if (!hasAccess) {
+            // Владельцы и админы могут удалять связи напрямую
+            if (hasAdminAccess) {
+                logger.debug("Direct relation deletion allowed for owner/admin");
+                memorialRelationRepository.deleteById(relationId);
+                logger.debug("Successfully deleted relation {} from tree {}", relationId, treeId);
+            }
+            // Редакторы должны работать через систему черновиков
+            else if (hasEditorAccess) {
+                logger.info("Editor {} attempting direct relation deletion from tree {} - should use draft system instead", 
+                    user.getId(), treeId);
+                throw new RuntimeException("Editors must use draft system for changes. Please create a draft with your changes and submit for review.");
+            }
+            // Нет доступа вообще
+            else {
                 logger.warn("Access denied for user {} to delete relation {} from tree {}", user.getId(), relationId, treeId);
                 throw new RuntimeException("Insufficient permissions to delete relation");
             }
-
-            logger.debug("Access granted for user {} to delete relation {} from tree {}", user.getId(), relationId, treeId);
-            memorialRelationRepository.deleteById(relationId);
-            logger.debug("Successfully deleted relation {} from tree {}", relationId, treeId);
         } catch (Exception e) {
             logger.error("Error deleting relation {} from tree {}: {}", relationId, treeId, e.getMessage(), e);
             throw e;
@@ -378,40 +427,50 @@ public class FamilyTreeService {
                     .orElseThrow(() -> new RuntimeException("Family tree not found"));
 
             boolean isOwner = tree.getUser().getId().equals(user.getId());
-            boolean hasAccess = isOwner || accessService.hasAccess(treeId, user.getId(), FamilyTreeAccess.AccessLevel.EDITOR);
+            boolean hasAdminAccess = isOwner || accessService.hasAccess(treeId, user.getId(), FamilyTreeAccess.AccessLevel.ADMIN);
+            boolean hasEditorAccess = accessService.hasAccess(treeId, user.getId(), FamilyTreeAccess.AccessLevel.EDITOR);
             
-            logger.debug("Add memorial access check - isOwner: {}, hasExplicitAccess: {}", 
-                isOwner, !isOwner ? accessService.hasAccess(treeId, user.getId(), FamilyTreeAccess.AccessLevel.EDITOR) : "not_checked");
+            logger.debug("Add memorial access check - isOwner: {}, hasAdminAccess: {}, hasEditorAccess: {}", 
+                isOwner, hasAdminAccess, hasEditorAccess);
             
-            if (!hasAccess) {
+            // Владельцы и админы могут добавлять мемориалы напрямую
+            if (hasAdminAccess) {
+                Memorial memorial = memorialRepository.findById(memorialId)
+                        .orElseThrow(() -> new RuntimeException("Memorial not found"));
+
+                // Проверяем, есть ли уже мемориал в дереве
+                boolean alreadyExists = memorialRelationRepository.findByFamilyTreeId(treeId)
+                        .stream()
+                        .anyMatch(relation -> 
+                            relation.getSourceMemorial().getId().equals(memorialId) ||
+                            relation.getTargetMemorial().getId().equals(memorialId));
+
+                if (alreadyExists) {
+                    throw new RuntimeException("Memorial already exists in the family tree");
+                }
+
+                // Для начала просто создаем placeholder связь
+                // Позже пользователь может создать реальные связи между мемориалами
+                MemorialRelation placeholderRelation = new MemorialRelation();
+                placeholderRelation.setFamilyTree(tree);
+                placeholderRelation.setSourceMemorial(memorial);
+                placeholderRelation.setTargetMemorial(memorial); // Временно ссылаемся на самого себя
+                placeholderRelation.setRelationType(MemorialRelation.RelationType.PLACEHOLDER);
+
+                memorialRelationRepository.save(placeholderRelation);
+                logger.debug("Successfully added memorial {} to tree {} as placeholder", memorialId, treeId);
+            }
+            // Редакторы должны работать через систему черновиков
+            else if (hasEditorAccess) {
+                logger.info("Editor {} attempting direct memorial addition to tree {} - should use draft system instead", 
+                    user.getId(), treeId);
+                throw new RuntimeException("Editors must use draft system for changes. Please create a draft with your changes and submit for review.");
+            }
+            // Нет доступа вообще
+            else {
                 logger.warn("Access denied for user {} to add memorial {} to tree {}", user.getId(), memorialId, treeId);
                 throw new RuntimeException("Insufficient permissions to add memorial");
             }
-
-            Memorial memorial = memorialRepository.findById(memorialId)
-                    .orElseThrow(() -> new RuntimeException("Memorial not found"));
-
-            // Проверяем, есть ли уже мемориал в дереве
-            boolean alreadyExists = memorialRelationRepository.findByFamilyTreeId(treeId)
-                    .stream()
-                    .anyMatch(relation -> 
-                        relation.getSourceMemorial().getId().equals(memorialId) ||
-                        relation.getTargetMemorial().getId().equals(memorialId));
-
-            if (alreadyExists) {
-                throw new RuntimeException("Memorial already exists in the family tree");
-            }
-
-            // Для начала просто создаем placeholder связь
-            // Позже пользователь может создать реальные связи между мемориалами
-            MemorialRelation placeholderRelation = new MemorialRelation();
-            placeholderRelation.setFamilyTree(tree);
-            placeholderRelation.setSourceMemorial(memorial);
-            placeholderRelation.setTargetMemorial(memorial); // Временно ссылаемся на самого себя
-            placeholderRelation.setRelationType(MemorialRelation.RelationType.PLACEHOLDER);
-
-            memorialRelationRepository.save(placeholderRelation);
-            logger.debug("Successfully added memorial {} to tree {} as placeholder", memorialId, treeId);
         } catch (Exception e) {
             logger.error("Error adding memorial {} to tree {}: {}", memorialId, treeId, e.getMessage(), e);
             throw e;
@@ -450,31 +509,41 @@ public class FamilyTreeService {
                     .orElseThrow(() -> new RuntimeException("Family tree not found"));
 
             boolean isOwner = tree.getUser().getId().equals(user.getId());
-            boolean hasAccess = isOwner || accessService.hasAccess(treeId, user.getId(), FamilyTreeAccess.AccessLevel.EDITOR);
+            boolean hasAdminAccess = isOwner || accessService.hasAccess(treeId, user.getId(), FamilyTreeAccess.AccessLevel.ADMIN);
+            boolean hasEditorAccess = accessService.hasAccess(treeId, user.getId(), FamilyTreeAccess.AccessLevel.EDITOR);
             
-            logger.debug("Remove memorial access check - isOwner: {}, hasExplicitAccess: {}", 
-                isOwner, !isOwner ? accessService.hasAccess(treeId, user.getId(), FamilyTreeAccess.AccessLevel.EDITOR) : "not_checked");
+            logger.debug("Remove memorial access check - isOwner: {}, hasAdminAccess: {}, hasEditorAccess: {}", 
+                isOwner, hasAdminAccess, hasEditorAccess);
             
-            if (!hasAccess) {
+            // Владельцы и админы могут удалять мемориалы напрямую
+            if (hasAdminAccess) {
+                // Удаляем все связи, где участвует данный мемориал
+                List<MemorialRelation> relationsToDelete = memorialRelationRepository.findByFamilyTreeId(treeId)
+                        .stream()
+                        .filter(relation -> 
+                            relation.getSourceMemorial().getId().equals(memorialId) ||
+                            relation.getTargetMemorial().getId().equals(memorialId))
+                        .collect(Collectors.toList());
+
+                logger.debug("Found {} relations to delete for memorial {} in tree {}", relationsToDelete.size(), memorialId, treeId);
+                
+                for (MemorialRelation relation : relationsToDelete) {
+                    memorialRelationRepository.delete(relation);
+                }
+                
+                logger.debug("Successfully removed memorial {} from tree {}", memorialId, treeId);
+            }
+            // Редакторы должны работать через систему черновиков
+            else if (hasEditorAccess) {
+                logger.info("Editor {} attempting direct memorial removal from tree {} - should use draft system instead", 
+                    user.getId(), treeId);
+                throw new RuntimeException("Editors must use draft system for changes. Please create a draft with your changes and submit for review.");
+            }
+            // Нет доступа вообще
+            else {
                 logger.warn("Access denied for user {} to remove memorial {} from tree {}", user.getId(), memorialId, treeId);
                 throw new RuntimeException("Insufficient permissions to remove memorial");
             }
-
-            // Удаляем все связи, где участвует данный мемориал
-            List<MemorialRelation> relationsToDelete = memorialRelationRepository.findByFamilyTreeId(treeId)
-                    .stream()
-                    .filter(relation -> 
-                        relation.getSourceMemorial().getId().equals(memorialId) ||
-                        relation.getTargetMemorial().getId().equals(memorialId))
-                    .collect(Collectors.toList());
-
-            logger.debug("Found {} relations to delete for memorial {} in tree {}", relationsToDelete.size(), memorialId, treeId);
-            
-            for (MemorialRelation relation : relationsToDelete) {
-                memorialRelationRepository.delete(relation);
-            }
-            
-            logger.debug("Successfully removed memorial {} from tree {}", memorialId, treeId);
         } catch (Exception e) {
             logger.error("Error removing memorial {} from tree {}: {}", memorialId, treeId, e.getMessage(), e);
             throw e;

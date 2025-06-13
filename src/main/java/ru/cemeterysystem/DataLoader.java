@@ -162,9 +162,18 @@ public class DataLoader implements CommandLineRunner {
             burial8.setMiddleName("Николаевна");
             burial8.setDeathDate(LocalDate.of(1998, 6, 14));
             burial8.setBirthDate(LocalDate.of(1928, 12, 15));
+
+            Memorial burial9 = new Memorial();
+            burial9.setUser(user2);
+            burial9.setCreatedBy(user2);
+            burial9.setFirstName("выыав");
+            burial9.setLastName("Сергапвеева");
+            burial9.setMiddleName("вапавпав");
+            burial9.setDeathDate(LocalDate.of(1998, 6, 14));
+            burial9.setBirthDate(LocalDate.of(1928, 12, 15));
             
             logger.info("Saving memorials to database...");
-            memorialRepository.saveAll(List.of(burial1, burial2, burial3, burial4, burial5, burial6, burial7, burial8));
+            memorialRepository.saveAll(List.of(burial1, burial2, burial3, burial4, burial5, burial6, burial7, burial8, burial9));
 
 
             // Создаем тестовое семейное дерево
@@ -172,6 +181,8 @@ public class DataLoader implements CommandLineRunner {
             familyTree.setName("Семья Ивановых");
             familyTree.setDescription("Генеалогическое древо семьи Ивановых");
             familyTree.setUser(user);
+            familyTree.setPublic(true);
+            familyTree.setPublicationStatus(FamilyTree.PublicationStatus.PUBLISHED);
             
             logger.info("Saving family tree to database...");
             familyTreeRepository.save(familyTree);

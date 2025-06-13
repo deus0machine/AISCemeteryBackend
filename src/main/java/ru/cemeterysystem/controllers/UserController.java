@@ -1,6 +1,8 @@
 package ru.cemeterysystem.controllers;
 
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -18,6 +20,8 @@ import java.util.Optional;
 @RequestMapping("/api")
 @RequiredArgsConstructor
 public class UserController {
+    private static final Logger logger = LoggerFactory.getLogger(UserController.class);
+    
     private final UserService userService;
     private final JwtUtils jwtUtils;
 
@@ -40,31 +44,43 @@ public class UserController {
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> credentials) {
         Map<String, Object> response = new HashMap<>();
+        
+        try {
+            logger.info("Login attempt for user: {}", credentials.get("login"));
+            
+            Optional<User> optionalGuest = userService.authenticate(
+                credentials.get("login"), 
+                credentials.get("password")
+            );
 
-        Optional<User> optionalGuest = userService.authenticate(
-            credentials.get("login"), 
-            credentials.get("password")
-        );
+            if (optionalGuest.isPresent()) {
+                User user = optionalGuest.get();
+                UserDetails userDetails = userService.loadUserByUsername(user.getLogin());
+                String token = jwtUtils.generateToken(userDetails);
 
-        if (optionalGuest.isPresent()) {
-            User user = optionalGuest.get();
-            UserDetails userDetails = userService.loadUserByUsername(user.getLogin());
-            String token = jwtUtils.generateToken(userDetails);
-
-            response.put("status", "SUCCESS");
-            response.put("id", user.getId());
-            response.put("fio", user.getFio());
-            response.put("contacts", user.getContacts());
-            response.put("dateOfRegistration", user.getDateOfRegistration());
-            response.put("login", user.getLogin());
-            response.put("hasSubscription", user.getHasSubscription());
-            response.put("role", user.getRole().name());
-            response.put("token", token);
-            return ResponseEntity.ok(response);
-        } else {
-            response.put("status", "FAILURE");
-            response.put("message", "Invalid login or password");
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+                response.put("status", "SUCCESS");
+                response.put("id", user.getId());
+                response.put("fio", user.getFio());
+                response.put("contacts", user.getContacts());
+                response.put("dateOfRegistration", user.getDateOfRegistration());
+                response.put("login", user.getLogin());
+                response.put("hasSubscription", user.getHasSubscription());
+                response.put("role", user.getRole().name());
+                response.put("token", token);
+                
+                logger.info("Login successful for user: {}", user.getLogin());
+                return ResponseEntity.ok(response);
+            } else {
+                logger.warn("Login failed for user: {}", credentials.get("login"));
+                response.put("status", "FAILURE");
+                response.put("message", "Invalid login or password");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+        } catch (Exception e) {
+            logger.error("Login error for user {}: {}", credentials.get("login"), e.getMessage(), e);
+            response.put("status", "ERROR");
+            response.put("message", "Internal server error");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 
