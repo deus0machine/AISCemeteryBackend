@@ -50,16 +50,16 @@ public class FamilyTreeDraft {
     private Boolean originalIsPublic = false;
     
     // JSON поля для хранения копий мемориалов и связей
-    @Column(name = "draft_memorials", columnDefinition = "TEXT")
+    @Column(name = "draft_memorials_json", columnDefinition = "TEXT")
     private String draftMemorialsJson; // JSON массив мемориалов черновика
     
-    @Column(name = "draft_relations", columnDefinition = "TEXT")
+    @Column(name = "draft_relations_json", columnDefinition = "TEXT")
     private String draftRelationsJson; // JSON массив связей черновика
     
-    @Column(name = "original_memorials", columnDefinition = "TEXT")
+    @Column(name = "original_memorials_json", columnDefinition = "TEXT")
     private String originalMemorialsJson; // JSON массив исходных мемориалов
     
-    @Column(name = "original_relations", columnDefinition = "TEXT")
+    @Column(name = "original_relations_json", columnDefinition = "TEXT")
     private String originalRelationsJson; // JSON массив исходных связей
     
     @Column(columnDefinition = "TEXT")

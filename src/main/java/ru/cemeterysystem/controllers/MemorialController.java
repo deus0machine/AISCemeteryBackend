@@ -450,6 +450,31 @@ public class MemorialController {
     }
 
     /**
+     * Удаляет документ мемориала.
+     *
+     * @param id ID мемориала
+     * @return ResponseEntity с результатом операции
+     */
+    @DeleteMapping("/{id}/document")
+    public ResponseEntity<Void> deleteDocument(@PathVariable Long id) {
+        log.info("=== НАЧАЛО УДАЛЕНИЯ ДОКУМЕНТА ===");
+        log.info("Удаление документа для мемориала с ID: {}", id);
+        
+        try {
+            User user = getCurrentUser();
+            log.info("Пользователь: {}", user.getLogin());
+            
+            memorialService.deleteDocument(id, user);
+            log.info("Документ успешно удален для мемориала: {}", id);
+            log.info("=== КОНЕЦ УДАЛЕНИЯ ДОКУМЕНТА ===");
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("ОШИБКА при удалении документа для мемориала {}: {}", id, e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    /**
      * Ищет памятники по различным параметрам с пагинацией.
      *
      * @param query строка поиска по названию или описанию памятника
@@ -873,5 +898,31 @@ public class MemorialController {
     @GetMapping("/search/stats")
     public Map<String, Object> getSearchStats() {
         return memorialService.getSearchStats();
+    }
+
+    /**
+     * Получает мемориалы в заданных географических границах для оптимизации карты
+     * 
+     * @param minLat минимальная широта
+     * @param maxLat максимальная широта  
+     * @param minLng минимальная долгота
+     * @param maxLng максимальная долгота
+     * @param page номер страницы
+     * @param size размер страницы
+     * @return пагинированный список мемориалов в заданных границах
+     */
+    @GetMapping("/search/bounds")
+    public ru.cemeterysystem.dto.PagedResponse<MemorialDTO> getMemorialsInBounds(
+            @RequestParam double minLat,
+            @RequestParam double maxLat,
+            @RequestParam double minLng,
+            @RequestParam double maxLng,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size
+    ) {
+        log.info("Поиск мемориалов в границах: minLat={}, maxLat={}, minLng={}, maxLng={}, page={}, size={}", 
+                minLat, maxLat, minLng, maxLng, page, size);
+        
+        return memorialService.getMemorialsInBounds(minLat, maxLat, minLng, maxLng, page, size);
     }
 }

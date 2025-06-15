@@ -71,6 +71,9 @@ public class MemorialDTO {
     private LocalDateTime blockedAt;
     private UserDTO blockedBy;
     
+    // Поле для прав редактирования
+    private boolean canEdit = false;
+    
     // Утилитные методы для работы с ФИО
     public String getFullName() {
         if (firstName != null && lastName != null && 

@@ -20,6 +20,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageImpl;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +30,7 @@ import java.util.Map;
 public class SystemLogService {
 
     private final SystemLogRepository systemLogRepository;
+    private static final Logger logger = LoggerFactory.getLogger(SystemLogService.class);
 
     /**
      * Асинхронное создание лога
@@ -102,6 +106,7 @@ public class SystemLogService {
 
     /**
      * Получение логов с фильтрацией и пагинацией
+     * Используем простые методы Spring Data вместо сложных запросов
      */
     public Page<SystemLog> getLogsWithFilters(SystemLog.ActionType actionType,
                                             SystemLog.EntityType entityType,
@@ -111,12 +116,28 @@ public class SystemLogService {
                                             LocalDateTime endDate,
                                             String searchText,
                                             int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Pageable pageable = PageRequest.of(page, size);
         
-        return systemLogRepository.findLogsWithFilters(
-            actionType, entityType, severity, user, 
-            startDate, endDate, searchText, pageable
-        );
+        // TODO: Поиск по searchText временно отключен - нужно исправить тип поля description в БД
+        if (searchText != null && !searchText.trim().isEmpty()) {
+            logger.warn("Поиск по тексту '{}' игнорируется - поле description имеет неправильный тип в БД", searchText);
+        }
+        
+        // Используем простые методы в зависимости от фильтров
+        if (actionType != null) {
+            return systemLogRepository.findByActionTypeOrderByCreatedAtDesc(actionType, pageable);
+        } else if (entityType != null) {
+            return systemLogRepository.findByEntityTypeOrderByCreatedAtDesc(entityType, pageable);
+        } else if (severity != null) {
+            return systemLogRepository.findBySeverityOrderByCreatedAtDesc(severity, pageable);
+        } else if (user != null) {
+            return systemLogRepository.findByUserOrderByCreatedAtDesc(user, pageable);
+        } else if (startDate != null && endDate != null) {
+            return systemLogRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(startDate, endDate, pageable);
+        } else {
+            // Если нет фильтров, возвращаем все логи
+            return systemLogRepository.findAllByOrderByCreatedAtDesc(pageable);
+        }
     }
 
     /**
@@ -138,7 +159,7 @@ public class SystemLogService {
      * Получение последних действий для dashboard
      */
     public List<SystemLog> getRecentActions() {
-        return systemLogRepository.findTop5ByOrderByCreatedAtDesc();
+        return systemLogRepository.findTop10ByOrderByCreatedAtDesc();
     }
 
     /**

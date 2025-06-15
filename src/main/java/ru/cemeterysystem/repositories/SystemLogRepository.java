@@ -36,25 +36,7 @@ public interface SystemLogRepository extends JpaRepository<SystemLog, Long> {
     // Поиск логов по IP адресу
     Page<SystemLog> findByIpAddress(String ipAddress, Pageable pageable);
     
-    // Комплексный поиск
-    @Query("SELECT sl FROM SystemLog sl WHERE " +
-           "(:actionType IS NULL OR sl.actionType = :actionType) AND " +
-           "(:entityType IS NULL OR sl.entityType = :entityType) AND " +
-           "(:severity IS NULL OR sl.severity = :severity) AND " +
-           "(:user IS NULL OR sl.user = :user) AND " +
-           "(:startDate IS NULL OR sl.createdAt >= :startDate) AND " +
-           "(:endDate IS NULL OR sl.createdAt <= :endDate) AND " +
-           "(:searchText IS NULL OR LOWER(sl.description) LIKE LOWER(CONCAT('%', :searchText, '%')))")
-    Page<SystemLog> findLogsWithFilters(
-            @Param("actionType") SystemLog.ActionType actionType,
-            @Param("entityType") SystemLog.EntityType entityType,
-            @Param("severity") SystemLog.Severity severity,
-            @Param("user") User user,
-            @Param("startDate") LocalDateTime startDate,
-            @Param("endDate") LocalDateTime endDate,
-            @Param("searchText") String searchText,
-            Pageable pageable
-    );
+
     
     // Получить последние действия (для dashboard)
     List<SystemLog> findTop10ByOrderByCreatedAtDesc();
@@ -88,4 +70,14 @@ public interface SystemLogRepository extends JpaRepository<SystemLog, Long> {
     
     // Удаление старых логов
     void deleteByCreatedAtBefore(LocalDateTime cutoffDate);
+    
+    // Простые методы поиска без сложных запросов
+    Page<SystemLog> findByActionTypeOrderByCreatedAtDesc(SystemLog.ActionType actionType, Pageable pageable);
+    Page<SystemLog> findByEntityTypeOrderByCreatedAtDesc(SystemLog.EntityType entityType, Pageable pageable);
+    Page<SystemLog> findBySeverityOrderByCreatedAtDesc(SystemLog.Severity severity, Pageable pageable);
+    Page<SystemLog> findByUserOrderByCreatedAtDesc(User user, Pageable pageable);
+    Page<SystemLog> findByCreatedAtBetweenOrderByCreatedAtDesc(LocalDateTime startDate, LocalDateTime endDate, Pageable pageable);
+    
+    // Все логи с сортировкой
+    Page<SystemLog> findAllByOrderByCreatedAtDesc(Pageable pageable);
 } 

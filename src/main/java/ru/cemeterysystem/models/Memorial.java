@@ -74,9 +74,9 @@ public class Memorial {
     @Column(name = "biography")
     private String biography;
 
-    @Column(name = "xCoord")
+    @Column(name = "xcoord")
     private Long xCoord;
-    @Column(name = "yCoord")
+    @Column(name = "ycoord")
     private Long yCoord;
 
     //Сделать поле для хранения документа, подтверждающего существование человека и его смерть
@@ -119,6 +119,7 @@ public class Memorial {
         REJECTED             // Отклонен
     }
 
+    @Column(name = "tree_id")
     private Long treeId;
 
     @ManyToOne
@@ -126,7 +127,10 @@ public class Memorial {
     @JsonIdentityReference(alwaysAsId = true)
     private User createdBy;
 
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
+    
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
     // Флаг, указывающий, требуются ли изменения подтверждения основным владельцем

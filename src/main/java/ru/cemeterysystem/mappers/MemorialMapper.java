@@ -29,8 +29,8 @@ public class MemorialMapper implements RowMapper<Memorial> {
         burial.setBirthDate(rs.getObject("birth_date", LocalDate.class));
         burial.setBiography(rs.getString("biography"));
         //burial.setPhoto(rs.getBytes("photo"));
-        burial.setXCoord(rs.getLong("xCoord"));
-        burial.setYCoord(rs.getLong("yCoord"));
+        burial.setXCoord(rs.getLong("xcoord"));
+        burial.setYCoord(rs.getLong("ycoord"));
 
         User user = new User();
         user.setId(rs.getLong("guest_id"));

@@ -1,6 +1,6 @@
 -- =====================================================
 -- PostgreSQL Migration Script for Cemetery System
--- Миграция с H2 на PostgreSQL
+-- Миграция с H2 на PostgreSQL (ИСПРАВЛЕННАЯ ВЕРСИЯ)
 -- =====================================================
 
 -- Удаляем существующие таблицы если они есть (в правильном порядке)
@@ -53,7 +53,7 @@ CREATE TABLE family_tree_access (
     id BIGSERIAL PRIMARY KEY,
     family_tree_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,
-    access_type VARCHAR(50) NOT NULL,
+    access_level VARCHAR(50) NOT NULL,
     granted_at TIMESTAMP NOT NULL,
     granted_by BIGINT,
     FOREIGN KEY (family_tree_id) REFERENCES family_trees(id) ON DELETE CASCADE,
@@ -161,10 +161,10 @@ CREATE TABLE family_tree_drafts (
     original_name VARCHAR(255) NOT NULL,
     original_description TEXT,
     original_is_public BOOLEAN DEFAULT FALSE,
-    draft_memorials TEXT,
-    draft_relations TEXT,
-    original_memorials TEXT,
-    original_relations TEXT,
+    draft_memorials_json TEXT,
+    draft_relations_json TEXT,
+    original_memorials_json TEXT,
+    original_relations_json TEXT,
     message TEXT,
     created_at TIMESTAMP NOT NULL,
     submitted_at TIMESTAMP,
@@ -196,13 +196,18 @@ CREATE TABLE draft_submissions (
 CREATE TABLE notifications (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL,
+    sender_id BIGINT,
     type VARCHAR(100) NOT NULL,
     title VARCHAR(255) NOT NULL,
     message TEXT NOT NULL,
-    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    status VARCHAR(50) DEFAULT 'PENDING',
+    related_entity_id BIGINT,
+    related_entity_name VARCHAR(255),
+    read BOOLEAN NOT NULL DEFAULT FALSE,
+    urgent BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL,
-    data TEXT,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- =====================================================
@@ -210,14 +215,16 @@ CREATE TABLE notifications (
 -- =====================================================
 CREATE TABLE system_logs (
     id BIGSERIAL PRIMARY KEY,
-    user_id BIGINT,
-    action VARCHAR(255) NOT NULL,
-    entity_type VARCHAR(100),
+    action_type VARCHAR(50) NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,
     entity_id BIGINT,
+    description VARCHAR(255) NOT NULL,
     details TEXT,
+    user_id BIGINT,
     ip_address VARCHAR(45),
     user_agent TEXT,
-    timestamp TIMESTAMP NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    severity VARCHAR(20) NOT NULL DEFAULT 'INFO',
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
@@ -227,9 +234,9 @@ CREATE TABLE system_logs (
 CREATE TABLE transaction_history (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL,
-    amount DECIMAL(10,2) NOT NULL,
-    transaction_type VARCHAR(50) NOT NULL,
-    description VARCHAR(255),
+    amount BIGINT NOT NULL,
+    operation_type VARCHAR(50) NOT NULL,
+    description VARCHAR(1000),
     created_at TIMESTAMP NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -240,12 +247,13 @@ CREATE TABLE transaction_history (
 CREATE TABLE family_tree_versions (
     id BIGSERIAL PRIMARY KEY,
     family_tree_id BIGINT NOT NULL,
-    version_number INTEGER NOT NULL,
-    changes_description TEXT,
+    version VARCHAR(50) NOT NULL,
+    description TEXT,
     created_at TIMESTAMP NOT NULL,
-    created_by BIGINT,
+    created_by_id BIGINT,
+    snapshot TEXT,
     FOREIGN KEY (family_tree_id) REFERENCES family_trees(id) ON DELETE CASCADE,
-    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+    FOREIGN KEY (created_by_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- =====================================================
@@ -288,15 +296,19 @@ CREATE INDEX idx_draft_submissions_submitted_at ON draft_submissions(submitted_a
 
 -- Индексы для уведомлений
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
-CREATE INDEX idx_notifications_is_read ON notifications(is_read);
+CREATE INDEX idx_notifications_read ON notifications(read);
 CREATE INDEX idx_notifications_created_at ON notifications(created_at);
 CREATE INDEX idx_notifications_type ON notifications(type);
 
 -- Индексы для системных логов
 CREATE INDEX idx_system_logs_user_id ON system_logs(user_id);
-CREATE INDEX idx_system_logs_timestamp ON system_logs(timestamp);
-CREATE INDEX idx_system_logs_action ON system_logs(action);
+CREATE INDEX idx_system_logs_created_at ON system_logs(created_at);
+CREATE INDEX idx_system_logs_action_type ON system_logs(action_type);
 CREATE INDEX idx_system_logs_entity_type ON system_logs(entity_type);
+
+-- Индексы для версий семейных деревьев
+CREATE INDEX idx_family_tree_versions_family_tree_id ON family_tree_versions(family_tree_id);
+CREATE INDEX idx_family_tree_versions_created_at ON family_tree_versions(created_at);
 
 -- =====================================================
 -- Создание тестовых данных (опционально)
@@ -311,31 +323,58 @@ INSERT INTO users (fio, contacts, dateofregistration, login, password, has_subsc
 VALUES ('Тестовый Пользователь', 'test@cemetery.ru', NOW(), 'testuser', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', false, 'USER');
 
 -- =====================================================
--- Комментарии по миграции
+-- Предоставление прав доступа пользователю cemetery_user
+-- =====================================================
+
+-- Предоставляем права на все таблицы
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO cemetery_user;
+
+-- Предоставляем права на все последовательности (для SERIAL полей)
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO cemetery_user;
+
+-- Предоставляем права на схему public
+GRANT USAGE ON SCHEMA public TO cemetery_user;
+
+-- Предоставляем права на создание объектов в схеме public
+GRANT CREATE ON SCHEMA public TO cemetery_user;
+
+-- Предоставляем права по умолчанию для будущих таблиц
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO cemetery_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO cemetery_user;
+
+-- =====================================================
+-- Комментарии по исправлениям
 -- =====================================================
 
 /*
-ВАЖНЫЕ ЗАМЕЧАНИЯ ПО МИГРАЦИИ:
+ИСПРАВЛЕННЫЕ НЕСООТВЕТСТВИЯ:
 
-1. ТИПЫ ДАННЫХ:
-   - BIGSERIAL вместо IDENTITY для автоинкремента
-   - TIMESTAMP вместо DATETIME
-   - TEXT вместо CLOB для больших текстовых полей
-   - BOOLEAN вместо BIT
+1. FAMILY_TREE_VERSIONS:
+   - version_number → version (VARCHAR)
+   - changes_description → description
+   - created_by → created_by_id
+   - Добавлено поле snapshot
 
-2. ПОСЛЕДОВАТЕЛЬНОСТИ:
-   PostgreSQL автоматически создает последовательности для BIGSERIAL полей
+2. SYSTEM_LOGS:
+   - action → action_type
+   - timestamp → created_at
+   - Добавлено поле description
+   - Добавлено поле severity
 
-3. ОГРАНИЧЕНИЯ:
-   - Все внешние ключи настроены с CASCADE или SET NULL
-   - Уникальные ограничения сохранены
-   - NOT NULL ограничения применены где необходимо
+3. TRANSACTION_HISTORY:
+   - transaction_type → operation_type
+   - amount: DECIMAL → BIGINT (как в Java модели Long)
 
-4. ИНДЕКСЫ:
-   - Созданы индексы для всех часто используемых полей
-   - Составные индексы для оптимизации сложных запросов
+4. FAMILY_TREE_DRAFTS:
+   - draft_memorials → draft_memorials_json
+   - draft_relations → draft_relations_json
+   - original_memorials → original_memorials_json
+   - original_relations → original_relations_json
 
-5. ПАРОЛИ:
-   - Тестовые пароли зашифрованы с помощью BCrypt
-   - Пароль для admin и testuser: "password"
+5. NOTIFICATIONS:
+   - is_read → read (без префикса is_)
+
+6. ИНДЕКСЫ:
+   - Исправлены имена полей в индексах
+   - Добавлены недостающие индексы
 */ 

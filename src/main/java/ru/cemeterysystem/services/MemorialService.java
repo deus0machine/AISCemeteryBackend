@@ -1168,6 +1168,55 @@ public class MemorialService {
         return documentUrl;
     }
 
+    @Transactional
+    public void deleteDocument(Long id, User currentUser) {
+        log.info("=== НАЧАЛО УДАЛЕНИЯ ДОКУМЕНТА В СЕРВИСЕ ===");
+        log.info("Удаление документа для мемориала ID={} пользователем {}", id, currentUser.getLogin());
+        
+        Memorial memorial = memorialRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Memorial not found"));
+        
+        // Проверяем права доступа - только владелец или редактор может удалять документы
+        boolean isOwner = memorial.getCreatedBy().equals(currentUser);
+        boolean isEditor = memorial.isEditor(currentUser);
+        
+        if (!isOwner && !isEditor) {
+            log.error("Пользователь {} не имеет прав для удаления документа мемориала {}", currentUser.getLogin(), id);
+            throw new RuntimeException("Only memorial owner or editor can delete documents");
+        }
+        
+        // Проверяем, что мемориал не опубликован
+        if (memorial.isPublic() && memorial.getPublicationStatus() == Memorial.PublicationStatus.PUBLISHED) {
+            log.error("Попытка удалить документ из опубликованного мемориала {} пользователем {}", id, currentUser.getLogin());
+            throw new RuntimeException("Cannot delete document from published memorial");
+        }
+        
+        // Проверяем наличие документа
+        if (memorial.getDocumentUrl() == null || memorial.getDocumentUrl().trim().isEmpty()) {
+            log.warn("У мемориала {} отсутствует документ для удаления", id);
+            throw new RuntimeException("Document not found");
+        }
+        
+        String documentUrl = memorial.getDocumentUrl();
+        log.info("Удаляем документ по URL: {}", documentUrl);
+        
+        // Удаляем файл из хранилища
+        try {
+            fileStorageService.deleteFile(documentUrl);
+            log.info("Файл документа успешно удален из хранилища");
+        } catch (Exception e) {
+            log.error("Ошибка при удалении файла документа из хранилища: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to delete document file: " + e.getMessage());
+        }
+        
+        // Очищаем URL документа в базе данных
+        memorial.setDocumentUrl(null);
+        memorialRepository.save(memorial);
+        
+        log.info("Документ успешно удален для мемориала ID={}", id);
+        log.info("=== КОНЕЦ УДАЛЕНИЯ ДОКУМЕНТА В СЕРВИСЕ ===");
+    }
+
     /**
      * Получает документ мемориала для просмотра или скачивания
      */
@@ -1955,32 +2004,23 @@ public class MemorialService {
      * Получает статистику для поиска мемориалов
      */
     public Map<String, Object> getSearchStats() {
+        List<Memorial> allPublicMemorials = memorialRepository.findByIsPublicTrueAndPublicationStatusAndIsBlockedFalse(
+            Memorial.PublicationStatus.PUBLISHED
+        );
+        
         Map<String, Object> stats = new HashMap<>();
+        stats.put("totalMemorials", allPublicMemorials.size());
+        stats.put("memorialsWithLocation", allPublicMemorials.stream()
+            .filter(m -> m.getMainLocation() != null || m.getBurialLocation() != null)
+            .count());
+        stats.put("memorialsWithPhotos", allPublicMemorials.stream()
+            .filter(m -> m.getPhotoUrl() != null && !m.getPhotoUrl().trim().isEmpty())
+            .count());
+        stats.put("memorialsWithDocuments", allPublicMemorials.stream()
+            .filter(m -> m.getDocumentUrl() != null && !m.getDocumentUrl().trim().isEmpty())
+            .count());
+        stats.put("popularLocations", getPopularLocations());
         
-        // Общая статистика
-        long totalMemorials = memorialRepository.count();
-        long publicMemorials = memorialRepository.countByIsPublic(true);
-        long publishedMemorials = memorialRepository.countByPublicationStatus(Memorial.PublicationStatus.PUBLISHED);
-        
-        stats.put("totalMemorials", totalMemorials);
-        stats.put("publicMemorials", publicMemorials);
-        stats.put("publishedMemorials", publishedMemorials);
-        
-        // Статистика по годам
-        LocalDateTime currentYear = LocalDateTime.of(LocalDate.now().getYear(), 1, 1, 0, 0);
-        LocalDateTime lastYear = currentYear.minusYears(1);
-        
-        long memorialsThisYear = memorialRepository.countByCreatedAtAfter(currentYear);
-        long memorialsLastYear = memorialRepository.countByCreatedAtBetween(lastYear, currentYear);
-        
-        stats.put("memorialsThisYear", memorialsThisYear);
-        stats.put("memorialsLastYear", memorialsLastYear);
-        
-        // Популярные локации (топ 5)
-        List<String> popularLocations = getPopularLocations();
-        stats.put("popularLocations", popularLocations);
-        
-        log.info("Search stats generated: {}", stats);
         return stats;
     }
     
@@ -2005,5 +2045,100 @@ public class MemorialService {
             .limit(5)
             .map(Map.Entry::getKey)
             .collect(Collectors.toList());
+    }
+
+    /**
+     * Получает мемориалы в заданных географических границах для оптимизации карты
+     */
+    public PagedResponse<MemorialDTO> getMemorialsInBounds(
+            double minLat, double maxLat, double minLng, double maxLng, 
+            int page, int size) {
+        
+        log.info("Поиск мемориалов в границах: minLat={}, maxLat={}, minLng={}, maxLng={}", 
+                minLat, maxLat, minLng, maxLng);
+        
+        // Получаем все публичные опубликованные мемориалы
+        List<Memorial> allMemorials = memorialRepository.findByIsPublicTrueAndPublicationStatusAndIsBlockedFalse(
+            Memorial.PublicationStatus.PUBLISHED
+        );
+        
+        // Фильтруем по географическим границам
+        List<Memorial> filteredMemorials = allMemorials.stream()
+            .filter(memorial -> isMemorialInBounds(memorial, minLat, maxLat, minLng, maxLng))
+            .collect(Collectors.toList());
+        
+        log.info("Найдено {} мемориалов в заданных границах из {} общих", 
+                filteredMemorials.size(), allMemorials.size());
+        
+        // Применяем пагинацию
+        long totalElements = filteredMemorials.size();
+        int startIndex = page * size;
+        int endIndex = Math.min(startIndex + size, filteredMemorials.size());
+        
+        List<Memorial> pageResults = startIndex < filteredMemorials.size() ? 
+            filteredMemorials.subList(startIndex, endIndex) : new ArrayList<>();
+        
+        // Получаем текущего пользователя для проверки прав доступа
+        User currentUser = null;
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication != null && authentication.isAuthenticated() && 
+                !authentication.getPrincipal().equals("anonymousUser")) {
+                String login = authentication.getName();
+                currentUser = userRepository.findByLogin(login).orElse(null);
+            }
+        } catch (Exception e) {
+            log.warn("getMemorialsInBounds: Не удалось получить текущего пользователя: {}", e.getMessage());
+        }
+        
+        final User finalCurrentUser = currentUser;
+        
+        // Преобразуем в DTO
+        List<MemorialDTO> memorialDTOs = pageResults.stream()
+            .map(memorial -> {
+                MemorialDTO dto = memorialMapper.toDTO(memorial);
+                
+                // Устанавливаем права доступа
+                if (finalCurrentUser != null) {
+                    boolean canEdit = memorial.getUser().getId().equals(finalCurrentUser.getId()) ||
+                                    (memorial.getEditors() != null && 
+                                     memorial.getEditors().stream().anyMatch(editor -> 
+                                         editor.getId().equals(finalCurrentUser.getId()))) ||
+                                    finalCurrentUser.getRole() == User.Role.ADMIN;
+                    dto.setCanEdit(canEdit);
+                } else {
+                    dto.setCanEdit(false);
+                }
+                
+                return dto;
+            })
+            .collect(Collectors.toList());
+        
+        return PagedResponse.of(memorialDTOs, page, size, totalElements);
+    }
+    
+    /**
+     * Проверяет, находится ли мемориал в заданных географических границах
+     */
+    private boolean isMemorialInBounds(Memorial memorial, double minLat, double maxLat, double minLng, double maxLng) {
+        // Проверяем основное местоположение
+        if (memorial.getMainLocation() != null) {
+            double lat = memorial.getMainLocation().getLatitude();
+            double lng = memorial.getMainLocation().getLongitude();
+            if (lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng) {
+                return true;
+            }
+        }
+        
+        // Проверяем место захоронения
+        if (memorial.getBurialLocation() != null) {
+            double lat = memorial.getBurialLocation().getLatitude();
+            double lng = memorial.getBurialLocation().getLongitude();
+            if (lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 }

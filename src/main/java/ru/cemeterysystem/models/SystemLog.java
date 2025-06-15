@@ -29,7 +29,7 @@ public class SystemLog {
     @Column(name = "entity_id")
     private Long entityId;
     
-    @Column(name = "description", nullable = false)
+    @Column(name = "description", nullable = false, length = 1000, columnDefinition = "VARCHAR(1000)")
     private String description;
     
     @Column(name = "details", columnDefinition = "TEXT")

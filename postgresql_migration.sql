@@ -53,7 +53,7 @@ CREATE TABLE family_tree_access (
     id BIGSERIAL PRIMARY KEY,
     family_tree_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,
-    access_type VARCHAR(50) NOT NULL,
+    access_level VARCHAR(50) NOT NULL,
     granted_at TIMESTAMP NOT NULL,
     granted_by BIGINT,
     FOREIGN KEY (family_tree_id) REFERENCES family_trees(id) ON DELETE CASCADE,
@@ -196,13 +196,18 @@ CREATE TABLE draft_submissions (
 CREATE TABLE notifications (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL,
+    sender_id BIGINT,
     type VARCHAR(100) NOT NULL,
     title VARCHAR(255) NOT NULL,
     message TEXT NOT NULL,
+    status VARCHAR(50) DEFAULT 'PENDING',
+    related_entity_id BIGINT,
+    related_entity_name VARCHAR(255),
     is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    urgent BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL,
-    data TEXT,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- =====================================================

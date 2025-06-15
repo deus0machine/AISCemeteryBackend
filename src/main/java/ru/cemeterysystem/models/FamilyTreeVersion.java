@@ -22,7 +22,7 @@ public class FamilyTreeVersion {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "created_by", nullable = false)
+    @Column(name = "created_by_id", nullable = false)
     private Long createdById;
 
     @Column(length = 1000)
