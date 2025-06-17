@@ -120,7 +120,7 @@
                             <span th:if="${memorial.publicationStatus != null && memorial.publicationStatus.name() == 'REJECTED'}" 
                                  class="badge bg-danger ms-2">Отклонен</span>
                             <span th:if="${memorial.publicationStatus != null && memorial.publicationStatus.name() == 'DRAFT'}" 
-                                 class="badge bg-secondary ms-2">Черновик</span>
+                                                                       class="badge bg-secondary ms-2">Приватный</span>
                         </p>
                         <p class="card-text" th:if="${memorial.biography != null && !memorial.biography.isEmpty()}" th:text="${#strings.abbreviate(memorial.biography, 100)}">
                             Краткая биография...

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -13,18 +14,24 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import ru.cemeterysystem.events.EditorRemovedEvent;
+import ru.cemeterysystem.events.EditorResignedEvent;
 import ru.cemeterysystem.dto.EditorRequestDTO;
 import ru.cemeterysystem.dto.MemorialDTO;
 import ru.cemeterysystem.dto.PagedResponse;
 import ru.cemeterysystem.dto.UserDTO;
 import ru.cemeterysystem.mappers.MemorialMapper;
 import ru.cemeterysystem.mappers.UserMapper;
+import ru.cemeterysystem.models.FamilyTree;
 import ru.cemeterysystem.models.Memorial;
+import ru.cemeterysystem.models.Memorial.PublicationStatus;
 import ru.cemeterysystem.models.Notification;
 import ru.cemeterysystem.models.User;
 import ru.cemeterysystem.repositories.MemorialRepository;
+import ru.cemeterysystem.repositories.MemorialRelationRepository;
 import ru.cemeterysystem.repositories.NotificationRepository;
 import ru.cemeterysystem.repositories.UserRepository;
+import ru.cemeterysystem.repositories.FamilyTreeRepository;
 import ru.cemeterysystem.services.FileStorageService;
 import ru.cemeterysystem.annotations.LogActivity;
 import ru.cemeterysystem.models.SystemLog;
@@ -42,7 +49,7 @@ import java.util.HashMap;
 
 @Service
 @RequiredArgsConstructor
-public class MemorialService {
+public class MemorialService implements MemorialApprovalService {
     private static final Logger log = LoggerFactory.getLogger(MemorialService.class);
     
     private final MemorialRepository memorialRepository;
@@ -51,10 +58,17 @@ public class MemorialService {
     private final MemorialMapper memorialMapper;
     private final UserMapper userMapper;
     private final NotificationRepository notificationRepository;
+    private final ApplicationEventPublisher eventPublisher;
+    private final MemorialRelationRepository memorialRelationRepository;
+    private final FamilyTreeRepository familyTreeRepository;
 
     public List<MemorialDTO> getAllMemorials() {
         return memorialRepository.findAll().stream()
-            .map(memorialMapper::toDTO)
+            .map(memorial -> {
+                MemorialDTO dto = memorialMapper.toDTO(memorial);
+                enrichMemorialWithFamilyTreeInfo(dto);
+                return dto;
+            })
             .collect(Collectors.toList());
     }
 
@@ -68,7 +82,11 @@ public class MemorialService {
         Page<Memorial> memorialPage = memorialRepository.findAll(pageable);
         
         List<MemorialDTO> memorialDTOs = memorialPage.getContent().stream()
-            .map(memorialMapper::toDTO)
+            .map(memorial -> {
+                MemorialDTO dto = memorialMapper.toDTO(memorial);
+                enrichMemorialWithFamilyTreeInfo(dto);
+                return dto;
+            })
             .collect(Collectors.toList());
             
         return PagedResponse.of(memorialDTOs, page, size, memorialPage.getTotalElements());
@@ -126,6 +144,9 @@ public class MemorialService {
                 boolean isEditor = memorial.isEditor(user);
                 
                 dto.setEditor(!isOwner && isEditor);
+                
+                // Обогащаем информацией о дереве
+                enrichMemorialWithFamilyTreeInfo(dto);
                 
                 return dto;
             })
@@ -192,6 +213,9 @@ public class MemorialService {
                             previousDto.setEditor(isEditor);
                             previousDto.setPendingChanges(false);
                             
+                            // Обогащаем информацией о дереве
+                            enrichMemorialWithFamilyTreeInfo(previousDto);
+                            
                             return previousDto;
                         }
                     } catch (Exception e) {
@@ -201,6 +225,10 @@ public class MemorialService {
                 
                 MemorialDTO dto = memorialMapper.toDTO(memorial);
                 dto.setEditor(isEditor);
+                
+                // Обогащаем информацией о дереве
+                enrichMemorialWithFamilyTreeInfo(dto);
+                
                 return dto;
             })
             .collect(Collectors.toList());
@@ -212,9 +240,21 @@ public class MemorialService {
     }
 
     public MemorialDTO getMemorialById(Long id) {
+        log.info("getMemorialById: запрос мемориала ID={}", id);
+        
         Memorial memorial = memorialRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Memorial not found"));
         MemorialDTO dto = memorialMapper.toDTO(memorial);
+        
+        log.info("getMemorialById: после convertToDTO - familyTreeId={}, familyTreeName='{}'", 
+                dto.getFamilyTreeId(), dto.getFamilyTreeName());
+        
+        // Обогащаем информацией о дереве
+        enrichMemorialWithFamilyTreeInfo(dto);
+        
+        log.info("getMemorialById: после enrichMemorialWithFamilyTreeInfo - familyTreeId={}, familyTreeName='{}'", 
+                dto.getFamilyTreeId(), dto.getFamilyTreeName());
+        
         return dto;
     }
 
@@ -302,6 +342,9 @@ public class MemorialService {
         
         // Устанавливаем флаг редактора для текущего пользователя
         dto.setEditor(isEditor);
+        
+        // Обогащаем информацией о дереве
+        enrichMemorialWithFamilyTreeInfo(dto);
         
         log.info("Мемориал ID={} получен пользователем {} (владелец: {}, редактор: {}, админ: {})", 
                 id, currentUser.getLogin(), isOwner, isEditor, isAdmin);
@@ -659,24 +702,40 @@ public class MemorialService {
         Memorial memorial = memorialRepository.findById(memorialId)
             .orElseThrow(() -> new RuntimeException("Memorial not found"));
         
-        // Проверяем права доступа - только владелец может управлять редакторами
-        if (!memorial.getCreatedBy().equals(currentUser)) {
-            throw new RuntimeException("Only memorial owner can manage editors");
-        }
-        
         User editor = userRepository.findById(request.getUserId())
             .orElseThrow(() -> new RuntimeException("Editor user not found"));
         
         String action = request.getAction();
+        boolean isOwnerAction = memorial.getCreatedBy().equals(currentUser);
+        boolean isEditorResigning = !isOwnerAction && currentUser.equals(editor);
+        
+        // Проверяем права доступа
+        if (!isOwnerAction && !isEditorResigning) {
+            throw new RuntimeException("Only memorial owner can manage editors or editor can resign");
+        }
         
         if ("add".equals(action)) {
-            // Добавляем редактора
+            // Добавляем редактора (только владелец)
+            if (!isOwnerAction) {
+                throw new RuntimeException("Only memorial owner can add editors");
+            }
             memorial.addEditor(editor);
             log.info("Добавлен редактор ID={} к мемориалу ID={}", editor.getId(), memorialId);
         } else if ("remove".equals(action)) {
             // Удаляем редактора
             memorial.removeEditor(editor);
             log.info("Удален редактор ID={} из мемориала ID={}", editor.getId(), memorialId);
+            
+            // Отправляем уведомления через события
+            if (isOwnerAction) {
+                // Владелец удалил редактора - уведомляем редактора
+                log.info("Публикация события удаления редактора ID={} из мемориала ID={}", editor.getId(), memorialId);
+                eventPublisher.publishEvent(new EditorRemovedEvent(this, memorialId, editor, currentUser));
+            } else if (isEditorResigning) {
+                // Редактор отказался от редактирования - уведомляем владельца
+                log.info("Публикация события отставки редактора ID={} от мемориала ID={}", editor.getId(), memorialId);
+                eventPublisher.publishEvent(new EditorResignedEvent(this, memorialId, editor, memorial.getCreatedBy()));
+            }
         } else {
             throw new IllegalArgumentException("Invalid action: " + action);
         }
@@ -685,8 +744,8 @@ public class MemorialService {
         memorial = memorialRepository.save(memorial);
         MemorialDTO resultDto = memorialMapper.toDTO(memorial);
         
-        log.info("Завершено подтверждение/отклонение изменений мемориала ID={}, финальное состояние pendingChanges={}", 
-                memorial.getId(), memorial.isPendingChanges());
+        log.info("Завершено управление редакторами мемориала ID={}, действие={}, пользователь={}", 
+                memorial.getId(), action, currentUser.getLogin());
         
         return resultDto;
     }
@@ -766,6 +825,7 @@ public class MemorialService {
         return dto;
     }
     
+    @Override
     @Transactional
     public MemorialDTO approveChanges(Long memorialId, boolean approve, User currentUser) {
         Memorial memorial = memorialRepository.findById(memorialId)
@@ -1519,6 +1579,9 @@ public class MemorialService {
         // Создаем уведомление для владельца мемориала
         createModerationResponseNotification(savedMemorial, admin, approved, reason);
         
+        // ИСПРАВЛЕНИЕ: Обновляем все связанные уведомления модерации
+        updateModerationNotifications(savedMemorial.getId(), approved);
+        
         log.info("Модерация мемориала ID={}: {}", id, approved ? "одобрен" : "отклонен");
         
         MemorialDTO result = memorialMapper.toDTO(savedMemorial);
@@ -1580,6 +1643,49 @@ public class MemorialService {
                     approved ? "одобрение" : "отклонение", memorial.getCreatedBy().getLogin());
         } catch (Exception e) {
             log.error("Ошибка при создании уведомления о результате модерации: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Обновляет все уведомления модерации для данного мемориала
+     */
+    private void updateModerationNotifications(Long memorialId, boolean approved) {
+        try {
+            log.info("=== ОБНОВЛЕНИЕ УВЕДОМЛЕНИЙ МОДЕРАЦИИ ===");
+            log.info("updateModerationNotifications: memorialId={}, approved={}", memorialId, approved);
+            
+            // Находим все уведомления типа MODERATION со статусом PENDING для данного мемориала
+            List<Notification> moderationNotifications = notificationRepository
+                .findByRelatedEntityIdAndTypeAndStatus(
+                    memorialId,
+                    Notification.NotificationType.MODERATION, 
+                    Notification.NotificationStatus.PENDING
+                );
+            
+            log.info("Найдено {} уведомлений модерации для обновления", moderationNotifications.size());
+            
+            for (Notification notification : moderationNotifications) {
+                // Обновляем статус уведомления
+                notification.setStatus(approved ? 
+                    Notification.NotificationStatus.ACCEPTED : 
+                    Notification.NotificationStatus.REJECTED);
+                
+                // Отмечаем как прочитанное (решенное)
+                notification.setRead(true);
+                
+                log.info("Обновляем уведомление ID={} на статус: {}", 
+                        notification.getId(), notification.getStatus());
+            }
+            
+            // Сохраняем все обновленные уведомления
+            if (!moderationNotifications.isEmpty()) {
+                notificationRepository.saveAll(moderationNotifications);
+                log.info("Обновлено {} уведомлений модерации для мемориала ID={}", 
+                        moderationNotifications.size(), memorialId);
+            }
+            
+        } catch (Exception e) {
+            log.error("Ошибка при обновлении уведомлений модерации: {}", e.getMessage(), e);
         }
     }
 
@@ -1660,6 +1766,9 @@ public class MemorialService {
         
         // Отправляем уведомления об отклонении изменений
         createChangesRejectionNotification(memorial, admin, reason, savedLastEditorId);
+        
+        // ИСПРАВЛЕНИЕ: Обновляем все связанные уведомления модерации изменений
+        updateModerationNotifications(memorial.getId(), false);
         
         log.info("Изменения мемориала ID={} отклонены администратором {}", id, admin.getLogin());
         return memorialMapper.toDTO(memorial);
@@ -1914,6 +2023,9 @@ public class MemorialService {
         log.info("Завершено одобрение изменений мемориала ID={} администратором, финальное состояние pendingChanges={}, changesUnderModeration={}", 
                 memorial.getId(), memorial.isPendingChanges(), memorial.isChangesUnderModeration());
         
+        // ИСПРАВЛЕНИЕ: Обновляем все связанные уведомления модерации изменений
+        updateModerationNotifications(memorial.getId(), true);
+        
         return memorialMapper.toDTO(memorial);
     }
 
@@ -1923,6 +2035,122 @@ public class MemorialService {
         // Вызываем новый метод с пагинацией и возвращаем первую страницу большого размера
         PagedResponse<MemorialDTO> pagedResponse = getMyMemorials(userId, 0, 1000);
         return pagedResponse.getContent();
+    }
+
+    /**
+     * Получает мемориалы пользователя, доступные для добавления в конкретное дерево
+     * Исключает мемориалы, которые уже находятся в других деревьях
+     * Для редакторов исключает совместные мемориалы (где пользователь не владелец)
+     * Для публичных деревьев показывает только публичные мемориалы
+     */
+    public List<MemorialDTO> getAvailableMemorialsForTree(Long userId, Long familyTreeId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        // Получаем информацию о дереве для проверки его публичности
+        FamilyTree familyTree = familyTreeRepository.findById(familyTreeId)
+            .orElseThrow(() -> new RuntimeException("Family tree not found"));
+        
+        log.info("Получение доступных мемориалов для дерева ID={} (публичное: {}) пользователем ID={}", 
+                familyTreeId, familyTree.isPublic(), userId);
+        
+        // Получаем все мемориалы пользователя (владелец + редактор)
+        List<Memorial> ownedMemorials = memorialRepository.findByCreatedBy(user);
+        List<Memorial> editedMemorials = memorialRepository.findByEditorsContaining(user);
+        List<Memorial> editedMemorials2 = memorialRepository.findMemorialsWhereUserIsEditor(user.getId());
+        
+        // Объединяем результаты
+        List<Memorial> allMemorials = new ArrayList<>(ownedMemorials);
+        for (Memorial memorial : editedMemorials) {
+            if (!allMemorials.contains(memorial)) {
+                allMemorials.add(memorial);
+            }
+        }
+        for (Memorial memorial : editedMemorials2) {
+            if (!allMemorials.contains(memorial)) {
+                allMemorials.add(memorial);
+            }
+        }
+        
+        // Фильтруем мемориалы
+        List<Memorial> availableMemorials = allMemorials.stream()
+            .filter(memorial -> {
+                // 1. Проверяем, что мемориал не находится ни в одном дереве
+                List<Long> treeIds = memorialRelationRepository.findFamilyTreeIdsByMemorialId(memorial.getId());
+                if (!treeIds.isEmpty()) {
+                    log.debug("Мемориал ID={} уже находится в деревьях: {}", memorial.getId(), treeIds);
+                    return false;
+                }
+                
+                // 2. Для редакторов исключаем совместные мемориалы (где пользователь не владелец)
+                boolean isOwner = memorial.getCreatedBy().equals(user);
+                if (!isOwner) {
+                    log.debug("Мемориал ID={} исключен - пользователь не владелец", memorial.getId());
+                    return false;
+                }
+                
+                // 3. Если дерево публичное, показываем только публичные мемориалы
+                if (familyTree.isPublic()) {
+                    boolean isMemorialPublic = memorial.isPublic() && 
+                        memorial.getPublicationStatus() == Memorial.PublicationStatus.PUBLISHED;
+                    if (!isMemorialPublic) {
+                        log.debug("Мемориал ID={} исключен - дерево публичное, но мемориал не публичный (isPublic: {}, status: {})", 
+                                memorial.getId(), memorial.isPublic(), memorial.getPublicationStatus());
+                        return false;
+                    }
+                }
+                
+                return true;
+            })
+            .collect(Collectors.toList());
+        
+        log.info("Найдено {} доступных мемориалов для дерева ID={} (публичное: {}) пользователем ID={}", 
+                availableMemorials.size(), familyTreeId, familyTree.isPublic(), userId);
+        
+        return availableMemorials.stream()
+            .map(memorial -> {
+                MemorialDTO dto = memorialMapper.toDTO(memorial);
+                enrichMemorialWithFamilyTreeInfo(dto);
+                return dto;
+            })
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * Получает информацию о дереве, к которому принадлежит мемориал
+     * Всегда показывает информацию о дереве, если мемориал принадлежит дереву
+     */
+    public void enrichMemorialWithFamilyTreeInfo(MemorialDTO memorialDTO) {
+        if (memorialDTO.getId() == null) return;
+        
+        try {
+            log.info("enrichMemorialWithFamilyTreeInfo: обрабатываем мемориал ID={}", memorialDTO.getId());
+            
+            // Находим деревья, в которых находится мемориал
+            List<Long> treeIds = memorialRelationRepository.findFamilyTreeIdsByMemorialId(memorialDTO.getId());
+            log.info("enrichMemorialWithFamilyTreeInfo: найдено {} деревьев для мемориала ID={}: {}", 
+                    treeIds.size(), memorialDTO.getId(), treeIds);
+            
+            if (!treeIds.isEmpty()) {
+                // Берем первое дерево (мемориал может быть только в одном дереве)
+                Long treeId = treeIds.get(0);
+                log.info("enrichMemorialWithFamilyTreeInfo: используем дерево ID={} для мемориала ID={}", 
+                        treeId, memorialDTO.getId());
+                
+                familyTreeRepository.findById(treeId).ifPresent(tree -> {
+                    memorialDTO.setFamilyTreeId(tree.getId());
+                    memorialDTO.setFamilyTreeName(tree.getName());
+                    log.info("enrichMemorialWithFamilyTreeInfo: УСТАНОВЛЕНЫ поля для мемориала ID={}: familyTreeId={}, familyTreeName='{}'", 
+                            memorialDTO.getId(), tree.getId(), tree.getName());
+                });
+            } else {
+                log.info("enrichMemorialWithFamilyTreeInfo: мемориал ID={} не принадлежит ни одному дереву", 
+                        memorialDTO.getId());
+            }
+        } catch (Exception e) {
+            log.error("Ошибка при получении информации о дереве для мемориала ID={}: {}", 
+                    memorialDTO.getId(), e.getMessage(), e);
+        }
     }
 
     public List<MemorialDTO> getPublicMemorials() {
@@ -1958,7 +2186,11 @@ public class MemorialService {
             allResults.subList(startIndex, endIndex) : new ArrayList<>();
         
         List<MemorialDTO> memorialDTOs = pageResults.stream()
-            .map(memorialMapper::toDTO)
+            .map(memorial -> {
+                MemorialDTO dto = memorialMapper.toDTO(memorial);
+                enrichMemorialWithFamilyTreeInfo(dto);
+                return dto;
+            })
             .collect(Collectors.toList());
             
         return PagedResponse.of(memorialDTOs, page, size, totalElements);
@@ -1973,7 +2205,11 @@ public class MemorialService {
         List<Memorial> results = memorialRepository.quickSearch(query, limit);
         
         return results.stream()
-            .map(memorialMapper::toDTO)
+            .map(memorial -> {
+                MemorialDTO dto = memorialMapper.toDTO(memorial);
+                enrichMemorialWithFamilyTreeInfo(dto);
+                return dto;
+            })
             .collect(Collectors.toList());
     }
 
@@ -1994,7 +2230,11 @@ public class MemorialService {
             allResults.subList(startIndex, endIndex) : new ArrayList<>();
         
         List<MemorialDTO> memorialDTOs = pageResults.stream()
-            .map(memorialMapper::toDTO)
+            .map(memorial -> {
+                MemorialDTO dto = memorialMapper.toDTO(memorial);
+                enrichMemorialWithFamilyTreeInfo(dto);
+                return dto;
+            })
             .collect(Collectors.toList());
             
         return PagedResponse.of(memorialDTOs, page, size, totalElements);
@@ -2109,6 +2349,9 @@ public class MemorialService {
                 } else {
                     dto.setCanEdit(false);
                 }
+                
+                // Обогащаем информацией о дереве
+                enrichMemorialWithFamilyTreeInfo(dto);
                 
                 return dto;
             })

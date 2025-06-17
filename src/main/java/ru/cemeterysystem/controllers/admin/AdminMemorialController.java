@@ -13,9 +13,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import ru.cemeterysystem.config.LocationPropertyEditor;
+import ru.cemeterysystem.models.Location;
 import ru.cemeterysystem.models.Memorial;
 import ru.cemeterysystem.models.Notification;
 import ru.cemeterysystem.models.User;
@@ -25,6 +28,7 @@ import ru.cemeterysystem.repositories.UserRepository;
 import ru.cemeterysystem.services.MemorialService;
 import ru.cemeterysystem.dto.MemorialDTO;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -42,6 +46,14 @@ public class AdminMemorialController {
     private final UserRepository userRepository;
     private final MemorialService memorialService;
     private final NotificationRepository notificationRepository;
+
+    /**
+     * Регистрирует Property Editor для конвертации строк в объекты Location
+     */
+    @InitBinder
+    public void initBinder(WebDataBinder binder) {
+        binder.registerCustomEditor(Location.class, new LocationPropertyEditor());
+    }
 
     @GetMapping
     public String memorialsList(
@@ -170,9 +182,21 @@ public class AdminMemorialController {
             @PathVariable Long id,
             @ModelAttribute Memorial memorialUpdates,
             @RequestParam("userId") Long userId,
+            @RequestParam(value = "isPublic", defaultValue = "false") boolean isPublicParam,
             @RequestParam(value = "photoFile", required = false) MultipartFile photoFile,
             @RequestParam(value = "removePhoto", defaultValue = "false") boolean removePhoto,
+            HttpServletRequest request,
             Model model) {
+        
+        log.info("=== ОБНОВЛЕНИЕ МЕМОРИАЛА ===");
+        log.info("updateMemorial: ID={}, isPublic из @ModelAttribute={}, isPublic из @RequestParam={}", 
+                id, memorialUpdates.isPublic(), isPublicParam);
+        
+        // Логируем все параметры запроса для отладки
+        log.info("Все параметры запроса:");
+        request.getParameterMap().forEach((key, values) -> {
+            log.info("  {}: {}", key, String.join(", ", values));
+        });
         
         Optional<Memorial> optionalMemorial = memorialRepository.findById(id);
         if (optionalMemorial.isEmpty()) {
@@ -180,6 +204,7 @@ public class AdminMemorialController {
         }
         
         Memorial memorial = optionalMemorial.get();
+        log.info("updateMemorial: текущий isPublic в БД={}", memorial.isPublic());
         
         // Обновление данных мемориала
         // Убираем прямое редактирование fio - только через отдельные поля
@@ -193,8 +218,19 @@ public class AdminMemorialController {
         memorial.setBirthDate(memorialUpdates.getBirthDate());
         memorial.setDeathDate(memorialUpdates.getDeathDate());
         memorial.setBiography(memorialUpdates.getBiography());
+        memorial.setMainLocation(memorialUpdates.getMainLocation());
         memorial.setBurialLocation(memorialUpdates.getBurialLocation());
-        memorial.setPublic(memorialUpdates.isPublic());
+        memorial.setPublic(isPublicParam);
+        log.info("updateMemorial: устанавливаем isPublic={}", isPublicParam);
+        
+        // Также обновляем publicationStatus в соответствии с isPublic
+        if (isPublicParam) {
+            memorial.setPublicationStatus(Memorial.PublicationStatus.PUBLISHED);
+            log.info("updateMemorial: устанавливаем publicationStatus=PUBLISHED");
+        } else {
+            memorial.setPublicationStatus(Memorial.PublicationStatus.DRAFT);
+            log.info("updateMemorial: устанавливаем publicationStatus=DRAFT");
+        }
         
         // Обновление владельца мемориала
         Optional<User> optionalUser = userRepository.findById(userId);
@@ -210,7 +246,8 @@ public class AdminMemorialController {
             memorial.setPhotoUrl(photoUrl);
         }
         
-        memorialRepository.save(memorial);
+        Memorial savedMemorial = memorialRepository.save(memorial);
+        log.info("updateMemorial: сохранен мемориал с isPublic={}", savedMemorial.isPublic());
         return "redirect:/admin/memorials?successMessage=Memorial+updated+successfully";
     }
     
@@ -761,6 +798,30 @@ public class AdminMemorialController {
         }
         
         return "redirect:/admin/memorials/" + id;
+    }
+    
+    // Тестовые методы для отладки checkbox
+    @GetMapping("/test-checkbox")
+    public String testCheckboxForm() {
+        return "admin/test-checkbox";
+    }
+    
+    @PostMapping("/test-checkbox")
+    public String testCheckboxSubmit(
+            @RequestParam(value = "testText", required = false) String testText,
+            @RequestParam(value = "isPublic", defaultValue = "false") boolean isPublic,
+            HttpServletRequest request) {
+        
+        log.info("=== ТЕСТ CHECKBOX ===");
+        log.info("testText: {}", testText);
+        log.info("isPublic: {}", isPublic);
+        
+        log.info("Все параметры запроса:");
+        request.getParameterMap().forEach((key, values) -> {
+            log.info("  {}: {}", key, String.join(", ", values));
+        });
+        
+        return "redirect:/admin/test-checkbox?success=true";
     }
 
     /**

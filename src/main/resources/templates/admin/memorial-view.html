@@ -363,7 +363,7 @@
                                         <span th:if="${memorial.publicationStatus?.name() == 'PUBLISHED'}" class="badge bg-success status-badge">Опубликован</span>
                                         <span th:if="${memorial.publicationStatus?.name() == 'PENDING_MODERATION'}" class="badge bg-warning status-badge">На модерации</span>
                                         <span th:if="${memorial.publicationStatus?.name() == 'REJECTED'}" class="badge bg-danger status-badge">Отклонен</span>
-                                        <span th:if="${memorial.publicationStatus?.name() == 'DRAFT'}" class="badge bg-secondary status-badge">Черновик</span>
+                                        <span th:if="${memorial.publicationStatus?.name() == 'DRAFT'}" class="badge bg-secondary status-badge">Приватный</span>
                                         <span th:unless="${memorial.publicationStatus}" class="badge bg-secondary status-badge" th:text="${memorial.isPublic ? 'Публичный' : 'Приватный'}">Статус</span>
                                     </div>
                                     <div>

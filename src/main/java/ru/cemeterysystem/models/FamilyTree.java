@@ -35,6 +35,16 @@ public class FamilyTree {
     @Enumerated(EnumType.STRING)
     @Column(name = "publication_status", nullable = false, columnDefinition = "VARCHAR(255) default 'DRAFT'")
     private PublicationStatus publicationStatus = PublicationStatus.DRAFT;
+
+    // Поля для модерации изменений
+    @Column(name = "pending_changes", nullable = false, columnDefinition = "boolean default false")
+    private boolean pendingChanges = false;
+
+    @Column(name = "pending_name")
+    private String pendingName;
+
+    @Column(name = "pending_description", length = 1000)
+    private String pendingDescription;
     
     // Enum для статуса публикации (используем тот же что и у Memorial)
     public enum PublicationStatus {

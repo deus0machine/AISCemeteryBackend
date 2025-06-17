@@ -269,6 +269,47 @@
                         </div>
                     </div>
                 </div>
+                
+                <!-- Блок ожидающих изменений -->
+                <div th:if="${familyTree.pendingChanges}" class="card mt-3 border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="bi bi-clock-history me-2"></i>
+                            Изменения ожидают модерации
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="text-danger">Текущие данные:</h6>
+                                <dl class="row">
+                                    <dt class="col-sm-4">Название:</dt>
+                                    <dd class="col-sm-8" th:text="${familyTree.name}">Текущее название</dd>
+                                    <dt class="col-sm-4">Описание:</dt>
+                                    <dd class="col-sm-8" th:text="${familyTree.description ?: 'Нет описания'}">Текущее описание</dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-success">Предлагаемые изменения:</h6>
+                                <dl class="row">
+                                    <dt class="col-sm-4">Название:</dt>
+                                    <dd class="col-sm-8" th:text="${familyTree.pendingName}">Новое название</dd>
+                                    <dt class="col-sm-4">Описание:</dt>
+                                    <dd class="col-sm-8" th:text="${familyTree.pendingDescription ?: 'Нет описания'}">Новое описание</dd>
+                                </dl>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3 text-center">
+                            <button class="btn btn-success me-2" th:onclick="|approveChanges(${familyTree.id})|">
+                                <i class="bi bi-check-lg me-1"></i> Одобрить изменения
+                            </button>
+                            <button class="btn btn-warning" th:onclick="|rejectChanges(${familyTree.id})|">
+                                <i class="bi bi-x-lg me-1"></i> Отклонить изменения
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <div class="col-lg-4">
@@ -336,11 +377,18 @@
                                     </div>
                                 </div>
                                 
-                                <div class="d-flex justify-content-end mt-3">
+                                <div class="d-flex justify-content-end mt-3 gap-1">
                                     <a th:href="@{/admin/memorials/{id}(id=${memorial.id})}" 
                                        class="btn btn-sm btn-outline-primary">
                                         <i class="bi bi-eye me-1"></i> Просмотр
                                     </a>
+                                    <button class="btn btn-sm btn-outline-danger remove-memorial-btn"
+                                            th:data-memorial-id="${memorial.id}"
+                                            th:data-memorial-name="${memorial.fio}"
+                                            th:data-tree-id="${familyTree.id}"
+                                            title="Удалить мемориал из дерева">
+                                        <i class="bi bi-trash me-1"></i> Удалить
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -411,6 +459,17 @@
                     deleteTree(treeId, treeName);
                 });
             }
+            
+            // Обработчики для кнопок удаления мемориалов из дерева
+            const removeMemorialBtns = document.querySelectorAll('.remove-memorial-btn');
+            removeMemorialBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const memorialId = this.getAttribute('data-memorial-id');
+                    const memorialName = this.getAttribute('data-memorial-name');
+                    const treeId = this.getAttribute('data-tree-id');
+                    removeMemorialFromTree(treeId, memorialId, memorialName);
+                });
+            });
         });
 
         function approveTree(treeId) {
@@ -452,15 +511,13 @@
                 return;
             }
 
-            const formData = new FormData();
-            formData.append('reason', reason);
-
             fetch(`/admin/family-trees/${currentTreeId}/reject`, {
                 method: 'POST',
                 headers: {
+                    'Content-Type': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest'
                 },
-                body: formData
+                body: JSON.stringify({reason: reason})
             })
             .then(response => response.json())
             .then(data => {
@@ -500,6 +557,103 @@
                 .catch(error => {
                     console.error('Error:', error);
                     showAlert('danger', 'Произошла ошибка при удалении дерева');
+                });
+            }
+        }
+
+        function approveChanges(treeId) {
+            if (confirm('Вы действительно хотите одобрить предложенные изменения?')) {
+                fetch(`/admin/family-trees/${treeId}/approve-changes`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert('success', data.message);
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showAlert('danger', data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showAlert('danger', 'Произошла ошибка при одобрении изменений');
+                });
+            }
+        }
+
+        function rejectChanges(treeId) {
+            const reason = prompt('Укажите причину отклонения изменений:');
+            if (reason && reason.trim()) {
+                const formData = new FormData();
+                formData.append('reason', reason.trim());
+
+                fetch(`/admin/family-trees/${treeId}/reject-changes`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert('success', data.message);
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showAlert('danger', data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showAlert('danger', 'Произошла ошибка при отклонении изменений');
+                });
+            }
+        }
+
+        function removeMemorialFromTree(treeId, memorialId, memorialName) {
+            if (confirm(`Вы действительно хотите удалить мемориал "${memorialName}" из дерева?\n\nЭто действие удалит мемориал и все его связи в дереве.`)) {
+                // Блокируем кнопку во время выполнения запроса
+                const btn = document.querySelector(`[data-memorial-id="${memorialId}"]`);
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="bi bi-hourglass me-1"></i> Удаление...';
+                }
+                
+                fetch(`/admin/family-trees/${treeId}/remove-memorial/${memorialId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert('success', data.message);
+                        // Удаляем карточку мемориала из DOM или перезагружаем страницу
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showAlert('danger', data.message || 'Ошибка при удалении мемориала из дерева');
+                        // Восстанавливаем кнопку
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="bi bi-trash me-1"></i> Удалить';
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showAlert('danger', 'Произошла ошибка при удалении мемориала из дерева');
+                    // Восстанавливаем кнопку
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="bi bi-trash me-1"></i> Удалить';
+                    }
                 });
             }
         }

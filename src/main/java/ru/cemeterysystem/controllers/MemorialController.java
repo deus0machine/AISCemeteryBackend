@@ -247,6 +247,21 @@ public class MemorialController {
     }
 
     /**
+     * Получает мемориалы пользователя, доступные для добавления в конкретное дерево
+     * Исключает мемориалы, которые уже находятся в других деревьях
+     * Для редакторов исключает совместные мемориалы (где пользователь не владелец)
+     * 
+     * @param familyTreeId ID дерева
+     * @return список доступных мемориалов
+     */
+    @GetMapping("/available-for-tree/{familyTreeId}")
+    public List<MemorialDTO> getAvailableMemorialsForTree(@PathVariable Long familyTreeId) {
+        User user = getCurrentUser();
+        log.info("Получение доступных мемориалов для дерева ID={} пользователем {}", familyTreeId, user.getLogin());
+        return memorialService.getAvailableMemorialsForTree(user.getId(), familyTreeId);
+    }
+
+    /**
      * Получает информацию о ожидающих изменениях мемориала
      * 
      * @param id ID мемориала
@@ -514,6 +529,49 @@ public class MemorialController {
                 id, request.getAction(), request.getUserId());
         
         User currentUser = getCurrentUser();
+        return memorialService.manageEditor(id, request, currentUser);
+    }
+    
+    /**
+     * Удаляет редактора из мемориала (только для владельца)
+     * 
+     * @param id ID мемориала
+     * @param editorId ID редактора для удаления
+     * @return обновленный мемориал
+     */
+    @DeleteMapping("/{id}/editors/{editorId}")
+    public MemorialDTO removeEditor(
+            @PathVariable Long id,
+            @PathVariable Long editorId) {
+        log.info("Удаление редактора ID={} из мемориала ID={}", editorId, id);
+        
+        User currentUser = getCurrentUser();
+        
+        // Создаем запрос на удаление редактора
+        EditorRequestDTO request = new EditorRequestDTO();
+        request.setUserId(editorId);
+        request.setAction("remove");
+        
+        return memorialService.manageEditor(id, request, currentUser);
+    }
+    
+    /**
+     * Отказ от права редактирования мемориала (для редактора)
+     * 
+     * @param id ID мемориала
+     * @return обновленный мемориал
+     */
+    @PostMapping("/{id}/editors/resign")
+    public MemorialDTO resignFromEditing(@PathVariable Long id) {
+        log.info("Отказ от редактирования мемориала ID={}", id);
+        
+        User currentUser = getCurrentUser();
+        
+        // Создаем запрос на удаление себя из редакторов
+        EditorRequestDTO request = new EditorRequestDTO();
+        request.setUserId(currentUser.getId());
+        request.setAction("remove");
+        
         return memorialService.manageEditor(id, request, currentUser);
     }
     

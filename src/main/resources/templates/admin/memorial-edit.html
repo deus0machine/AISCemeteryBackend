@@ -348,8 +348,10 @@
                                     <div class="col-sm-3 col-form-label">Опубликован</div>
                                     <div class="col-sm-9">
                                         <div class="form-check form-switch">
+                                            <!-- Скрытое поле для корректной обработки checkbox -->
+                                            <input type="hidden" name="_isPublic" value="on">
                                             <input class="form-check-input" type="checkbox" id="isPublic" 
-                                                   name="isPublic" th:checked="${memorial.isPublic}">
+                                                   name="isPublic" value="true" th:checked="${memorial.isPublic}">
                                             <label class="form-check-label" for="isPublic">
                                                 <span th:text="${memorial.isPublic ? 'Да' : 'Нет'}">Статус публикации</span>
                                             </label>

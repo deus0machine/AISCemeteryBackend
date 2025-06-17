@@ -425,7 +425,7 @@
                                         <span class="badge rounded-pill bg-success" th:if="${memorial.isPublic && memorial.publicationStatus != null && memorial.publicationStatus.name() == 'PUBLISHED'}">Опубликован</span>
                                         <span class="badge rounded-pill bg-warning text-dark" th:if="${memorial.publicationStatus != null && memorial.publicationStatus.name() == 'PENDING_MODERATION'}">На модерации</span>
                                         <span class="badge rounded-pill bg-danger" th:if="${memorial.publicationStatus != null && memorial.publicationStatus.name() == 'REJECTED'}">Отклонен</span>
-                                        <span class="badge rounded-pill bg-secondary" th:if="${!memorial.isPublic && (memorial.publicationStatus == null || memorial.publicationStatus.name() == 'DRAFT')}">Черновик</span>
+                                        <span class="badge rounded-pill bg-secondary" th:if="${!memorial.isPublic && (memorial.publicationStatus == null || memorial.publicationStatus.name() == 'DRAFT')}">Приватный</span>
                                         <span class="badge bg-info text-dark rounded-pill ms-1" th:if="${memorial.pendingChanges}">Ожидает изменений</span>
                                     </td>
                                     <td>

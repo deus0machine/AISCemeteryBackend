@@ -3,6 +3,9 @@ package ru.cemeterysystem.controllers.admin;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +29,8 @@ public class AdminNotificationController {
 
     @GetMapping
     public String notificationsList(
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "50") int size,
             @RequestParam(name = "search", required = false) String search,
             @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "type", required = false) String type,
@@ -42,33 +47,34 @@ public class AdminNotificationController {
         model.addAttribute("processedNotifications", processedNotifications);
         model.addAttribute("recentNotifications", recentNotifications);
         
-        // Получаем и фильтруем уведомления
-        List<Notification> notificationList = notificationRepository.findAll();
+        // Создаем объект пагинации
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Notification> notifications;
         
-        // Применяем фильтры
-        if (search != null && !search.isEmpty()) {
-            notificationList = notificationList.stream()
-                .filter(n -> (n.getTitle() != null && n.getTitle().toLowerCase().contains(search.toLowerCase())) || 
-                            (n.getMessage() != null && n.getMessage().toLowerCase().contains(search.toLowerCase())))
-                .collect(Collectors.toList());
-        }
-        
-        if (status != null && !status.isEmpty()) {
+        // Получаем уведомления с фильтрацией и пагинацией
+        if (search != null && !search.trim().isEmpty()) {
+            // Поиск по заголовку или сообщению
+            notifications = notificationRepository.findByTitleContainingIgnoreCaseOrMessageContainingIgnoreCaseOrderByCreatedAtDesc(
+                search.trim(), search.trim(), pageable);
+        } else if (status != null && !status.isEmpty()) {
+            // Фильтрация по статусу
             switch (status) {
                 case "read":
-                    notificationList = notificationList.stream().filter(Notification::isRead).collect(Collectors.toList());
+                    notifications = notificationRepository.findByReadOrderByCreatedAtDesc(true, pageable);
                     break;
                 case "unread":
-                    notificationList = notificationList.stream().filter(n -> !n.isRead()).collect(Collectors.toList());
+                    notifications = notificationRepository.findByReadOrderByCreatedAtDesc(false, pageable);
                     break;
                 case "urgent":
-                    notificationList = notificationList.stream().filter(Notification::isUrgent).collect(Collectors.toList());
+                    notifications = notificationRepository.findByUrgentOrderByCreatedAtDesc(true, pageable);
+                    break;
+                default:
+                    notifications = notificationRepository.findAllByOrderByCreatedAtDesc(pageable);
                     break;
             }
-        }
-        
-        if (type != null && !type.isEmpty()) {
-            Notification.NotificationType notificationType;
+        } else if (type != null && !type.isEmpty()) {
+            // Фильтрация по типу
+            Notification.NotificationType notificationType = null;
             switch (type) {
                 case "moderation":
                     notificationType = Notification.NotificationType.MODERATION;
@@ -85,27 +91,30 @@ public class AdminNotificationController {
                 case "system":
                     notificationType = Notification.NotificationType.SYSTEM;
                     break;
-                default:
-                    notificationType = null;
             }
             
             if (notificationType != null) {
-                final Notification.NotificationType finalType = notificationType;
-                notificationList = notificationList.stream()
-                    .filter(n -> n.getType() == finalType)
-                    .collect(Collectors.toList());
+                notifications = notificationRepository.findByTypeOrderByCreatedAtDesc(notificationType, pageable);
+            } else {
+                notifications = notificationRepository.findAllByOrderByCreatedAtDesc(pageable);
             }
+        } else {
+            // Без фильтров - все уведомления
+            notifications = notificationRepository.findAllByOrderByCreatedAtDesc(pageable);
         }
         
-        model.addAttribute("notificationList", notificationList);
+        model.addAttribute("notifications", notifications);
+        model.addAttribute("notificationList", notifications.getContent());
         
-        // Данные для графиков на основе реальных данных
+        // Данные для графиков на основе всех уведомлений (не только текущей страницы)
+        List<Notification> allNotifications = notificationRepository.findAll();
+        
         Map<String, Object> chartData = new HashMap<>();
         String[] days = new String[]{"Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"};
         int[] values = new int[7];
         
         // Подсчитываем количество уведомлений по дням недели
-        for (Notification notification : notificationList) {
+        for (Notification notification : allNotifications) {
             if (notification.getCreatedAt() != null) {
                 int dayOfWeek = notification.getCreatedAt().getDayOfWeek().getValue() - 1; // 0 = Monday
                 if (dayOfWeek >= 0 && dayOfWeek < 7) {
@@ -125,7 +134,7 @@ public class AdminNotificationController {
         typeCountMap.put("Жалобы на мемориалы", 0);
         typeCountMap.put("Системные", 0);
         
-        for (Notification notification : notificationList) {
+        for (Notification notification : allNotifications) {
             if (notification.getType() != null) {
                 switch (notification.getType()) {
                     case MODERATION:
@@ -278,5 +287,34 @@ public class AdminNotificationController {
             responseData.put("message", e.getMessage());
             return responseData;
         }
+    }
+    
+    /**
+     * Удаление отдельного уведомления
+     */
+    @DeleteMapping("/{id}/delete")
+    @ResponseBody
+    public Map<String, Object> deleteNotification(@PathVariable Long id) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            boolean success = notificationService.deleteNotification(id);
+            
+            if (success) {
+                response.put("success", true);
+                response.put("message", "Уведомление успешно удалено");
+                log.info("Notification {} deleted by admin", id);
+            } else {
+                response.put("success", false);
+                response.put("message", "Уведомление не найдено");
+                log.warn("Attempted to delete non-existent notification {}", id);
+            }
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Ошибка при удалении уведомления: " + e.getMessage());
+            log.error("Error deleting notification {}: {}", id, e.getMessage(), e);
+        }
+        
+        return response;
     }
 } 

@@ -14,6 +14,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import ru.cemeterysystem.dto.FamilyTreeDTO;
+import ru.cemeterysystem.dto.RejectTreeRequest;
 import ru.cemeterysystem.models.FamilyTree;
 import ru.cemeterysystem.models.Memorial;
 import ru.cemeterysystem.models.User;
@@ -135,7 +137,7 @@ public class AdminFamilyTreeController {
             User admin = userService.findByLogin(auth.getName())
                     .orElseThrow(() -> new RuntimeException("Admin user not found"));
             
-            FamilyTree approvedTree = familyTreeService.approveTree(id);
+            FamilyTreeDTO approvedTree = familyTreeService.approveTree(id, admin);
             
             logger.info("Family tree {} approved by admin {}", id, admin.getLogin());
             
@@ -156,11 +158,12 @@ public class AdminFamilyTreeController {
     @ResponseBody
     public ResponseEntity<Map<String, Object>> rejectFamilyTree(
             @PathVariable Long id,
-            @RequestParam String reason) {
+            @RequestBody RejectTreeRequest request) {
         
         Map<String, Object> response = new HashMap<>();
         
         try {
+            String reason = request.getReason();
             if (reason == null || reason.trim().isEmpty()) {
                 response.put("success", false);
                 response.put("message", "Необходимо указать причину отклонения");
@@ -171,7 +174,7 @@ public class AdminFamilyTreeController {
             User admin = userService.findByLogin(auth.getName())
                     .orElseThrow(() -> new RuntimeException("Admin user not found"));
             
-            FamilyTree rejectedTree = familyTreeService.rejectTree(id, reason.trim());
+            FamilyTreeDTO rejectedTree = familyTreeService.rejectTree(id, admin, reason.trim());
             
             logger.info("Family tree {} rejected by admin {} with reason: {}", 
                 id, admin.getLogin(), reason);
@@ -215,6 +218,68 @@ public class AdminFamilyTreeController {
         }
     }
 
+    @PostMapping("/{id}/approve-changes")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> approveTreeChanges(@PathVariable Long id) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            User admin = userService.findByLogin(auth.getName())
+                    .orElseThrow(() -> new RuntimeException("Admin user not found"));
+            
+            familyTreeService.approveTreeChanges(id, admin, null);
+            
+            logger.info("Tree changes approved for family tree {} by admin {}", id, admin.getLogin());
+            
+            response.put("success", true);
+            response.put("message", "Изменения дерева одобрены успешно");
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Error approving tree changes for {}: {}", id, e.getMessage());
+            response.put("success", false);
+            response.put("message", "Ошибка при одобрении изменений: " + e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @PostMapping("/{id}/reject-changes")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> rejectTreeChanges(
+            @PathVariable Long id,
+            @RequestParam String reason) {
+        
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            if (reason == null || reason.trim().isEmpty()) {
+                response.put("success", false);
+                response.put("message", "Необходимо указать причину отклонения");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            User admin = userService.findByLogin(auth.getName())
+                    .orElseThrow(() -> new RuntimeException("Admin user not found"));
+            
+            familyTreeService.rejectTreeChanges(id, admin, null, reason.trim());
+            
+            logger.info("Tree changes rejected for family tree {} by admin {} with reason: {}", 
+                id, admin.getLogin(), reason);
+            
+            response.put("success", true);
+            response.put("message", "Изменения дерева отклонены");
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Error rejecting tree changes for {}: {}", id, e.getMessage());
+            response.put("success", false);
+            response.put("message", "Ошибка при отклонении изменений: " + e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
     @GetMapping("/{id}/memorials")
     @ResponseBody
     public ResponseEntity<List<Memorial>> getFamilyTreeMemorials(@PathVariable Long id) {
@@ -224,6 +289,37 @@ public class AdminFamilyTreeController {
         } catch (Exception e) {
             logger.error("Error getting memorials for family tree {}: {}", id, e.getMessage());
             return ResponseEntity.badRequest().build();
+        }
+    }
+    
+    @DeleteMapping("/{treeId}/remove-memorial/{memorialId}")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> removeMemorialFromTree(
+            @PathVariable Long treeId, 
+            @PathVariable Long memorialId) {
+        
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            User admin = userService.findByLogin(auth.getName())
+                    .orElseThrow(() -> new RuntimeException("Admin user not found"));
+            
+            familyTreeService.removeMemorialFromTree(treeId, memorialId, admin);
+            
+            logger.info("Memorial {} removed from family tree {} by admin {}", 
+                memorialId, treeId, admin.getLogin());
+            
+            response.put("success", true);
+            response.put("message", "Мемориал успешно удален из дерева");
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Error removing memorial {} from family tree {}: {}", 
+                memorialId, treeId, e.getMessage());
+            response.put("success", false);
+            response.put("message", "Ошибка при удалении мемориала из дерева: " + e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         }
     }
 } 

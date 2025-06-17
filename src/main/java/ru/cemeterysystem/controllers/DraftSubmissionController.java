@@ -52,7 +52,11 @@ public class DraftSubmissionController {
         draftSubmissionService.respondToSubmission(submissionId, request.getApproved(), request.getReviewMessage());
         return ResponseEntity.ok("Response recorded");
     }
-    
+    @DeleteMapping("/{submissionId}")
+    public ResponseEntity<Void> deleteDraftSubmission(@PathVariable Long submissionId) {
+        draftSubmissionService.deleteSubmission(submissionId);
+        return ResponseEntity.ok().build();
+    }
     public static class RespondToSubmissionRequest {
         private Boolean approved;
         private String reviewMessage;

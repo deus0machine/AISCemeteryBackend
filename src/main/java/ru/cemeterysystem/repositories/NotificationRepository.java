@@ -1,5 +1,7 @@
 package ru.cemeterysystem.repositories;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import ru.cemeterysystem.models.Notification;
@@ -66,4 +68,22 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     
     // Подсчёт уведомлений по прочтению
     long countByRead(boolean read);
+    
+    // Методы для пагинации в админ-панели
+    
+    // Все уведомления с пагинацией, отсортированные по дате создания (новые сверху)
+    Page<Notification> findAllByOrderByCreatedAtDesc(Pageable pageable);
+    
+    // Поиск по заголовку или сообщению с пагинацией
+    Page<Notification> findByTitleContainingIgnoreCaseOrMessageContainingIgnoreCaseOrderByCreatedAtDesc(
+        String title, String message, Pageable pageable);
+    
+    // Фильтрация по статусу прочтения с пагинацией
+    Page<Notification> findByReadOrderByCreatedAtDesc(boolean read, Pageable pageable);
+    
+    // Фильтрация по срочности с пагинацией
+    Page<Notification> findByUrgentOrderByCreatedAtDesc(boolean urgent, Pageable pageable);
+    
+    // Фильтрация по типу с пагинацией
+    Page<Notification> findByTypeOrderByCreatedAtDesc(Notification.NotificationType type, Pageable pageable);
 } 

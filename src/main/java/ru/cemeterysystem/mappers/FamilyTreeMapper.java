@@ -38,6 +38,11 @@ public class FamilyTreeMapper {
         dto.setPublic(tree.isPublic());
         dto.setPublicationStatus(tree.getPublicationStatus());
         
+        // Добавляем поля для модерации изменений
+        dto.setPendingChanges(tree.isPendingChanges());
+        dto.setPendingName(tree.getPendingName());
+        dto.setPendingDescription(tree.getPendingDescription());
+        
         // Форматируем даты как строки
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
         dto.setCreatedAt(tree.getCreatedAt() != null ? tree.getCreatedAt().format(formatter) : null);

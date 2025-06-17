@@ -159,7 +159,7 @@ public class SystemLogService {
      * Получение последних действий для dashboard
      */
     public List<SystemLog> getRecentActions() {
-        return systemLogRepository.findTop10ByOrderByCreatedAtDesc();
+        return systemLogRepository.findTop5ByOrderByCreatedAtDesc();
     }
 
     /**

@@ -22,7 +22,7 @@ public class Notification {
     @JoinColumn(name = "sender_id")
     private User sender;
 
-    @Column(nullable = false, length = 50)
+    @Column(nullable = false, length = 255)
     private String title;
 
     @Column(nullable = false, length = 1000)
@@ -78,7 +78,9 @@ public class Notification {
         FAMILY_TREE_ACCESS_REQUEST, // Запрос на доступ к семейному дереву
         FAMILY_TREE_ACCESS_GRANTED, // Доступ к семейному дереву предоставлен
         FAMILY_TREE_ACCESS_REVOKED, // Доступ к семейному дереву отозван
-        FAMILY_TREE_CHANGES_PENDING // Изменения в семейном дереве ожидают одобрения
+        FAMILY_TREE_CHANGES_PENDING, // Изменения в семейном дереве ожидают одобрения
+        MEMORIAL_EDITOR_REMOVED,    // Редактор удален из мемориала
+        MEMORIAL_EDITOR_RESIGNED    // Редактор отказался от редактирования
     }
     
     public enum NotificationStatus {

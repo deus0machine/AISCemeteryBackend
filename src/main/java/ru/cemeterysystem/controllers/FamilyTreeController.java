@@ -208,6 +208,79 @@ public class FamilyTreeController {
         }
     }
 
+    @PostMapping("/{id}/submit-changes-for-moderation")
+    public ResponseEntity<?> submitTreeChangesForModeration(
+            @PathVariable Long id,
+            @RequestParam String name,
+            @RequestParam String description,
+            @RequestParam String message) {
+        try {
+            User user = getCurrentUser();
+            logger.debug("Submitting changes for moderation for family tree {} by user: {}", id, user.getLogin());
+            
+            familyTreeService.submitTreeChangesForModeration(id, user, name, description, message);
+            
+            return ResponseEntity.ok().body("Changes submitted for moderation successfully");
+        } catch (Exception e) {
+            logger.error("Error submitting tree changes for moderation {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body("Failed to submit changes for moderation: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/{id}/approve-changes")
+    public ResponseEntity<?> approveTreeChanges(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long notificationId) {
+        try {
+            User admin = getCurrentUser();
+            logger.debug("Approving changes for family tree {} by admin: {}", id, admin.getLogin());
+            
+            familyTreeService.approveTreeChanges(id, admin, notificationId);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Изменения дерева одобрены успешно");
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Error approving tree changes {}: {}", id, e.getMessage(), e);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Ошибка при одобрении изменений: " + e.getMessage());
+            
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+    }
+
+    @PostMapping("/{id}/reject-changes")
+    public ResponseEntity<?> rejectTreeChanges(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long notificationId,
+            @RequestParam String reason) {
+        try {
+            User admin = getCurrentUser();
+            logger.debug("Rejecting changes for family tree {} by admin: {}", id, admin.getLogin());
+            
+            familyTreeService.rejectTreeChanges(id, admin, notificationId, reason);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Изменения дерева отклонены");
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Error rejecting tree changes {}: {}", id, e.getMessage(), e);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Ошибка при отклонении изменений: " + e.getMessage());
+            
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+    }
+
     @PostMapping("/{id}/approve")
     public ResponseEntity<?> approveFamilyTree(@PathVariable Long id) {
         try {
@@ -279,6 +352,42 @@ public class FamilyTreeController {
             logger.error("Error deleting relation: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed to delete relation: " + e.getMessage());
+        }
+    }
+
+    @PutMapping("/{id}/relations/{relationId}")
+    public ResponseEntity<?> updateRelation(
+            @PathVariable Long id,
+            @PathVariable Long relationId,
+            @RequestBody MemorialRelationDTO relationDTO) {
+        logger.info("=== START updateRelation ===");
+        logger.info("Family Tree ID: {}", id);
+        logger.info("Relation ID: {}", relationId);
+        logger.info("Incoming MemorialRelationDTO: {}", relationDTO);
+        
+        try {
+            User user = getCurrentUser();
+            logger.info("Current user: {}", user.getLogin());
+            
+            // Устанавливаем ID связи из URL
+            relationDTO.setId(relationId);
+            relationDTO.setFamilyTreeId(id);
+            
+            logger.info("Calling familyTreeService.updateRelation...");
+            MemorialRelation updatedRelation = familyTreeService.updateRelation(id, relationDTO, user);
+            logger.info("Successfully updated relation with ID: {}", updatedRelation.getId());
+            
+            logger.info("Returning response with updated relation: {}", updatedRelation);
+            logger.info("=== END updateRelation SUCCESS ===");
+            return ResponseEntity.ok(updatedRelation);
+        } catch (Exception e) {
+            logger.error("=== ERROR in updateRelation ===");
+            logger.error("Exception type: {}", e.getClass().getSimpleName());
+            logger.error("Exception message: {}", e.getMessage());
+            logger.error("Full stack trace:", e);
+            logger.error("=== END updateRelation ERROR ===");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to update relation: " + e.getMessage());
         }
     }
 

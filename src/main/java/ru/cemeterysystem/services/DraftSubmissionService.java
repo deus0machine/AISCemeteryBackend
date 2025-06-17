@@ -105,4 +105,17 @@ public class DraftSubmissionService {
             }
         }
     }
+    
+    /**
+     * Удалить уведомление о черновике
+     */
+    @Transactional
+    public void deleteSubmission(Long submissionId) {
+        DraftSubmission submission = draftSubmissionRepository.findById(submissionId)
+            .orElseThrow(() -> new RuntimeException("Submission not found with ID: " + submissionId));
+        
+        logger.info("Deleting draft submission with ID: {}", submissionId);
+        draftSubmissionRepository.delete(submission);
+        logger.info("Draft submission {} successfully deleted", submissionId);
+    }
 } 

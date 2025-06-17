@@ -419,6 +419,104 @@ public class FamilyTreeService {
     }
 
     @Transactional
+    public MemorialRelation updateRelation(Long treeId, MemorialRelationDTO relationDTO, User user) {
+        logger.info("=== FamilyTreeService.updateRelation START ===");
+        logger.info("TreeId: {}, RelationId: {}", treeId, relationDTO.getId());
+        logger.info("User: {}", user.getLogin());
+        logger.info("RelationDTO: {}", relationDTO);
+        
+        try {
+            // Находим существующую связь
+            MemorialRelation existingRelation = memorialRelationRepository.findById(relationDTO.getId())
+                    .orElseThrow(() -> new RuntimeException("Relation not found"));
+            
+            // Проверяем, что связь принадлежит указанному дереву
+            if (!existingRelation.getFamilyTree().getId().equals(treeId)) {
+                throw new RuntimeException("Relation does not belong to the specified family tree");
+            }
+            
+            FamilyTree tree = existingRelation.getFamilyTree();
+            logger.info("Found existing relation in tree: {}", tree.getName());
+            
+            // Проверяем права доступа
+            boolean isOwner = tree.getUser().getId().equals(user.getId());
+            boolean hasAdminAccess = isOwner || accessService.hasAccess(treeId, user.getId(), FamilyTreeAccess.AccessLevel.ADMIN);
+            boolean hasEditorAccess = accessService.hasAccess(treeId, user.getId(), FamilyTreeAccess.AccessLevel.EDITOR);
+            
+            logger.info("Update relation access check - isOwner: {}, hasAdminAccess: {}, hasEditorAccess: {}", 
+                isOwner, hasAdminAccess, hasEditorAccess);
+            
+            // Владельцы и админы могут обновлять связи напрямую
+            if (hasAdminAccess) {
+                logger.info("Direct relation update allowed for owner/admin");
+                
+                // Получаем мемориалы для обновления
+                Long sourceMemorialId = relationDTO.getSourceMemorial().getId();
+                Long targetMemorialId = relationDTO.getTargetMemorial().getId();
+                
+                Memorial sourceMemorial = memorialRepository.findById(sourceMemorialId)
+                        .orElseThrow(() -> new RuntimeException("Source memorial not found"));
+                Memorial targetMemorial = memorialRepository.findById(targetMemorialId)
+                        .orElseThrow(() -> new RuntimeException("Target memorial not found"));
+                
+                // Парсим тип связи
+                MemorialRelation.RelationType relationType;
+                try {
+                    relationType = MemorialRelation.RelationType.valueOf(relationDTO.getRelationType());
+                } catch (IllegalArgumentException e) {
+                    throw new RuntimeException("Invalid relation type: " + relationDTO.getRelationType());
+                }
+                
+                // Проверяем, не создаст ли обновление дублирующую связь
+                List<MemorialRelation> conflictingRelations = memorialRelationRepository.findByFamilyTreeId(treeId)
+                        .stream()
+                        .filter(relation -> 
+                            !relation.getId().equals(existingRelation.getId()) && // Исключаем текущую связь
+                            ((relation.getSourceMemorial().getId().equals(sourceMemorialId) && 
+                              relation.getTargetMemorial().getId().equals(targetMemorialId)) ||
+                             (relation.getSourceMemorial().getId().equals(targetMemorialId) && 
+                              relation.getTargetMemorial().getId().equals(sourceMemorialId)))
+                        )
+                        .collect(Collectors.toList());
+                
+                if (!conflictingRelations.isEmpty()) {
+                    logger.warn("Update would create duplicate relation between memorial {} and {}", sourceMemorialId, targetMemorialId);
+                    throw new RuntimeException("Связь между этими мемориалами уже существует");
+                }
+                
+                // Обновляем связь
+                existingRelation.setSourceMemorial(sourceMemorial);
+                existingRelation.setTargetMemorial(targetMemorial);
+                existingRelation.setRelationType(relationType);
+                
+                MemorialRelation updatedRelation = memorialRelationRepository.save(existingRelation);
+                logger.info("Successfully updated relation with ID: {}", updatedRelation.getId());
+                logger.info("=== FamilyTreeService.updateRelation SUCCESS ===");
+                
+                return updatedRelation;
+            }
+            // Редакторы должны работать через систему черновиков
+            else if (hasEditorAccess) {
+                logger.info("Editor {} attempting direct relation update in tree {} - should use draft system instead", 
+                    user.getId(), treeId);
+                throw new RuntimeException("Editors must use draft system for changes. Please create a draft with your changes and submit for review.");
+            }
+            // Нет доступа вообще
+            else {
+                logger.warn("Access denied for user {} to update relation {} in tree {}", user.getId(), relationDTO.getId(), treeId);
+                throw new RuntimeException("Insufficient permissions to update relation");
+            }
+        } catch (Exception e) {
+            logger.error("=== FamilyTreeService.updateRelation ERROR ===");
+            logger.error("Exception type: {}", e.getClass().getSimpleName());
+            logger.error("Exception message: {}", e.getMessage());
+            logger.error("Full stack trace:", e);
+            logger.error("=== FamilyTreeService.updateRelation END ERROR ===");
+            throw e;
+        }
+    }
+
+    @Transactional
     public void addMemorialToTree(Long treeId, Long memorialId, User user) {
         try {
             logger.debug("Adding memorial {} to tree {} by user {}", memorialId, treeId, user.getId());
@@ -438,15 +536,10 @@ public class FamilyTreeService {
                 Memorial memorial = memorialRepository.findById(memorialId)
                         .orElseThrow(() -> new RuntimeException("Memorial not found"));
 
-                // Проверяем, есть ли уже мемориал в дереве
-                boolean alreadyExists = memorialRelationRepository.findByFamilyTreeId(treeId)
-                        .stream()
-                        .anyMatch(relation -> 
-                            relation.getSourceMemorial().getId().equals(memorialId) ||
-                            relation.getTargetMemorial().getId().equals(memorialId));
-
-                if (alreadyExists) {
-                    throw new RuntimeException("Memorial already exists in the family tree");
+                // Проверяем, есть ли уже мемориал в ЛЮБОМ дереве
+                List<Long> existingTreeIds = memorialRelationRepository.findFamilyTreeIdsByMemorialId(memorialId);
+                if (!existingTreeIds.isEmpty()) {
+                    throw new RuntimeException("Memorial already exists in another family tree (ID: " + existingTreeIds.get(0) + "). A memorial can only be added to one tree.");
                 }
 
                 // Для начала просто создаем placeholder связь
@@ -509,14 +602,15 @@ public class FamilyTreeService {
                     .orElseThrow(() -> new RuntimeException("Family tree not found"));
 
             boolean isOwner = tree.getUser().getId().equals(user.getId());
+            boolean isSystemAdmin = user.getRole() == User.Role.ADMIN; // Системный администратор
             boolean hasAdminAccess = isOwner || accessService.hasAccess(treeId, user.getId(), FamilyTreeAccess.AccessLevel.ADMIN);
             boolean hasEditorAccess = accessService.hasAccess(treeId, user.getId(), FamilyTreeAccess.AccessLevel.EDITOR);
             
-            logger.debug("Remove memorial access check - isOwner: {}, hasAdminAccess: {}, hasEditorAccess: {}", 
-                isOwner, hasAdminAccess, hasEditorAccess);
+            logger.debug("Remove memorial access check - isOwner: {}, isSystemAdmin: {}, hasAdminAccess: {}, hasEditorAccess: {}", 
+                isOwner, isSystemAdmin, hasAdminAccess, hasEditorAccess);
             
-            // Владельцы и админы могут удалять мемориалы напрямую
-            if (hasAdminAccess) {
+            // Системные администраторы, владельцы и админы дерева могут удалять мемориалы напрямую
+            if (isSystemAdmin || hasAdminAccess) {
                 // Удаляем все связи, где участвует данный мемориал
                 List<MemorialRelation> relationsToDelete = memorialRelationRepository.findByFamilyTreeId(treeId)
                         .stream()
@@ -617,6 +711,9 @@ public class FamilyTreeService {
             // Создаем уведомление владельцу об одобрении
             createTreeApprovalNotification(savedTree, admin, true, null);
             
+            // ИСПРАВЛЕНИЕ: Обновляем все связанные уведомления модерации дерева
+            updateTreeModerationNotifications(savedTree.getId(), true);
+            
             logger.info("Family tree {} approved by admin {}", id, admin.getId());
             return familyTreeMapper.toDTO(savedTree);
         } catch (Exception e) {
@@ -648,6 +745,9 @@ public class FamilyTreeService {
             
             // Создаем уведомление владельцу об отклонении с указанием причины
             createTreeApprovalNotification(savedTree, admin, false, reason);
+            
+            // ИСПРАВЛЕНИЕ: Обновляем все связанные уведомления модерации дерева
+            updateTreeModerationNotifications(savedTree.getId(), false);
             
             logger.info("Family tree {} rejected by admin {}, reason: {}", id, admin.getId(), reason);
             return familyTreeMapper.toDTO(savedTree);
@@ -792,6 +892,209 @@ public class FamilyTreeService {
         }
     }
 
+    /**
+     * Обновляет все уведомления модерации для данного семейного дерева
+     */
+    private void updateTreeModerationNotifications(Long treeId, boolean approved) {
+        try {
+            logger.info("=== ОБНОВЛЕНИЕ УВЕДОМЛЕНИЙ МОДЕРАЦИИ ДЕРЕВА ===");
+            logger.info("updateTreeModerationNotifications: treeId={}, approved={}", treeId, approved);
+            
+            // Находим все уведомления типа FAMILY_TREE_MODERATION со статусом PENDING для данного дерева
+            List<Notification> moderationNotifications = notificationRepository
+                .findByRelatedEntityIdAndTypeAndStatus(
+                    treeId,
+                    Notification.NotificationType.FAMILY_TREE_MODERATION, 
+                    Notification.NotificationStatus.PENDING
+                );
+            
+            logger.info("Найдено {} уведомлений модерации дерева для обновления", moderationNotifications.size());
+            
+            for (Notification notification : moderationNotifications) {
+                // Обновляем статус уведомления
+                notification.setStatus(approved ? 
+                    Notification.NotificationStatus.ACCEPTED : 
+                    Notification.NotificationStatus.REJECTED);
+                
+                // Отмечаем как прочитанное (решенное)
+                notification.setRead(true);
+                
+                logger.info("Обновляем уведомление ID={} на статус: {}", 
+                        notification.getId(), notification.getStatus());
+            }
+            
+            // Сохраняем все обновленные уведомления
+            if (!moderationNotifications.isEmpty()) {
+                notificationRepository.saveAll(moderationNotifications);
+                logger.info("Обновлено {} уведомлений модерации для дерева ID={}", 
+                        moderationNotifications.size(), treeId);
+            }
+            
+        } catch (Exception e) {
+            logger.error("Ошибка при обновлении уведомлений модерации дерева: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Создает уведомления для администраторов о изменениях в публичном дереве
+     */
+    private void createTreeChangesModerationNotification(FamilyTree tree, User sender, String newName, String newDescription, String message) {
+        try {
+            // Находим всех администраторов
+            List<User> admins = userRepository.findByRole(User.Role.ADMIN);
+            
+            for (User admin : admins) {
+                Notification notification = new Notification();
+                notification.setType(Notification.NotificationType.FAMILY_TREE_MODERATION);
+                notification.setUser(admin);
+                notification.setSender(sender);
+                notification.setTitle("Предложены изменения в публичном дереве");
+                
+                StringBuilder notificationMessage = new StringBuilder();
+                notificationMessage.append(String.format(
+                    "Пользователь %s предложил изменения в публичном генеалогическом дереве \"%s\".\n\n",
+                    sender.getFio() != null ? sender.getFio() : sender.getLogin(),
+                    tree.getName()
+                ));
+                
+                // Добавляем детали изменений
+                if (!tree.getName().equals(newName)) {
+                    notificationMessage.append(String.format("Новое название: \"%s\"\n", newName));
+                }
+                if (!java.util.Objects.equals(tree.getDescription(), newDescription)) {
+                    notificationMessage.append(String.format("Новое описание: \"%s\"\n", newDescription));
+                }
+                
+                if (message != null && !message.trim().isEmpty()) {
+                    notificationMessage.append(String.format("\nСообщение от пользователя: %s\n", message));
+                }
+                
+                notificationMessage.append("\nТребуется ваше решение об одобрении или отклонении изменений.");
+                
+                notification.setMessage(notificationMessage.toString());
+                notification.setStatus(Notification.NotificationStatus.PENDING);
+                notification.setRelatedEntityId(tree.getId());
+                notification.setRelatedEntityName(tree.getName());
+                notification.setRead(false);
+                notification.setCreatedAt(LocalDateTime.now());
+                notification.setUrgent(true);
+                
+                notification.setMessage(notificationMessage.toString());
+                
+                notificationRepository.save(notification);
+                logger.info("Уведомление об изменениях дерева создано для администратора {}", admin.getLogin());
+            }
+        } catch (Exception e) {
+            logger.error("Ошибка при создании уведомления об изменениях дерева: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Обновляет статус уведомления об изменениях дерева
+     */
+    private void updateTreeChangesNotification(Long notificationId, boolean approved, String reason) {
+        try {
+            Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new RuntimeException("Notification not found"));
+            
+            notification.setStatus(approved ? 
+                Notification.NotificationStatus.ACCEPTED : 
+                Notification.NotificationStatus.REJECTED);
+            notification.setRead(true);
+            
+            if (!approved && reason != null) {
+                notification.setMessage(notification.getMessage() + "\n\nПричина отклонения: " + reason);
+            }
+            
+            notificationRepository.save(notification);
+            logger.info("Уведомление {} обновлено со статусом: {}", notificationId, notification.getStatus());
+        } catch (Exception e) {
+            logger.error("Ошибка при обновлении уведомления об изменениях дерева: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Обновляет статус уведомлений об изменениях дерева по ID дерева
+     */
+    private void updateTreeChangesNotificationsByTreeId(Long treeId, boolean approved, String reason) {
+        try {
+            // Ищем все активные уведомления о модерации изменений для данного дерева
+            List<Notification> notifications = notificationRepository.findByRelatedEntityIdAndTypeAndStatus(
+                treeId, 
+                Notification.NotificationType.FAMILY_TREE_MODERATION,
+                Notification.NotificationStatus.PENDING
+            );
+            
+            for (Notification notification : notifications) {
+                notification.setStatus(approved ? 
+                    Notification.NotificationStatus.ACCEPTED : 
+                    Notification.NotificationStatus.REJECTED);
+                notification.setRead(true);
+                
+                if (!approved && reason != null) {
+                    notification.setMessage(notification.getMessage() + "\n\nПричина отклонения: " + reason);
+                }
+                
+                notificationRepository.save(notification);
+                logger.info("Уведомление {} обновлено со статусом: {}", notification.getId(), notification.getStatus());
+            }
+            
+            if (notifications.isEmpty()) {
+                logger.warn("Не найдено активных уведомлений о модерации изменений для дерева {}", treeId);
+            }
+        } catch (Exception e) {
+            logger.error("Ошибка при обновлении уведомлений об изменениях дерева по ID дерева: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Создает уведомление владельцу о результате рассмотрения изменений
+     */
+    private void createTreeChangesResponseNotification(FamilyTree tree, User admin, boolean approved, String reason) {
+        try {
+            Notification notification = new Notification();
+            notification.setUser(tree.getUser());
+            notification.setSender(admin);
+            notification.setType(Notification.NotificationType.SYSTEM);
+            
+            if (approved) {
+                notification.setTitle("Изменения дерева одобрены");
+                notification.setStatus(Notification.NotificationStatus.INFO);
+                notification.setMessage(String.format(
+                    "Ваши изменения в генеалогическом дереве \"%s\" были одобрены администратором и применены.\n\n" +
+                    "Новые данные теперь отображаются в дереве.",
+                    tree.getName()
+                ));
+            } else {
+                notification.setTitle("Изменения дерева отклонены");
+                notification.setStatus(Notification.NotificationStatus.INFO);
+                String message = String.format(
+                    "Ваши изменения в генеалогическом дереве \"%s\" были отклонены администратором.\n\n",
+                    tree.getName()
+                );
+                
+                if (reason != null && !reason.trim().isEmpty()) {
+                    message += "Причина отклонения: " + reason + "\n\n";
+                }
+                
+                message += "Вы можете внести изменения и повторно отправить их на модерацию.";
+                
+                notification.setMessage(message);
+            }
+            
+            notification.setRelatedEntityId(tree.getId());
+            notification.setRelatedEntityName(tree.getName());
+            notification.setRead(false);
+            notification.setCreatedAt(LocalDateTime.now());
+            
+            notificationRepository.save(notification);
+            logger.info("Уведомление о результате модерации изменений дерева ({}) создано для пользователя {}", 
+                    approved ? "одобрение" : "отклонение", tree.getUser().getLogin());
+        } catch (Exception e) {
+            logger.error("Ошибка при создании уведомления о результате модерации изменений дерева: {}", e.getMessage(), e);
+        }
+    }
+
     // Административные методы для работы с деревьями
     @Transactional(readOnly = true)
     public Page<FamilyTree> findAllForAdmin(Pageable pageable) {
@@ -858,6 +1161,9 @@ public class FamilyTreeService {
         // Создаем уведомление для владельца
         createTreeApprovalNotification(savedTree, null, true, null);
         
+        // ИСПРАВЛЕНИЕ: Обновляем все связанные уведомления модерации дерева
+        updateTreeModerationNotifications(savedTree.getId(), true);
+        
         return savedTree;
     }
 
@@ -877,6 +1183,9 @@ public class FamilyTreeService {
         
         // Создаем уведомление для владельца
         createTreeApprovalNotification(savedTree, null, false, reason);
+        
+        // ИСПРАВЛЕНИЕ: Обновляем все связанные уведомления модерации дерева
+        updateTreeModerationNotifications(savedTree.getId(), false);
         
         return savedTree;
     }
@@ -905,6 +1214,123 @@ public class FamilyTreeService {
         logger.info("Family tree {} unpublished by owner {}", id, owner.getLogin());
         
         return savedTree;
+    }
+
+    @Transactional
+    public void submitTreeChangesForModeration(Long id, User user, String newName, String newDescription, String message) {
+        try {
+            FamilyTree tree = familyTreeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Family tree not found"));
+
+            // Проверяем, что пользователь является владельцем дерева
+            if (!tree.getUser().getId().equals(user.getId())) {
+                throw new RuntimeException("Only tree owner can submit changes for moderation");
+            }
+
+            // Проверяем, что дерево опубликовано
+            if (tree.getPublicationStatus() != FamilyTree.PublicationStatus.PUBLISHED) {
+                throw new RuntimeException("Can only submit changes for published trees");
+            }
+
+            // Сохраняем данные ожидающих изменений в дереве
+            tree.setPendingChanges(true);
+            tree.setPendingName(newName);
+            tree.setPendingDescription(newDescription);
+            familyTreeRepository.save(tree);
+
+            // Создаем уведомления для администраторов о необходимости модерации изменений
+            createTreeChangesModerationNotification(tree, user, newName, newDescription, message);
+            
+            logger.info("Tree changes submitted for moderation for tree {} by user {}", id, user.getLogin());
+        } catch (Exception e) {
+            logger.error("Error submitting tree changes for moderation: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to submit tree changes for moderation: " + e.getMessage(), e);
+        }
+    }
+
+    @Transactional
+    public void approveTreeChanges(Long treeId, User admin, Long notificationId) {
+        try {
+            // Проверяем права администратора
+            if (admin.getRole() != User.Role.ADMIN) {
+                throw new RuntimeException("Only administrators can approve tree changes");
+            }
+
+            FamilyTree tree = familyTreeRepository.findById(treeId)
+                .orElseThrow(() -> new RuntimeException("Family tree not found"));
+
+            // Проверяем что есть ожидающие изменения
+            if (!tree.isPendingChanges()) {
+                throw new RuntimeException("No pending changes for this tree");
+            }
+
+            // Применяем изменения к дереву из ожидающих полей
+            tree.setName(tree.getPendingName());
+            tree.setDescription(tree.getPendingDescription());
+            tree.setUpdatedAt(LocalDateTime.now());
+            // Очищаем поля ожидающих изменений
+            tree.setPendingChanges(false);
+            tree.setPendingName(null);
+            tree.setPendingDescription(null);
+            
+            FamilyTree savedTree = familyTreeRepository.save(tree);
+            
+            // Обновляем статус уведомления (если ID передан)
+            if (notificationId != null) {
+                updateTreeChangesNotification(notificationId, true, null);
+            } else {
+                // Ищем и обновляем уведомления по ID дерева
+                updateTreeChangesNotificationsByTreeId(treeId, true, null);
+            }
+            
+            // Создаем уведомление владельцу об одобрении изменений
+            createTreeChangesResponseNotification(savedTree, admin, true, null);
+            
+            logger.info("Tree changes approved for tree {} by admin {}", treeId, admin.getLogin());
+        } catch (Exception e) {
+            logger.error("Error approving tree changes: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to approve tree changes: " + e.getMessage(), e);
+        }
+    }
+
+    @Transactional
+    public void rejectTreeChanges(Long treeId, User admin, Long notificationId, String reason) {
+        try {
+            // Проверяем права администратора
+            if (admin.getRole() != User.Role.ADMIN) {
+                throw new RuntimeException("Only administrators can reject tree changes");
+            }
+
+            FamilyTree tree = familyTreeRepository.findById(treeId)
+                .orElseThrow(() -> new RuntimeException("Family tree not found"));
+
+            // Проверяем что есть ожидающие изменения
+            if (!tree.isPendingChanges()) {
+                throw new RuntimeException("No pending changes for this tree");
+            }
+
+            // Очищаем поля ожидающих изменений при отклонении
+            tree.setPendingChanges(false);
+            tree.setPendingName(null);
+            tree.setPendingDescription(null);
+            familyTreeRepository.save(tree);
+
+            // Обновляем статус уведомления (если ID передан)
+            if (notificationId != null) {
+                updateTreeChangesNotification(notificationId, false, reason);
+            } else {
+                // Ищем и обновляем уведомления по ID дерева
+                updateTreeChangesNotificationsByTreeId(treeId, false, reason);
+            }
+            
+            // Создаем уведомление владельцу об отклонении изменений
+            createTreeChangesResponseNotification(tree, admin, false, reason);
+            
+            logger.info("Tree changes rejected for tree {} by admin {} with reason: {}", treeId, admin.getLogin(), reason);
+        } catch (Exception e) {
+            logger.error("Error rejecting tree changes: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to reject tree changes: " + e.getMessage(), e);
+        }
     }
 
     @Transactional

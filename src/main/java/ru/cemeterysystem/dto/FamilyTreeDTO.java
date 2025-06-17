@@ -22,4 +22,9 @@ public class FamilyTreeDTO {
     private List<MemorialRelationDTO> memorialRelations;
     private Integer memorialCount;
     private List<FamilyTreeAccessDTO> accessList; // Добавляем информацию о доступе
+    
+    // Поля для модерации изменений
+    private boolean pendingChanges;
+    private String pendingName;
+    private String pendingDescription;
 } 

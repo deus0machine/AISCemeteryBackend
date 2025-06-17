@@ -316,7 +316,7 @@
                                 <div class="row no-gutters align-items-center">
                                     <div class="col mr-2">
                                         <div class="text-xs text-uppercase fw-bold text-success mb-1">
-                                            Захоронений</div>
+                                            Мемориалов</div>
                                         <div class="h3 mb-0 fw-bold" th:text="${stats.memorialCount}">0</div>
                                         <div class="text-muted small mt-2">
                                             <i class="bi bi-arrow-up-short text-success"></i> 
@@ -478,7 +478,7 @@
                                                 <td>
                                                     <span class="badge rounded-pill" 
                                                           th:classappend="${user.hasSubscription ? 'bg-success' : 'bg-secondary'}" 
-                                                          th:text="${user.hasSubscription ? 'Подписчик' : 'Базовый'}">Статус</span>
+                                                          th:text="${user.hasSubscription ? 'Подписчик' : 'Нет подписки'}">Статус</span>
                                                 </td>
                                                 <td class="text-end">
                                                     <div class="btn-group">
@@ -506,15 +506,15 @@
                         </div>
                     </div>
 
-                    <!-- Недавно добавленные захоронения -->
+                    <!-- Недавно добавленные мемориалы -->
                     <div class="col-lg-6">
                         <div class="card shadow-sm mb-4">
                             <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
                                 <h5 class="card-title m-0 text-primary">
-                                    <i class="bi bi-bookmark-heart me-2"></i>Недавние захоронения
+                                    <i class="bi bi-bookmark-heart me-2"></i>Недавние мемориалы
                                 </h5>
                                 <a href="/admin/memorials" class="btn btn-sm btn-primary">
-                                    <i class="bi bi-list me-1"></i>Все захоронения
+                                    <i class="bi bi-list me-1"></i>Все мемориалы
                                 </a>
                             </div>
                             <div class="card-body p-0">

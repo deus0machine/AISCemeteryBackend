@@ -3,10 +3,13 @@ package ru.cemeterysystem.services;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.event.EventListener;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.cemeterysystem.events.EditorRemovedEvent;
+import ru.cemeterysystem.events.EditorResignedEvent;
 import ru.cemeterysystem.models.Memorial;
 import ru.cemeterysystem.models.Notification;
 import ru.cemeterysystem.models.User;
@@ -30,7 +33,7 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final MemorialRepository memorialRepository;
-    private final MemorialService memorialService;
+    private final MemorialApprovalService memorialApprovalService;
 
     // Получить все уведомления пользователя
     public List<NotificationDTO> getUserNotifications(Long userId) {
@@ -167,9 +170,9 @@ public class NotificationService {
             Long memorialId = notification.getRelatedEntityId();
             
             try {
-                log.info("Вызываем MemorialService.approveChanges для мемориала ID={}, approve={}", 
+                log.info("Вызываем MemorialApprovalService.approveChanges для мемориала ID={}, approve={}", 
                          memorialId, accept);
-                memorialService.approveChanges(memorialId, accept, currentUser);
+                memorialApprovalService.approveChanges(memorialId, accept, currentUser);
                 log.info("Успешно применены/отклонены изменения мемориала ID={}", memorialId);
             } catch (Exception e) {
                 log.error("Ошибка при обработке изменений мемориала: {}", e.getMessage(), e);
@@ -250,8 +253,20 @@ public class NotificationService {
     }
     
     // Удалить уведомление
-    public void deleteNotification(Long notificationId) {
-        notificationRepository.deleteById(notificationId);
+    public boolean deleteNotification(Long notificationId) {
+        try {
+            if (notificationRepository.existsById(notificationId)) {
+                notificationRepository.deleteById(notificationId);
+                log.info("Notification {} successfully deleted", notificationId);
+                return true;
+            } else {
+                log.warn("Notification {} not found for deletion", notificationId);
+                return false;
+            }
+        } catch (Exception e) {
+            log.error("Error deleting notification {}: {}", notificationId, e.getMessage(), e);
+            return false;
+        }
     }
     
     // Конвертировать в DTO
@@ -418,6 +433,74 @@ public class NotificationService {
         return firstNotification; // Возвращаем первое созданное уведомление
     }
 
+    // Создать уведомление об удалении редактора
+    public void createEditorRemovedNotification(Long memorialId, User removedEditor, User owner) {
+        try {
+            Memorial memorial = memorialRepository.findById(memorialId)
+                    .orElseThrow(() -> new RuntimeException("Мемориал не найден"));
+
+            Notification notification = new Notification();
+            notification.setType(Notification.NotificationType.MEMORIAL_EDITOR_REMOVED);
+            notification.setUser(removedEditor); // Получатель - удаленный редактор
+            notification.setSender(owner); // Отправитель - владелец
+            notification.setTitle("Вы исключены из редакторов мемориала");
+            
+            String message = String.format(
+                "Владелец %s исключил вас из списка редакторов мемориала \"%s\".\n\n" +
+                "Теперь у вас нет прав на редактирование этого мемориала.",
+                owner.getFio() != null ? owner.getFio() : owner.getLogin(),
+                memorial.getFio()
+            );
+            
+            notification.setMessage(message);
+            notification.setStatus(Notification.NotificationStatus.INFO);
+            notification.setRelatedEntityId(memorialId);
+            notification.setRelatedEntityName(memorial.getFio());
+            notification.setRead(false);
+            notification.setCreatedAt(LocalDateTime.now());
+            notification.setUrgent(false);
+            
+            notificationRepository.save(notification);
+            log.info("Уведомление об удалении редактора создано для пользователя ID={}", removedEditor.getId());
+        } catch (Exception e) {
+            log.error("Ошибка при создании уведомления об удалении редактора: {}", e.getMessage(), e);
+        }
+    }
+
+    // Создать уведомление об отказе редактора от редактирования
+    public void createEditorResignedNotification(Long memorialId, User resignedEditor, User owner) {
+        try {
+            Memorial memorial = memorialRepository.findById(memorialId)
+                    .orElseThrow(() -> new RuntimeException("Мемориал не найден"));
+
+            Notification notification = new Notification();
+            notification.setType(Notification.NotificationType.MEMORIAL_EDITOR_RESIGNED);
+            notification.setUser(owner); // Получатель - владелец
+            notification.setSender(resignedEditor); // Отправитель - редактор
+            notification.setTitle("Редактор отказался от редактирования мемориала");
+            
+            String message = String.format(
+                "Пользователь %s отказался от права редактирования вашего мемориала \"%s\".\n\n" +
+                "Теперь он больше не является редактором этого мемориала.",
+                resignedEditor.getFio() != null ? resignedEditor.getFio() : resignedEditor.getLogin(),
+                memorial.getFio()
+            );
+            
+            notification.setMessage(message);
+            notification.setStatus(Notification.NotificationStatus.INFO);
+            notification.setRelatedEntityId(memorialId);
+            notification.setRelatedEntityName(memorial.getFio());
+            notification.setRead(false);
+            notification.setCreatedAt(LocalDateTime.now());
+            notification.setUrgent(false);
+            
+            notificationRepository.save(notification);
+            log.info("Уведомление об отказе редактора создано для владельца ID={}", owner.getId());
+        } catch (Exception e) {
+            log.error("Ошибка при создании уведомления об отказе редактора: {}", e.getMessage(), e);
+        }
+    }
+
     @Transactional
     public long cleanupExcessNotifications() {
         try {
@@ -528,5 +611,20 @@ public class NotificationService {
             log.error("Ошибка при ответе на техническое уведомление: {}", e.getMessage(), e);
             return false;
         }
+    }
+
+    // Обработчики событий для разрыва циклической зависимости
+    @EventListener
+    @Transactional
+    public void handleEditorRemovedEvent(EditorRemovedEvent event) {
+        log.info("Обработка события удаления редактора для мемориала ID={}", event.getMemorialId());
+        createEditorRemovedNotification(event.getMemorialId(), event.getRemovedEditor(), event.getOwner());
+    }
+
+    @EventListener
+    @Transactional
+    public void handleEditorResignedEvent(EditorResignedEvent event) {
+        log.info("Обработка события отставки редактора для мемориала ID={}", event.getMemorialId());
+        createEditorResignedNotification(event.getMemorialId(), event.getResignedEditor(), event.getOwner());
     }
 } 

@@ -433,7 +433,7 @@
                         <button class="btn btn-sm btn-outline-danger me-2" id="cleanupNotifications">
                             <i class="bi bi-trash me-1"></i>Удалить прочитанные уведомления
                         </button>
-                        <span class="badge bg-primary rounded-pill" th:text="${notifications != null ? notifications.totalElements : '1'}">1</span>
+                        <span class="badge bg-primary rounded-pill" th:text="${notifications != null ? notifications.totalElements : '0'}">0</span>
                     </div>
                 </div>
                 <div class="card-body p-0">
@@ -539,7 +539,7 @@
                                             <i class="bi bi-eye me-1"></i>Просмотреть мемориал
                                         </a>
                                         
-                                        <!-- Кнопки принятия/отклонения для запросов модерации -->
+                                        <!-- Кнопки принятия/отклонения для запросов модерации мемориалов -->
                                         <div th:if="${notification.status.name() == 'PENDING' && notification.type.name() == 'MODERATION'}">
                                             <a th:href="@{/admin/memorials/{id}/approve(id=${notification.relatedEntityId})}" 
                                                class="btn btn-sm btn-outline-success">
@@ -551,8 +551,24 @@
                                             </a>
                                         </div>
                                         
+                                        <!-- Кнопки принятия/отклонения для запросов модерации изменений семейных деревьев -->
+                                        <div th:if="${notification.status.name() == 'PENDING' && notification.type.name() == 'FAMILY_TREE_MODERATION'}">
+                                            <button class="btn btn-sm btn-outline-success approve-tree-changes" 
+                                                    th:data-tree-id="${notification.relatedEntityId}"
+                                                    th:data-tree-name="${notification.relatedEntityName}"
+                                                    th:data-notification-id="${notification.id}">
+                                                <i class="bi bi-check-lg me-1"></i>Одобрить изменения
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger reject-tree-changes" 
+                                                    th:data-tree-id="${notification.relatedEntityId}"
+                                                    th:data-tree-name="${notification.relatedEntityName}"
+                                                    th:data-notification-id="${notification.id}">
+                                                <i class="bi bi-x-lg me-1"></i>Отклонить изменения
+                                            </button>
+                                        </div>
+                                        
                                         <!-- Кнопки принятия/отклонения для других типов запросов -->
-                                        <div th:if="${notification.status.name() == 'PENDING' && notification.type.name() != 'MODERATION'}">
+                                        <div th:if="${notification.status.name() == 'PENDING' && notification.type.name() != 'MODERATION' && notification.type.name() != 'FAMILY_TREE_MODERATION'}">
                                             <button class="btn btn-sm btn-outline-success mark-accept" 
                                                     th:data-id="${notification.id}">
                                                 <i class="bi bi-check-lg me-1"></i>Одобрить
@@ -602,8 +618,8 @@
                                     </div>
                                 </div>
                                 
-                                <!-- Кнопка для отметки как прочитанное -->
-                                <div class="flex-shrink-0 ms-2">
+                                <!-- Кнопки управления уведомлением -->
+                                <div class="flex-shrink-0 ms-2 d-flex gap-1">
                                     <button th:if="${!notification.read}" 
                                             class="btn btn-sm btn-action btn-outline-secondary mark-read"
                                             th:data-id="${notification.id}" 
@@ -614,6 +630,13 @@
                                             class="btn btn-sm btn-action btn-outline-secondary" 
                                             disabled title="Прочитано">
                                         <i class="bi bi-check"></i>
+                                    </button>
+                                    <!-- Кнопка удаления уведомления -->
+                                    <button class="btn btn-sm btn-action btn-outline-danger delete-notification"
+                                            th:data-id="${notification.id}"
+                                            th:data-title="${notification.title}"
+                                            title="Удалить уведомление">
+                                        <i class="bi bi-trash"></i>
                                     </button>
                                 </div>
                             </div>
@@ -626,13 +649,53 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <span class="text-muted" 
-                                  th:text="${notificationList != null && !notificationList.isEmpty() ? 
-                                           'Показано ' + notificationList.size() + ' из ' + notificationList.size() : 
+                                  th:text="${notifications != null ? 
+                                           'Показано ' + (notifications.number * notifications.size + 1) + '-' + 
+                                           (notifications.number * notifications.size + notifications.numberOfElements) + 
+                                           ' из ' + notifications.totalElements : 
                                            'Уведомлений нет'}">
-                                Показано 0 из 0
+                                Показано 1-50 из 142
                             </span>
                         </div>
-                        <!-- Если будет добавлена пагинация в будущем, то здесь будет соответствующий код -->
+                        
+                        <!-- Пагинация -->
+                        <nav th:if="${notifications != null && notifications.totalPages > 1}">
+                            <ul class="pagination pagination-sm mb-0">
+                                <!-- Предыдущая страница -->
+                                <li class="page-item" th:classappend="${!notifications.hasPrevious() ? 'disabled' : ''}">
+                                    <a class="page-link" 
+                                       th:href="@{/admin/notifications(page=${notifications.number - 1}, size=${notifications.size}, search=${param.search}, status=${param.status}, type=${param.type})}"
+                                       th:if="${notifications.hasPrevious()}">
+                                        <i class="bi bi-chevron-left"></i>
+                                    </a>
+                                    <span class="page-link" th:unless="${notifications.hasPrevious()}">
+                                        <i class="bi bi-chevron-left"></i>
+                                    </span>
+                                </li>
+                                
+                                <!-- Номера страниц -->
+                                <li class="page-item" 
+                                    th:each="pageNum : ${#numbers.sequence(0, notifications.totalPages - 1)}"
+                                    th:if="${pageNum >= notifications.number - 2 && pageNum <= notifications.number + 2}"
+                                    th:classappend="${pageNum == notifications.number ? 'active' : ''}">
+                                    <a class="page-link" 
+                                       th:href="@{/admin/notifications(page=${pageNum}, size=${notifications.size}, search=${param.search}, status=${param.status}, type=${param.type})}"
+                                       th:text="${pageNum + 1}">1</a>
+                                </li>
+                                
+                                <!-- Следующая страница -->
+                                <li class="page-item" th:classappend="${!notifications.hasNext() ? 'disabled' : ''}">
+                                    <a class="page-link" 
+                                       th:href="@{/admin/notifications(page=${notifications.number + 1}, size=${notifications.size}, search=${param.search}, status=${param.status}, type=${param.type})}"
+                                       th:if="${notifications.hasNext()}">
+                                        <i class="bi bi-chevron-right"></i>
+                                    </a>
+                                    <span class="page-link" th:unless="${notifications.hasNext()}">
+                                        <i class="bi bi-chevron-right"></i>
+                                    </span>
+                                </li>
+                            </ul>
+                        </nav>
                     </div>
                 </div>
             </div>
@@ -700,6 +763,52 @@
                 });
             });
         }
+        
+        // Обработчик для кнопок удаления отдельных уведомлений
+        const deleteNotificationButtons = document.querySelectorAll('.delete-notification');
+        deleteNotificationButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const notificationId = this.getAttribute('data-id');
+                const notificationTitle = this.getAttribute('data-title');
+                
+                if (!confirm(`Вы уверены, что хотите удалить уведомление "${notificationTitle}"?`)) {
+                    return;
+                }
+                
+                // Блокируем кнопку во время выполнения запроса
+                this.disabled = true;
+                const originalContent = this.innerHTML;
+                this.innerHTML = '<i class="bi bi-hourglass"></i>';
+                
+                fetch(`/admin/notifications/${notificationId}/delete`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Уведомление успешно удалено');
+                        // Удаляем элемент из DOM или перезагружаем страницу
+                        window.location.reload();
+                    } else {
+                        alert('Ошибка при удалении уведомления: ' + (data.message || 'Неизвестная ошибка'));
+                        // Восстанавливаем кнопку
+                        this.disabled = false;
+                        this.innerHTML = originalContent;
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                    alert('Произошла ошибка при удалении уведомления');
+                    // Восстанавливаем кнопку
+                    this.disabled = false;
+                    this.innerHTML = originalContent;
+                });
+            });
+        });
         
         // Обработчик для кнопок ответа на технические уведомления
         const respondTechnicalButtons = document.querySelectorAll('.respond-technical');
@@ -827,6 +936,160 @@
                 .catch(error => {
                     console.error('Ошибка:', error);
                     alert('Произошла ошибка при отклонении жалобы');
+                });
+            });
+        });
+        
+        // Обработчики для кнопок одобрения семейных деревьев
+        const approveFamilyTreeButtons = document.querySelectorAll('.approve-family-tree');
+        approveFamilyTreeButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const treeId = this.getAttribute('data-tree-id');
+                const treeName = this.getAttribute('data-tree-name');
+                
+                if (!confirm(`Вы действительно хотите одобрить семейное дерево "${treeName}"?`)) {
+                    return;
+                }
+                
+                fetch(`/admin/family-trees/${treeId}/approve`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        window.location.reload();
+                    } else {
+                        alert(data.message || 'Ошибка при одобрении дерева');
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                    alert('Произошла ошибка при одобрении дерева');
+                });
+            });
+        });
+        
+        // Обработчики для кнопок отклонения семейных деревьев
+        const rejectFamilyTreeButtons = document.querySelectorAll('.reject-family-tree');
+        rejectFamilyTreeButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const treeId = this.getAttribute('data-tree-id');
+                const treeName = this.getAttribute('data-tree-name');
+                
+                const reason = prompt(`Укажите причину отклонения дерева "${treeName}":`, '');
+                if (reason === null) {
+                    return; // Пользователь отменил
+                }
+                
+                if (reason.trim() === '') {
+                    alert('Необходимо указать причину отклонения');
+                    return;
+                }
+                
+                fetch(`/admin/family-trees/${treeId}/reject`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({ reason: reason.trim() })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        window.location.reload();
+                    } else {
+                        alert(data.message || 'Ошибка при отклонении дерева');
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                    alert('Произошла ошибка при отклонении дерева');
+                });
+            });
+        });
+
+        // Обработчики для кнопок одобрения изменений семейных деревьев
+        const approveTreeChangesButtons = document.querySelectorAll('.approve-tree-changes');
+        approveTreeChangesButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const treeId = this.getAttribute('data-tree-id');
+                const treeName = this.getAttribute('data-tree-name');
+                const notificationId = this.getAttribute('data-notification-id');
+                
+                if (!confirm(`Вы действительно хотите одобрить изменения в семейном дереве "${treeName}"?`)) {
+                    return;
+                }
+                
+                fetch(`/admin/family-trees/${treeId}/approve-changes`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        window.location.reload();
+                    } else {
+                        alert(data.message || 'Ошибка при одобрении изменений');
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                    alert('Произошла ошибка при одобрении изменений');
+                });
+            });
+        });
+
+        // Обработчики для кнопок отклонения изменений семейных деревьев
+        const rejectTreeChangesButtons = document.querySelectorAll('.reject-tree-changes');
+        rejectTreeChangesButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const treeId = this.getAttribute('data-tree-id');
+                const treeName = this.getAttribute('data-tree-name');
+                const notificationId = this.getAttribute('data-notification-id');
+                
+                const reason = prompt(`Укажите причину отклонения изменений в дереве "${treeName}":`, '');
+                if (reason === null) {
+                    return; // Пользователь отменил
+                }
+                
+                if (reason.trim() === '') {
+                    alert('Необходимо указать причину отклонения');
+                    return;
+                }
+                
+                const formData = new FormData();
+                formData.append('reason', reason.trim());
+                
+                fetch(`/admin/family-trees/${treeId}/reject-changes`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        window.location.reload();
+                    } else {
+                        alert(data.message || 'Ошибка при отклонении изменений');
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                    alert('Произошла ошибка при отклонении изменений');
                 });
             });
         });

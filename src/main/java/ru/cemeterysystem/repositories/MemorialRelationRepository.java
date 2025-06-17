@@ -21,4 +21,12 @@ public interface MemorialRelationRepository extends JpaRepository<MemorialRelati
     
     boolean existsByFamilyTreeIdAndSourceMemorialIdAndTargetMemorialId(
         Long familyTreeId, Long sourceMemorialId, Long targetMemorialId);
+    
+    // Проверяем, есть ли мемориал в каком-либо дереве
+    @Query("SELECT DISTINCT mr.familyTree.id FROM MemorialRelation mr WHERE mr.sourceMemorial.id = ?1 OR mr.targetMemorial.id = ?1")
+    List<Long> findFamilyTreeIdsByMemorialId(Long memorialId);
+    
+    // Проверяем, есть ли мемориал в конкретном дереве
+    @Query("SELECT COUNT(mr) > 0 FROM MemorialRelation mr WHERE (mr.sourceMemorial.id = ?1 OR mr.targetMemorial.id = ?1) AND mr.familyTree.id = ?2")
+    boolean existsByMemorialIdAndFamilyTreeId(Long memorialId, Long familyTreeId);
 } 
